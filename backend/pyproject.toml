@@ -1,0 +1,79 @@
+[project]
+name = "dioptra-backend"
+version = "0.1.0"
+description = "Dioptra — white-box analysis platform backend"
+requires-python = ">=3.13"
+license = { text = "Apache-2.0" }
+
+# Every dependency MUST carry a free license (CLAUDE.md → Hard Rules).
+# The license is stated here and re-verified in CI by scripts/license_gate.py.
+dependencies = [
+    "fastapi",          # MIT      — HTTP framework
+    "uvicorn[standard]", # BSD-3   — ASGI server
+    "sqlalchemy",       # MIT      — ORM / core
+    "alembic",          # MIT      — schema migrations
+    "psycopg[binary]",  # LGPL-3.0 — PostgreSQL driver
+    "pydantic",         # MIT      — request/response models
+    "pydantic-settings", # MIT     — env-driven settings
+    "argon2-cffi",      # MIT      — Argon2id password hashing (ASVS V2.4)
+    "pyjwt",            # MIT      — JWT encode/decode
+]
+
+[dependency-groups]
+dev = [
+    "pytest",           # MIT
+    "pytest-cov",       # MIT
+    "httpx2",           # BSD-3 — ASGI transport required by starlette's TestClient
+    "ruff",             # MIT
+    "mypy",             # MIT
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["."]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "B",        # bugbear
+    "UP",       # pyupgrade
+    "S",        # bandit — we audit others, we audit ourselves
+    "ASYNC",    # async correctness
+    "C4", "SIM", "RET", "ARG", "PTH", "N", "ANN",
+]
+ignore = [
+    "ANN401",   # typing.Any is occasionally the honest annotation
+    "N818",     # domain errors read as outcomes (AccountLocked); the base class is AppError
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "ANN201", "ARG001"]  # asserts and fixture creds are the point
+"alembic/**" = ["ANN", "ARG", "N"]                          # generated revision shape
+"app/db/types.py" = ["ARG002"]                              # TypeDecorator fixes the signature
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_unreachable = true
+disallow_any_generics = true
+plugins = []
+exclude = ["alembic/versions/"]
+
+[[tool.mypy.overrides]]
+module = ["alembic.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+filterwarnings = ["error"]

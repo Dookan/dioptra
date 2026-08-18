@@ -1,0 +1,665 @@
+<title>Dioptra UI</title>
+<style>
+  :root {
+    --ground: #FAFAF7;
+    --s1: #FFFFFF;
+    --s2: #F1F4F1;
+    --s3: #E7EDE8;
+    --line: #E3E7E2;
+    --line-strong: #C9D2CB;
+    --ink: #1C2420;
+    --t2: #5C6B62;
+    --t3: #93A096;
+    --acc: #1F5E3C;
+    --acc-soft: rgba(31, 94, 60, 0.10);
+    --acc-ring: rgba(31, 94, 60, 0.16);
+    --err: #B3261E;   --err-bg: rgba(179, 38, 30, 0.10);
+    --warn: #96660A;  --warn-bg: rgba(150, 102, 10, 0.12);
+    --ok: #1F5E3C;    --ok-bg: rgba(31, 94, 60, 0.12);
+    --info: #2F6DB3;  --info-bg: rgba(47, 109, 179, 0.10);
+    --chrome: #1C2420;
+    --chrome-text: #E8EDE9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #121714; --s1: #1A211C; --s2: #202923; --s3: #27332B;
+      --line: #2A332D; --line-strong: #3A4740;
+      --ink: #E8EDE9; --t2: #9AA89F; --t3: #66756B;
+      --acc: #7CC79A; --acc-soft: rgba(124,199,154,0.12); --acc-ring: rgba(124,199,154,0.18);
+      --err: #F2867F; --err-bg: rgba(242,134,127,0.12);
+      --warn: #E0A94E; --warn-bg: rgba(224,169,78,0.12);
+      --ok: #7CC79A; --ok-bg: rgba(124,199,154,0.12);
+      --info: #85B4E8; --info-bg: rgba(133,180,232,0.12);
+      --chrome: #0C100E; --chrome-text: #E8EDE9;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #121714; --s1: #1A211C; --s2: #202923; --s3: #27332B;
+    --line: #2A332D; --line-strong: #3A4740;
+    --ink: #E8EDE9; --t2: #9AA89F; --t3: #66756B;
+    --acc: #7CC79A; --acc-soft: rgba(124,199,154,0.12); --acc-ring: rgba(124,199,154,0.18);
+    --err: #F2867F; --err-bg: rgba(242,134,127,0.12);
+    --warn: #E0A94E; --warn-bg: rgba(224,169,78,0.12);
+    --ok: #7CC79A; --ok-bg: rgba(124,199,154,0.12);
+    --info: #85B4E8; --info-bg: rgba(133,180,232,0.12);
+    --chrome: #0C100E; --chrome-text: #E8EDE9;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--ground); color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.6; margin: 0; padding: 0 1.25rem; }
+  .page { max-width: 68rem; margin: 0 auto; padding: 3.5rem 0 5rem; }
+  header.doc { border-bottom: 2px solid var(--acc); padding-bottom: 1.4rem; margin-bottom: 2.75rem; }
+  .eyebrow { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--acc); font-weight: 600; margin: 0 0 0.7rem; }
+  h1 { font-family: Georgia, "Times New Roman", serif; font-size: clamp(1.8rem, 4vw, 2.4rem); margin: 0 0 0.6rem; line-height: 1.15; }
+  .lede { color: var(--t2); max-width: 62ch; margin: 0; }
+  .shot { margin: 0 0 3.5rem; }
+  .shot-head { display: flex; gap: 0.9rem; align-items: baseline; margin-bottom: 1rem; }
+  .shot-num { font-family: ui-monospace, Menlo, monospace; color: var(--acc); font-weight: 600; font-size: 0.85rem; }
+  .shot-head h2 { font-family: Georgia, serif; font-size: 1.3rem; margin: 0 0 0.2rem; }
+  .shot-head p { margin: 0; color: var(--t2); font-size: 0.92rem; max-width: 64ch; }
+
+  .frame { border: 1px solid var(--line); border-radius: 14px; overflow-x: auto; background: var(--ground); box-shadow: 0 8px 28px rgba(0,0,0,0.07); }
+  .screen { min-width: 940px; font-size: 13.5px; line-height: 1.5; }
+
+  .appbar { display: flex; align-items: center; gap: 16px; background: var(--chrome); color: var(--chrome-text); padding: 10px 16px; }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 650; }
+  .brandmark { width: 22px; height: 22px; border-radius: 7px; background: var(--acc); color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  :root[data-theme="dark"] .brandmark { color: #121714; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .brandmark { color: #121714; } }
+  .appbar .right { margin-left: auto; display: flex; align-items: center; gap: 12px; font-size: 12.5px; opacity: 0.95; }
+  .avatar { width: 26px; height: 26px; border-radius: 50%; background: var(--acc-soft); color: var(--acc); font-size: 10.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--acc); }
+  .appbar .avatar { background: rgba(255,255,255,0.12); color: var(--chrome-text); border-color: rgba(255,255,255,0.3); }
+
+  .tabsbar { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: var(--s1); border-bottom: 1px solid var(--line); }
+  .ptab { border: 1px solid transparent; border-radius: 999px; padding: 5px 15px; color: var(--t2); font-weight: 500; }
+  .ptab.on { background: var(--acc-soft); border-color: var(--acc); color: var(--acc); font-weight: 650; }
+  .tabsbar .right { margin-left: auto; color: var(--t3); font-size: 12px; }
+
+  .content { padding: 20px; background: var(--ground); }
+  .pagehead { margin-bottom: 16px; }
+  .pagehead h3 { margin: 0; font-size: 19px; }
+  .pagehead .sub { color: var(--t2); font-size: 13px; margin-top: 2px; max-width: 70ch; }
+
+  .nextstep { display: flex; align-items: center; gap: 14px; background: var(--acc-soft); border: 1px solid var(--acc); border-radius: 12px; padding: 13px 16px; margin-bottom: 18px; }
+  .nextstep .txt b { font-size: 13.5px; }
+  .nextstep .txt div { color: var(--t2); font-size: 12.5px; }
+  .nextstep .btn { margin-left: auto; white-space: nowrap; }
+
+  .btn { display: inline-block; border-radius: 9px; padding: 7px 16px; font-weight: 600; font-size: 13px; border: 1px solid var(--line-strong); background: var(--s2); color: var(--ink); }
+  .btn.primary { background: var(--acc); border-color: var(--acc); color: #fff; }
+  :root[data-theme="dark"] .btn.primary { color: #121714; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.primary { color: #121714; } }
+  .btn.ghost { background: transparent; color: var(--t2); }
+  .btn.danger { background: transparent; border-color: var(--err); color: var(--err); }
+
+  .badge { display: inline-block; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 650; border-radius: 5px; padding: 2px 8px; border: 1px solid; }
+  .badge.err  { color: var(--err);  background: var(--err-bg);  border-color: var(--err); }
+  .badge.warn { color: var(--warn); background: var(--warn-bg); border-color: var(--warn); }
+  .badge.ok   { color: var(--ok);   background: var(--ok-bg);   border-color: var(--ok); }
+  .badge.info { color: var(--info); background: var(--info-bg); border-color: var(--info); }
+  .chip { display: inline-block; font-family: ui-monospace, Menlo, monospace; font-size: 11px; border-radius: 5px; padding: 2px 8px; background: var(--acc-soft); color: var(--acc); }
+  .mono { font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; color: var(--t2); }
+  .hint { color: var(--t3); font-size: 12px; margin-top: 6px; }
+
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .card { background: var(--s1); border: 1px solid var(--line); border-radius: 12px; padding: 15px; }
+  .card h4 { margin: 0 0 3px; font-size: 14.5px; }
+  .card .meta { color: var(--t2); font-size: 12px; margin-top: 8px; }
+  .card .row { display: flex; gap: 7px; align-items: center; flex-wrap: wrap; margin-top: 9px; }
+  .card.sel { border-color: var(--acc); box-shadow: 0 0 0 3px var(--acc-ring); }
+
+  .progress { margin-top: 10px; }
+  .progress .plabel { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--t2); margin-bottom: 3px; }
+  .pbar { height: 7px; border-radius: 4px; background: var(--s3); overflow: hidden; }
+  .pfill { height: 100%; border-radius: 4px; background: var(--acc); }
+  .pfill.low { background: var(--err); }
+
+  .cols { display: grid; grid-template-columns: 330px 1fr; gap: 16px; align-items: start; }
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  .panel { background: var(--s1); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .panel h4 { margin: 0 0 4px; font-size: 15px; }
+  .panel h5 { margin: 14px 0 4px; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--acc); }
+  .panel .desc { color: var(--t2); font-size: 13px; margin: 0; }
+  .codeblock { background: var(--s2); border: 1px solid var(--line); border-radius: 9px; padding: 11px 13px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; margin: 10px 0; overflow-x: auto; white-space: pre; line-height: 1.6; }
+  .codeblock .ln { color: var(--t3); margin-right: 12px; }
+  .codeblock .hl { color: var(--err); font-weight: 600; }
+  .codeblock .cm { color: var(--t3); font-style: italic; }
+  .codeblock .kw { color: var(--acc); font-weight: 600; }
+  .panel ul { margin: 6px 0 0; padding-left: 1.25rem; color: var(--t2); font-size: 13px; }
+  .panel li { margin-bottom: 4px; }
+  .actions { display: flex; gap: 10px; margin-top: 14px; align-items: center; }
+
+  .steps { display: flex; align-items: flex-start; background: var(--s1); border: 1px solid var(--line); border-radius: 12px; padding: 13px 16px 11px; margin-bottom: 18px; gap: 4px; }
+  .stp { flex: 1; text-align: center; position: relative; font-size: 11px; color: var(--t3); }
+  .stp .dot { width: 22px; height: 22px; border-radius: 50%; margin: 0 auto 4px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; border: 1.5px solid var(--line-strong); color: var(--t3); background: var(--s2); }
+  .stp.done { color: var(--t2); }
+  .stp.done .dot { background: var(--acc); border-color: var(--acc); color: #fff; }
+  :root[data-theme="dark"] .stp.done .dot { color: #121714; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .stp.done .dot { color: #121714; } }
+  .stp.now { color: var(--ink); font-weight: 650; }
+  .stp.now .dot { border-color: var(--acc); color: var(--acc); background: var(--acc-soft); box-shadow: 0 0 0 3px var(--acc-ring); }
+
+  .rowline { display: flex; align-items: center; gap: 12px; background: var(--s1); border: 1px solid var(--line); border-radius: 10px; padding: 11px 14px; }
+  .rowline + .rowline { margin-top: 8px; }
+  .rowline .grow { flex: 1; }
+  .rowline b { font-size: 13.5px; }
+  .rowline .sub { color: var(--t2); font-size: 12px; }
+  .prio { width: 26px; height: 26px; border-radius: 8px; background: var(--acc-soft); color: var(--acc); font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+
+  .radios { display: flex; gap: 8px; flex-wrap: wrap; }
+  .radio { border: 1px solid var(--line-strong); border-radius: 999px; padding: 4px 13px; font-size: 12.5px; color: var(--t2); }
+  .radio.on { border-color: var(--acc); background: var(--acc-soft); color: var(--acc); font-weight: 650; }
+
+  .drop { border: 1.5px dashed var(--line-strong); border-radius: 12px; padding: 26px; text-align: center; color: var(--t2); background: var(--s1); }
+  .drop.on { border-color: var(--acc); background: var(--acc-soft); }
+  .drop b { color: var(--ink); }
+
+  .checkline { display: flex; align-items: center; gap: 9px; font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+  .checkline:last-child { border-bottom: none; }
+  .ck { width: 17px; height: 17px; border-radius: 50%; font-size: 10px; display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid var(--line-strong); color: var(--t3); flex: 0 0 auto; }
+  .ck.done { background: var(--acc); border-color: var(--acc); color: #fff; }
+  :root[data-theme="dark"] .ck.done { color: #121714; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ck.done { color: #121714; } }
+  .ck.err { border-color: var(--err); color: var(--err); }
+
+  .statusbar { display: flex; align-items: center; background: var(--s1); border-top: 1px solid var(--line); color: var(--t2); font-size: 11.5px; padding: 6px 16px; gap: 12px; }
+  .statusbar .mid { flex: 1; text-align: center; }
+  .statusbar .z { display: flex; align-items: center; gap: 7px; }
+
+  .login-wrap { display: flex; align-items: center; justify-content: center; padding: 60px 0; background: var(--ground); }
+  .login { width: 360px; background: var(--s1); border: 1px solid var(--line); border-radius: 14px; padding: 28px; }
+  .login .brandrow { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .login .brandmark { width: 32px; height: 32px; font-size: 13px; border-radius: 9px; }
+  .login h4 { margin: 0; font-size: 17px; }
+  .login .sub { color: var(--t2); font-size: 12.5px; margin: 4px 0 20px; }
+  .field { margin-bottom: 13px; }
+  .field label { display: block; font-size: 12px; font-weight: 600; color: var(--t2); margin-bottom: 4px; }
+  .input { border: 1px solid var(--line-strong); border-radius: 9px; background: var(--ground); padding: 8px 11px; font-size: 13.5px; color: var(--ink); }
+  .input.focus { border-color: var(--acc); box-shadow: 0 0 0 3px var(--acc-ring); }
+  .login .btn.primary { width: 100%; text-align: center; margin-top: 4px; padding: 9px; }
+  .login .foot { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; color: var(--t3); font-size: 11.5px; }
+  .lang { display: flex; gap: 4px; }
+  .lang span { border: 1px solid var(--line-strong); border-radius: 5px; padding: 1px 8px; }
+  .lang .on { background: var(--acc); border-color: var(--acc); color: #fff; font-weight: 600; }
+  :root[data-theme="dark"] .lang .on { color: #121714; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .lang .on { color: #121714; } }
+
+  .dg-err { stroke: var(--err); }
+  .repout { background: var(--s2); border: 1px solid var(--line); border-radius: 9px; padding: 14px 16px; font-size: 12px; }
+  .repout .rtitle { font-family: Georgia, serif; font-weight: 700; font-size: 13.5px; text-align: center; margin-bottom: 8px; }
+  .repout .rline { border-top: 1px solid var(--line-strong); margin: 8px 0; }
+  .note { background: var(--acc-soft); border-left: 3px solid var(--acc); border-radius: 0 6px 6px 0; padding: 0.8rem 1rem; font-size: 0.92rem; margin: 2.5rem 0 0; max-width: 70ch; }
+</style>
+
+<div class="page">
+<header class="doc">
+  <p class="eyebrow">Mockups · Agosto 2026</p>
+  <h1>Dioptra UI</h1>
+  <p class="lede">El recorrido completo del sistema en diez pantallas, con un principio rector: en cada momento el usuario sabe dónde está, qué le falta y cuál es el siguiente paso — la barra de progreso del workflow siempre visible, un banner de "siguiente paso" en cada pantalla y lenguaje llano en lugar de jerga. Paleta verde institucional, tema claro y oscuro.</p>
+</header>
+
+<!-- 01 LOGIN -->
+<section class="shot">
+  <div class="shot-head"><span class="shot-num">01</span>
+    <div><h2>Inicio de sesión</h2>
+    <p>Simple y sin ruido. Las cuentas las crea un administrador; el idioma y el tema se pueden cambiar desde aquí mismo.</p></div>
+  </div>
+  <div class="frame"><div class="screen">
+    <div class="login-wrap">
+      <div class="login">
+        <div class="brandrow"><div class="brandmark">DP</div><h4>Dioptra</h4></div>
+        <p class="sub">Hola de nuevo. Inicia sesión para continuar con tus análisis.</p>
+        <div class="field"><label>Usuario o correo</label><div class="input">mmarin</div></div>
+        <div class="field"><label>Contraseña</label><div class="input focus">••••••••••••</div></div>
+        <span class="btn primary">Entrar</span>
+        <p class="hint">¿No tienes cuenta? Pídele acceso a tu administrador.</p>
+        <div class="foot">
+          <div class="lang"><span class="on">ES</span><span>EN</span></div>
+          <span>◐ Cambiar tema</span>
+          <span class="mono">v0.1.0</span>
+        </div>
+      </div>
+    </div>
+  </div></div>
+</section>
+
+<!-- 02 INICIO -->
+<section class="shot">
+  <div class="shot-head"><span class="shot-num">02</span>
+    <div><h2>Inicio</h2>
+    <p>Saludo, un banner que retoma exactamente donde quedaste, y cada proyecto con su barra de avance en lenguaje claro ("Paso 3 de 8 · Análisis"), no con códigos.</p></div>
+  </div>
+  <div class="frame"><div class="screen">
+    <div class="appbar">
+      <div class="brand"><div class="brandmark">DP</div>Dioptra</div>
+      <div class="right"><span>ES</span><span>◐</span><span class="avatar">MM</span><span>mmarin</span></div>
+    </div>
+    <div class="tabsbar">
+      <span class="ptab on">Inicio</span><span class="ptab">Hallazgos</span><span class="ptab">Workflow</span><span class="ptab">Reporte</span><span class="ptab">Bitácora</span>
+      <span class="right">Analista</span>
+    </div>
+    <div class="content">
+      <div class="pagehead"><h3>Hola, mmarin 👋</h3><div class="sub">Tienes 3 proyectos activos y 5 hallazgos esperando tu revisión.</div></div>
+      <div class="nextstep">
+        <div class="txt"><b>Continúa donde quedaste</b><div>formulario_mincyt_apirest · te faltan 5 hallazgos por revisar para desbloquear la planificación.</div></div>
+        <span class="btn primary">Continuar revisión →</span>
+      </div>
+      <div class="cards">
+        <div class="card sel">
+          <h4>Formulario MINCYT — API</h4>
+          <div class="row"><span class="chip">Express</span><span class="chip">JavaScript</span><span class="badge err">2 hallazgos altos</span></div>
+          <div class="progress"><div class="plabel"><span>Paso 3 de 8 · Análisis y revisión</span><span>38 %</span></div><div class="pbar"><div class="pfill" style="width:38%"></div></div></div>
+          <div class="meta">Actualizado hace 2 horas por mmarin</div>
+        </div>
+        <div class="card">
+          <h4>Formulario MINCYT — Frontend</h4>
+          <div class="row"><span class="chip">React</span><span class="chip">TypeScript</span><span class="badge warn">1 hallazgo alto</span></div>
+          <div class="progress"><div class="plabel"><span>Paso 5 de 8 · Diseño de casos</span><span>62 %</span></div><div class="pbar"><div class="pfill" style="width:62%"></div></div></div>
+          <div class="meta">cperez está escribiendo el pseudocódigo</div>
+        </div>
+        <div class="card">
+          <h4>Sistema de Nómina</h4>
+          <div class="row"><span class="chip">Laravel</span><span class="chip">PHP</span><span class="badge ok">Completado</span></div>
+          <div class="progress"><div class="plabel"><span>Paso 8 de 8 · Reporte entregado</span><span>100 %</span></div><div class="pbar"><div class="pfill" style="width:100%"></div></div></div>
+          <div class="meta">Cobertura final 84 % · reporte firmado el 12-08</div>
+        </div>
+      </div>
+      <p class="hint" style="margin-top:14px">＋ ¿Nuevo sistema para auditar? <b style="color:var(--acc)">Crear análisis</b> — solo necesitas el código (ZIP o URL de git).</p>
+    </div>
+    <div class="statusbar"><div class="z"><span class="avatar" style="width:20px;height:20px;font-size:9px">MM</span> mmarin · Analista</div><div class="mid">Todo al día · último análisis 14:31</div><div class="z"><span class="mono">v0.1.0</span></div></div>
+  </div></div>
+</section>
+
+<!-- 03 NUEVO ANALISIS -->
+<section class="shot">
+  <div class="shot-head"><span class="shot-num">03</span>
+    <div><h2>Nuevo análisis (E1–E2)</h2>
+    <p>Un solo formulario amable: datos del sistema y el código. El sistema detecta solo el lenguaje y el framework; se explica qué va a pasar con el código antes de empezar.</p></div>
+  </div>
+  <div class="frame"><div class="screen">
+    <div class="appbar">
+      <div class="brand"><div class="brandmark">DP</div>Dioptra</div>
+      <div class="right"><span>ES</span><span>◐</span><span class="avatar">MM</span><span>mmarin</span></div>
+    </div>
+    <div class="tabsbar"><span class="ptab on">Inicio</span><span class="ptab">Hallazgos</span><span class="ptab">Workflow</span><span class="ptab">Reporte</span><span class="ptab">Bitácora</span></div>
+    <div class="content">
+      <div class="pagehead"><h3>Nuevo análisis</h3><div class="sub">Registra el sistema y entrega el código. Del resto se encarga la plataforma.</div></div>
+      <div class="cols" style="grid-template-columns: 1fr 340px;">
+        <div class="panel">
+          <h5>1 · Datos del sistema</h5>
+          <div class="cols" style="grid-template-columns:1fr 1fr; gap:10px;">
+            <div class="field"><label>Nombre del sistema</label><div class="input">Formulario MINCYT — API</div></div>
+            <div class="field"><label>Equipo desarrollador</label><div class="input">Coordinación de Desarrollo</div></div>
+          </div>
+          <h5>2 · El código</h5>
+          <div class="drop on"><b>formulario_mincyt_apirest.zip</b> · 4.2 MB ✓<br><span style="font-size:12px">o pega una URL de repositorio git</span></div>
+          <div class="hint">Detectado automáticamente: <span class="chip">JavaScript 92 %</span> <span class="chip">Express</span> <span class="chip">npm</span></div>
+          <div class="actions"><span class="btn primary">Comenzar análisis →</span><span class="hint" style="margin:0">Tarda entre 1 y 5 minutos según el tamaño.</span></div>
+        </div>
+        <div class="panel">
+          <h4>¿Qué haremos con el código?</h4>
+          <ul>
+            <li><b>Seguridad:</b> buscamos vulnerabilidades y las clasificamos con el estándar OWASP.</li>
+            <li><b>Dependencias:</b> revisamos si alguna librería tiene vulnerabilidades conocidas (CVE).</li>
+            <li><b>Secretos:</b> detectamos contraseñas o claves olvidadas en el código.</li>
+            <li><b>Salud del código:</b> medimos qué funciones son las más complejas y riesgosas.</li>
+          </ul>
+          <p class="hint">El código nunca sale del servidor y solo se ejecuta en un entorno aislado sin red.</p>
+        </div>
+      </div>
+    </div>
+    <div class="statusbar"><div class="z"><span class="avatar" style="width:20px;height:20px;font-size:9px">MM</span> mmarin · Analista</div><div class="mid">Paso 1 de 8 · Registro</div><div class="z"><span class="mono">v0.1.0</span></div></div>
+  </div></div>
+</section>
+
+<!-- 04 HALLAZGOS -->
+<section class="shot">
+  <div class="shot-head"><span class="shot-num">04</span>
+    <div><h2>Hallazgos y revisión (E3)</h2>
+    <p>El detalle responde tres preguntas en lenguaje llano: qué se encontró, por qué importa y cómo corregirlo. Los botones dicen lo que hacen; descartar exige explicar por qué.</p></div>
+  </div>
+  <div class="frame"><div class="screen">
+    <div class="appbar">
+      <div class="brand"><div class="brandmark">DP</div>Dioptra</div>
+      <div class="right"><span>ES</span><span>◐</span><span class="avatar">MM</span><span>mmarin</span></div>
+    </div>
+    <div class="tabsbar"><span class="ptab">Inicio</span><span class="ptab on">Hallazgos</span><span class="ptab">Workflow</span><span class="ptab">Reporte</span><span class="ptab">Bitácora</span><span class="right">Formulario MINCYT — API</span></div>
+    <div class="content">
+      <div class="nextstep">
+        <div class="txt"><b>Te faltan 5 hallazgos por revisar</b><div>Cuando termines se desbloquea el siguiente paso: planificar las pruebas.</div></div>
+        <div class="progress" style="width:180px;margin:0"><div class="plabel"><span>1 de 6</span></div><div class="pbar"><div class="pfill" style="width:17%"></div></div></div>
+      </div>
+      <div class="cols">
+        <div class="list">
+          <div class="card sel">
+            <div class="row" style="margin-top:0"><span class="badge err">Alta</span><span class="badge ok">Revisado</span></div>
+            <h4 style="margin-top:7px">Contraseña olvidada en el código</h4>
+            <div class="mono">.gitlab-ci.yml · línea 73</div>
+          </div>
+          <div class="card">
+            <div class="row" style="margin-top:0"><span class="badge err">Alta</span></div>
+            <h4 style="margin-top:7px">Clave de API expuesta</h4>
+            <div class="mono">.gitlab-ci.yml · línea 73</div>
+          </div>
+          <div class="card">
+            <div class="row" style="margin-top:0"><span class="badge warn">Media</span></div>
+            <h4 style="margin-top:7px">Datos del usuario sin filtrar</h4>
+            <div class="mono">index.js · línea 279</div>
+          </div>
+          <div class="card">
+            <div class="row" style="margin-top:0"><span class="badge warn">Media</span></div>
+            <h4 style="margin-top:7px">Librería cargada desde internet (CDN)</h4>
+            <div class="mono">views/form.html · línea 12</div>
+          </div>
+        </div>
+        <div class="panel">
+          <div style="display:flex;gap:9px;align-items:center;margin-bottom:6px">
+            <h4 style="margin:0">Contraseña olvidada en el código</h4>
+            <span class="badge err">Alta</span><span class="chip">CWE-798 · OWASP A07</span>
+          </div>
+          <h5>¿Qué encontramos?</h5>
+          <p class="desc">Hay un secreto escrito directamente en la configuración. Cualquier persona con acceso al repositorio — o a su historial — puede leerlo.</p>
+          <div class="codeblock"><span class="ln">72</span>  deploy_production:
+<span class="ln">73</span>    <span class="hl">HMAC_SECRET=b7***a2"</span>  <span class="cm">← el secreto, en texto plano</span>
+<span class="ln">74</span>    script: npm run deploy</div>
+          <h5>¿Cómo corregirlo?</h5>
+          <ul>
+            <li>Cambia el secreto ya — considéralo comprometido.</li>
+            <li>Muévelo a una variable de entorno o gestor de secretos.</li>
+            <li>Verifica que no siga en el historial de git.</li>
+          </ul>
+          <div class="actions">
+            <span class="btn primary">Es real — incluir en el reporte</span>
+            <span class="btn ghost">No aplica (explicar por qué)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="statusbar"><div class="z"><span class="avatar" style="width:20px;height:20px;font-size:9px">MM</span> mmarin · Analista</div><div class="mid">Paso 3 de 8 · Análisis y revisión</div><div class="z"><span class="mono">v0.1.0</span></div></div>
+  </div></div>
+</section>
+
+<!-- 05 PLAN -->
+<section class="shot">
+  <div class="shot-head"><span class="shot-num">05</span>
+    <div><h2>Plan de pruebas (E4)</h2>
+    <p>El sistema ya ordenó qué conviene probar primero y explica por qué con palabras, no con fórmulas. El programador elige la exigencia de cobertura y justifica su plan.</p></div>
+  </div>
+  <div class="frame"><div class="screen">
+    <div class="appbar">
+      <div class="brand"><div class="brandmark">DP</div>Dioptra</div>
+      <div class="right"><span>ES</span><span>◐</span><span class="avatar">CP</span><span>cperez</span></div>
+    </div>
+    <div class="tabsbar"><span class="ptab">Inicio</span><span class="ptab">Hallazgos</span><span class="ptab on">Workflow</span><span class="ptab">Reporte</span><span class="ptab">Bitácora</span><span class="right">Formulario MINCYT — API</span></div>
+    <div class="content">
+      <div class="steps">
+        <span class="stp done"><span class="dot">✓</span>Registro</span><span class="stp done"><span class="dot">✓</span>Código</span><span class="stp done"><span class="dot">✓</span>Análisis</span><span class="stp now"><span class="dot">4</span>Plan</span><span class="stp"><span class="dot">5</span>Diseño</span><span class="stp"><span class="dot">6</span>Tests</span><span class="stp"><span class="dot">7</span>Verificación</span><span class="stp"><span class="dot">8</span>Reporte</span>
+      </div>
+      <div class="pagehead"><h3>¿Qué vamos a probar?</h3><div class="sub">Ordenamos las funciones por riesgo: qué tan compleja es cada una y si tiene hallazgos de seguridad. Elige cuáles entran al plan.</div></div>
+      <div class="rowline">
+        <span class="prio">1</span>
+        <div class="grow"><b>validateForm()</b> · <span class="mono">src/validators.js</span><div class="sub">Muy compleja (12 caminos posibles) y con 1 hallazgo de seguridad — la candidata más urgente.</div></div>
+        <span class="badge err">Riesgo alto</span><span class="btn primary">Incluir</span>
+      </div>
+      <div class="rowline">
+        <span class="prio">2</span>
+        <div class="grow"><b>calculateDiscount()</b> · <span class="mono">src/billing/discount.js</span><div class="sub">Complejidad media (5 caminos) y un hallazgo de validación de entrada.</div></div>
+        <span class="badge warn">Riesgo medio</span><span class="btn primary">Incluir</span>
+      </div>
+      <div class="rowline">
+        <span class="prio">3</span>
+        <div class="grow"><b>formatDate()</b> · <span class="mono">src/utils.js</span><div class="sub">Simple (2 caminos), sin hallazgos. Puede esperar.</div></div>
+        <span class="badge ok">Riesgo bajo</span><span class="btn ghost">Dejar fuera</span>
+      </div>
+      <div class="panel" style="margin-top:16px">
+        <h4>¿Qué tan exigente será la cobertura?</h4>
+        <div class="radios" style="margin-top:8px">
+          <span class="radio">Sentencias — básica</span>
+          <span class="radio on">Decisiones 100 % — recomendada</span>
+          <span class="radio">Caminos — exhaustiva</span>
+        </div>
+        <p class="hint">Con "Decisiones" cada bifurcación del código se prueba en verdadero y en falso. Es el estándar del plan.</p>
+        <div class="actions"><span class="btn primary">Guardar plan y diseñar los casos →</span><span class="hint" style="margin:0">Tu justificación quedará en el reporte.</span></div>
+      </div>
+    </div>
+    <div class="statusbar"><div class="z"><span class="avatar" style="width:20px;height:20px;font-size:9px">CP</span> cperez · Programador</div><div class="mid">Paso 4 de 8 · Plan de pruebas</div><div class="z"><span class="mono">v0.1.0</span></div></div>
+  </div></div>
+</section>
+
+<!-- 06 DISEÑO -->
+<section class="shot">
+  <div class="shot-head"><span class="shot-num">06</span>
+    <div><h2>Diseño de casos (E5)</h2>
+    <p>A la izquierda, el diagrama de flujo de la función y la consigna que el sistema calculó: qué ramas cubrir, qué valores frontera probar. A la derecha, el programador describe sus casos con sus palabras — todavía sin código.</p></div>
+  </div>
+  <div class="frame"><div class="screen">
+    <div class="appbar">
+      <div class="brand"><div class="brandmark">DP</div>Dioptra</div>
+      <div class="right"><span>ES</span><span>◐</span><span class="avatar">CP</span><span>cperez</span></div>
+    </div>
+    <div class="tabsbar"><span class="ptab">Inicio</span><span class="ptab">Hallazgos</span><span class="ptab on">Workflow</span><span class="ptab">Reporte</span><span class="ptab">Bitácora</span><span class="right">Formulario MINCYT — API</span></div>
+    <div class="content">
+      <div class="steps">
+        <span class="stp done"><span class="dot">✓</span>Registro</span><span class="stp done"><span class="dot">✓</span>Código</span><span class="stp done"><span class="dot">✓</span>Análisis</span><span class="stp done"><span class="dot">✓</span>Plan</span><span class="stp now"><span class="dot">5</span>Diseño</span><span class="stp"><span class="dot">6</span>Tests</span><span class="stp"><span class="dot">7</span>Verificación</span><span class="stp"><span class="dot">8</span>Reporte</span>
+      </div>
+      <div class="cols" style="grid-template-columns: 380px 1fr;">
+        <div class="panel">
+          <h4>calculateDiscount()</h4>
+          <div class="mono" style="margin-bottom:8px">src/billing/discount.js · línea 42</div>
+          <svg viewBox="0 0 320 190" width="320" height="190" role="img" aria-label="Diagrama de flujo de calculateDiscount: dos decisiones encadenadas con sus ramas" style="max-width:100%;height:auto">
+            <defs><marker id="fa" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="currentColor"/></marker></defs>
+            <rect x="120" y="6" width="80" height="24" rx="12" fill="none" stroke="currentColor"/><text x="160" y="22" text-anchor="middle" font-size="11" fill="currentColor">inicio</text>
+            <line x1="160" y1="30" x2="160" y2="46" stroke="currentColor" marker-end="url(#fa)"/>
+            <polygon points="160,48 226,74 160,100 94,74" fill="none" stroke="#B3261E" class="dg-err"/><text x="160" y="78" text-anchor="middle" font-size="10.5" fill="currentColor">price ≤ 0</text>
+            <line x1="226" y1="74" x2="286" y2="74" stroke="currentColor" marker-end="url(#fa)"/><text x="252" y="66" font-size="9.5" fill="currentColor">sí</text>
+            <text x="300" y="78" text-anchor="middle" font-size="10.5" fill="currentColor">error</text>
+            <line x1="160" y1="100" x2="160" y2="116" stroke="currentColor" marker-end="url(#fa)"/><text x="170" y="112" font-size="9.5" fill="currentColor">no</text>
+            <polygon points="160,118 234,144 160,170 86,144" fill="none" stroke="currentColor"/><text x="160" y="141" text-anchor="middle" font-size="10.5" fill="currentColor">coupon &amp;&amp;</text><text x="160" y="153" text-anchor="middle" font-size="10.5" fill="currentColor">valid</text>
+            <line x1="234" y1="144" x2="294" y2="144" stroke="currentColor" marker-end="url(#fa)"/><text x="258" y="136" font-size="9.5" fill="currentColor">sí</text>
+            <text x="308" y="148" text-anchor="end" font-size="10.5" fill="currentColor">10 %</text>
+            <line x1="86" y1="144" x2="26" y2="144" stroke="currentColor" marker-end="url(#fa)"/><text x="62" y="136" font-size="9.5" fill="currentColor">no</text>
+            <text x="12" y="148" text-anchor="start" font-size="10.5" fill="currentColor">0 %</text>
+          </svg>
+          <h5>La consigna te pide</h5>
+          <ul>
+            <li>Al menos <b>5 casos</b> (uno por camino).</li>
+            <li>Probar la frontera de <span class="mono">price ≤ 0</span>: con 0, −1 y 0.01.</li>
+            <li>Cupón: nulo, inválido y válido.</li>
+            <li>Un caso con <b>entrada maliciosa</b> (hay un hallazgo de validación).</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h4>Tus casos, con tus palabras</h4>
+          <p class="desc">Describe qué vas a probar y qué esperas que pase. El código viene después.</p>
+          <div class="codeblock">C1 · Si el precio es 0, −1 o 0.01 → la función rechaza con error
+C2 · Cliente premium con precio válido → aplica 10 % de descuento
+C3 · Cupón nulo o inválido → no aplica descuento (0 %)
+C4 · Cupón válido → descuento del cupón sobre el precio
+C5 · Entrada maliciosa "&lt;script&gt;…" en el cupón → rechazada, sin ejecutar nada</div>
+          <div class="actions">
+            <span class="btn primary">Aprobar mis casos y pasar a escribir los tests →</span>
+          </div>
+          <p class="hint">Al aprobar, el sistema te prepara los archivos de test con estos 5 casos ya nombrados.</p>
+        </div>
+      </div>
+    </div>
+    <div class="statusbar"><div class="z"><span class="avatar" style="width:20px;height:20px;font-size:9px">CP</span> cperez · Programador</div><div class="mid">Paso 5 de 8 · Diseño de casos · función 2 de 2</div><div class="z"><span class="mono">v0.1.0</span></div></div>
+  </div></div>
+</section>
+
+<!-- 07 TESTS -->
+<section class="shot">
+  <div class="shot-head"><span class="shot-num">07</span>
+    <div><h2>Escribir los tests (E6)</h2>
+    <p>La lista de la izquierda muestra el avance caso por caso. El sistema preparó el archivo con los nombres de los casos aprobados; las aserciones las escribe el programador.</p></div>
+  </div>
+  <div class="frame"><div class="screen">
+    <div class="appbar">
+      <div class="brand"><div class="brandmark">DP</div>Dioptra</div>
+      <div class="right"><span>ES</span><span>◐</span><span class="avatar">CP</span><span>cperez</span></div>
+    </div>
+    <div class="tabsbar"><span class="ptab">Inicio</span><span class="ptab">Hallazgos</span><span class="ptab on">Workflow</span><span class="ptab">Reporte</span><span class="ptab">Bitácora</span><span class="right">Formulario MINCYT — API</span></div>
+    <div class="content">
+      <div class="steps">
+        <span class="stp done"><span class="dot">✓</span>Registro</span><span class="stp done"><span class="dot">✓</span>Código</span><span class="stp done"><span class="dot">✓</span>Análisis</span><span class="stp done"><span class="dot">✓</span>Plan</span><span class="stp done"><span class="dot">✓</span>Diseño</span><span class="stp now"><span class="dot">6</span>Tests</span><span class="stp"><span class="dot">7</span>Verificación</span><span class="stp"><span class="dot">8</span>Reporte</span>
+      </div>
+      <div class="cols" style="grid-template-columns: 300px 1fr;">
+        <div class="panel">
+          <h4>Tu avance</h4>
+          <div class="checkline"><span class="ck done">✓</span> C1 · precio inválido (frontera)</div>
+          <div class="checkline"><span class="ck done">✓</span> C2 · descuento premium</div>
+          <div class="checkline"><span class="ck now" style="border-color:var(--acc);color:var(--acc)">3</span> C3 · cupón nulo o inválido</div>
+          <div class="checkline"><span class="ck">4</span> C4 · cupón válido</div>
+          <div class="checkline"><span class="ck">5</span> C5 · entrada maliciosa</div>
+          <div class="progress"><div class="plabel"><span>2 de 5 casos listos</span><span>40 %</span></div><div class="pbar"><div class="pfill" style="width:40%"></div></div></div>
+          <p class="hint">Cuando termines los 5, podrás ejecutarlos en el entorno seguro.</p>
+        </div>
+        <div class="panel">
+          <h4>discount.test.js</h4>
+          <div class="codeblock"><span class="kw">test</span>('C3 · cupón nulo o inválido no aplica descuento', () => {
+  <span class="cm">// Tu turno: según tu caso C3 —</span>
+  <span class="cm">// "cupón nulo o inválido → no aplica descuento (0 %)"</span>
+  <span class="kw">const</span> result = calculateDiscount(100, 'regular', <span class="kw">null</span>);
+  expect(result).toBe(<span class="hl">/* ¿qué esperas aquí? */</span>);
+});</div>
+          <div class="actions">
+            <span class="btn ghost">← Revisar mis casos</span>
+            <span class="btn primary">Guardar y seguir con C4 →</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="statusbar"><div class="z"><span class="avatar" style="width:20px;height:20px;font-size:9px">CP</span> cperez · Programador</div><div class="mid">Paso 6 de 8 · Escribiendo tests · 2 de 5</div><div class="z"><span class="mono">v0.1.0</span></div></div>
+  </div></div>
+</section>
+
+<!-- 08 VERIFICACION -->
+<section class="shot">
+  <div class="shot-head"><span class="shot-num">08</span>
+    <div><h2>Verificación (E7)</h2>
+    <p>Un veredicto en lenguaje claro con exactamente qué faltó y un botón que lleva al lugar correcto. La verificación cubre dos cosas: que se probó todo lo pedido, y que los tests de verdad detectan errores (mutation testing).</p></div>
+  </div>
+  <div class="frame"><div class="screen">
+    <div class="appbar">
+      <div class="brand"><div class="brandmark">DP</div>Dioptra</div>
+      <div class="right"><span>ES</span><span>◐</span><span class="avatar">CP</span><span>cperez</span></div>
+    </div>
+    <div class="tabsbar"><span class="ptab">Inicio</span><span class="ptab">Hallazgos</span><span class="ptab on">Workflow</span><span class="ptab">Reporte</span><span class="ptab">Bitácora</span><span class="right">Formulario MINCYT — API</span></div>
+    <div class="content">
+      <div class="steps">
+        <span class="stp done"><span class="dot">✓</span>Registro</span><span class="stp done"><span class="dot">✓</span>Código</span><span class="stp done"><span class="dot">✓</span>Análisis</span><span class="stp done"><span class="dot">✓</span>Plan</span><span class="stp done"><span class="dot">✓</span>Diseño</span><span class="stp done"><span class="dot">✓</span>Tests</span><span class="stp now"><span class="dot">7</span>Verificación</span><span class="stp"><span class="dot">8</span>Reporte</span>
+      </div>
+      <div class="nextstep" style="border-color:var(--warn);background:var(--warn-bg)">
+        <div class="txt"><b>Casi lo logras — faltan 2 cosas</b><div>Una rama quedó sin probar y un test no detecta errores. Abajo te decimos exactamente cuáles.</div></div>
+        <span class="btn primary">Volver al diseño de casos →</span>
+      </div>
+      <div class="cols" style="grid-template-columns: 1fr 1fr;">
+        <div class="panel">
+          <h4>¿Probaste todo lo pedido?</h4>
+          <div class="progress"><div class="plabel"><span>Decisiones cubiertas (meta: 100 %)</span><span>87 %</span></div><div class="pbar"><div class="pfill low" style="width:87%"></div></div></div>
+          <div style="margin-top:10px">
+            <div class="checkline"><span class="ck done">✓</span> <span class="mono">price ≤ 0</span> — probada en sí y no</div>
+            <div class="checkline"><span class="ck done">✓</span> <span class="mono">type === 'premium'</span> — probada en sí y no</div>
+            <div class="checkline"><span class="ck err">✗</span> <span class="mono">coupon &amp;&amp; valid</span> — <b style="color:var(--err)">falta el caso "no"</b></div>
+          </div>
+          <p class="hint">Sugerencia: tu caso C3 lo describe, pero el test nunca llega a esa rama con cupón inválido.</p>
+        </div>
+        <div class="panel">
+          <h4>¿Tus tests detectan errores de verdad?</h4>
+          <p class="desc">Rompimos el código a propósito 14 veces. Un buen test debe fallar cada vez.</p>
+          <div style="margin-top:10px">
+            <div class="checkline"><span class="ck done">✓</span> 13 errores introducidos → tus tests los detectaron</div>
+            <div class="checkline"><span class="ck err">✗</span> Cambiamos <span class="mono">&amp;&amp;</span> por <span class="mono">||</span> en la línea 51 y <b style="color:var(--err)">ningún test falló</b></div>
+          </div>
+          <p class="hint">Si un test sigue en verde con el código roto, no está probando lo que dice. Refuerza las aserciones de C3/C4.</p>
+        </div>
+      </div>
+    </div>
+    <div class="statusbar"><div class="z"><span class="avatar" style="width:20px;height:20px;font-size:9px">CP</span> cperez · Programador</div><div class="mid">Paso 7 de 8 · Verificación · 2 pendientes</div><div class="z"><span class="mono">v0.1.0</span></div></div>
+  </div></div>
+</section>
+
+<!-- 09 REPORTE -->
+<section class="shot">
+  <div class="shot-head"><span class="shot-num">09</span>
+    <div><h2>Reporte (E8)</h2>
+    <p>El reporte se arma solo con todo lo anterior, sección por sección. El índice muestra qué está completo; cada sección se puede editar antes de exportar con la plantilla institucional.</p></div>
+  </div>
+  <div class="frame"><div class="screen">
+    <div class="appbar">
+      <div class="brand"><div class="brandmark">DP</div>Dioptra</div>
+      <div class="right"><span>ES</span><span>◐</span><span class="avatar">MM</span><span>mmarin</span></div>
+    </div>
+    <div class="tabsbar"><span class="ptab">Inicio</span><span class="ptab">Hallazgos</span><span class="ptab">Workflow</span><span class="ptab on">Reporte</span><span class="ptab">Bitácora</span><span class="right">Sistema de Nómina</span></div>
+    <div class="content">
+      <div class="cols" style="grid-template-columns: 290px 1fr;">
+        <div class="panel">
+          <h4>Secciones</h4>
+          <div class="checkline"><span class="ck done">✓</span> Introducción</div>
+          <div class="checkline"><span class="ck done">✓</span> Resumen ejecutivo</div>
+          <div class="checkline"><span class="ck done">✓</span> Detalles del sistema</div>
+          <div class="checkline"><span class="ck done">✓</span> Hallazgos (11)</div>
+          <div class="checkline"><span class="ck done">✓</span> Métricas del código</div>
+          <div class="checkline"><span class="ck now" style="border-color:var(--acc);color:var(--acc)">✎</span> Deuda de pruebas <span class="hint" style="margin:0">— editando</span></div>
+          <div class="checkline"><span class="ck">·</span> Anexos (diagramas y tests)</div>
+          <div class="actions" style="flex-wrap:wrap">
+            <span class="btn primary">Exportar PDF</span>
+            <span class="btn ghost">DOCX</span><span class="btn ghost">Markdown</span>
+          </div>
+          <p class="hint">Versión 2 · editada por mmarin hace 5 min · historial completo en la bitácora.</p>
+        </div>
+        <div class="panel">
+          <h4>Vista previa · Deuda de pruebas</h4>
+          <div class="repout">
+            <div class="rtitle">Análisis de Caja Blanca — Sistema de Nómina</div>
+            <div class="rline"></div>
+            <b>Deuda de pruebas</b>
+            <p style="margin:6px 0">El sistema llegó a la auditoría sin ningún test. Al cierre, el equipo escribió <b>34 tests</b> que cubren el <b>84 %</b> de las decisiones de los módulos priorizados. Los 34 superaron la verificación por mutación (61 de 63 mutantes eliminados).</p>
+            <div class="progress" style="max-width:340px"><div class="plabel"><span>Cobertura de decisiones</span><span>0 % → 84 %</span></div><div class="pbar"><div class="pfill" style="width:84%"></div></div></div>
+          </div>
+          <div class="actions"><span class="btn ghost">✎ Editar esta sección</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="statusbar"><div class="z"><span class="avatar" style="width:20px;height:20px;font-size:9px">MM</span> mmarin · Analista</div><div class="mid">Paso 8 de 8 · Reporte casi listo</div><div class="z"><span class="mono">v0.1.0</span></div></div>
+  </div></div>
+</section>
+
+<!-- 10 ADMIN + BITACORA -->
+<section class="shot">
+  <div class="shot-head"><span class="shot-num">10</span>
+    <div><h2>Usuarios y bitácora</h2>
+    <p>El administrador gestiona cuentas y roles; la bitácora cuenta cada acción en una frase — quién hizo qué y cuándo — y todo es filtrable.</p></div>
+  </div>
+  <div class="frame"><div class="screen">
+    <div class="appbar">
+      <div class="brand"><div class="brandmark">DP</div>Dioptra</div>
+      <div class="right"><span>ES</span><span>◐</span><span class="avatar">AM</span><span>amedina</span></div>
+    </div>
+    <div class="tabsbar"><span class="ptab">Inicio</span><span class="ptab">Hallazgos</span><span class="ptab">Workflow</span><span class="ptab">Reporte</span><span class="ptab on">Bitácora</span><span class="ptab">Usuarios</span></div>
+    <div class="content">
+      <div class="cols" style="grid-template-columns: 1fr 1fr;">
+        <div class="panel">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><h4 style="margin:0">Usuarios</h4><span class="btn primary" style="margin-left:auto">+ Invitar</span></div>
+          <div class="rowline"><span class="avatar">AM</span><div class="grow"><b>amedina</b><div class="sub">Administradora · activa</div></div><span class="badge info">Admin</span></div>
+          <div class="rowline"><span class="avatar">MM</span><div class="grow"><b>mmarin</b><div class="sub">Analista · activa · 3 proyectos</div></div><span class="badge ok">Analista</span></div>
+          <div class="rowline"><span class="avatar">CP</span><div class="grow"><b>cperez</b><div class="sub">Programador · activo · 12 tests escritos</div></div><span class="badge warn">Programador</span></div>
+          <div class="rowline"><span class="avatar" style="opacity:.6">JR</span><div class="grow"><b>jrivas</b><div class="sub">Invitación enviada · pendiente</div></div><span class="btn ghost">Reenviar</span></div>
+        </div>
+        <div class="panel">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><h4 style="margin:0">Bitácora</h4><span class="radio on" style="margin-left:auto">Hoy</span><span class="radio">Semana</span><span class="radio">Todo</span></div>
+          <div class="rowline"><span class="mono">16:03</span><div class="grow"><b>cperez</b> envió sus tests a verificación<div class="sub">Formulario MINCYT — API · 2 pendientes devueltos</div></div></div>
+          <div class="rowline"><span class="mono">15:47</span><div class="grow"><b>mmarin</b> confirmó el hallazgo "Contraseña olvidada en el código"<div class="sub">severidad alta · incluido en el reporte</div></div></div>
+          <div class="rowline"><span class="mono">15:31</span><div class="grow"><b>mmarin</b> descartó "Uso de eval" como falso positivo<div class="sub">justificación: "es código de un test del proveedor, no se despliega"</div></div></div>
+          <div class="rowline"><span class="mono">14:31</span><div class="grow"><b>Sistema</b> completó el análisis automático<div class="sub">6 hallazgos · 1 CVE en dependencias · 3 min 12 s</div></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="statusbar"><div class="z"><span class="avatar" style="width:20px;height:20px;font-size:9px">AM</span> amedina · Administradora</div><div class="mid">4 usuarios · 3 proyectos activos</div><div class="z"><span class="mono">v0.1.0</span></div></div>
+  </div></div>
+</section>
+
+<p class="note"><strong>Notas de implementación:</strong> usuarios con formato inicial + apellido (mmarin, cperez, amedina); el paso del workflow siempre visible con nombres, no códigos; cada pantalla abre con su "siguiente paso"; los botones dicen lo que hacen ("Es real — incluir en el reporte") y toda acción sensible pide justificación y queda en la bitácora. Tipografías y librerías libres, empaquetadas localmente — sin CDN.</p>
+
+<footer style="margin-top:3rem;padding-top:1.25rem;border-top:1px solid var(--line);color:var(--t2);font-size:0.85rem">Mockups · Dioptra · UTD — agosto 2026<br><strong>Moises Marin</strong></footer>
+
+</div>

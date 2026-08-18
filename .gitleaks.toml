@@ -1,0 +1,52 @@
+# Gitleaks configuration — we run on ourselves what we demand of the factory.
+# CLAUDE.md -> Hard Rules -> No secrets in the repo.
+
+title = "Dioptra"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "dioptra-jwt-secret"
+description = "DIOPTRA_JWT_SECRET assigned a literal value"
+# The character class excludes "$" on purpose: `${DIOPTRA_JWT_SECRET:?...}` is a
+# reference to a secret, not a secret.
+regex = '''(?i)DIOPTRA_JWT_SECRET\s*[:=]\s*["']?[A-Za-z0-9+/=_\-]{16,}["']?'''
+tags = ["secret", "dioptra"]
+
+[[rules]]
+id = "dioptra-seed-password"
+description = "A seed password committed instead of read from the environment"
+regex = '''(?i)DIOPTRA_SEED_PASSWORD_[A-Z]+\s*[:=]\s*["']?[A-Za-z0-9+/=_\-]{8,}["']?'''
+tags = ["secret", "dioptra"]
+
+[allowlist]
+description = "Fixtures and documentation that contain no real credential"
+paths = [
+  # Gitignored local configuration, allowlisted so a developer's real .env does
+  # not fail the `gitleaks dir` pass (that pass reads the working tree and does
+  # not honour .gitignore).
+  #
+  # Be clear about the cost: a global [allowlist] paths entry suppresses by file
+  # path in BOTH the dir and the git pass, so this is NOT backstopped by history
+  # scanning — if .env were ever committed, neither pass in scripts/ci.sh would
+  # report it. .gitignore is the only thing keeping it out. Revisit if .env ever
+  # stops being ignored.
+  '''^\.env$''',
+  '''backend/tests/.*''',
+  '''frontend/src/.*\.test\.tsx?''',
+  '''frontend/src/test/.*''',
+  '''scripts/test_.*\.py''',
+  '''\.env\.example''',
+  '''docs/mockups/.*''',
+]
+regexes = [
+  # The Argon2 dummy hash input and the documented placeholder passwords.
+  '''dioptra-dummy-password-for-constant-work''',
+  '''correct-horse-battery-staple''',
+  # Placeholders written into documentation and CI service containers on
+  # purpose, so a reader can copy a runnable command.
+  '''a-development-secret-of-32-plus-chars''',
+  '''ci-only-secret-value-at-least-32-chars''',
+  '''ci-only-password''',
+]

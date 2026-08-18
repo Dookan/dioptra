@@ -1,0 +1,10 @@
+<!-- Dioptra brand mark: the `DP` monogram from docs/name-and-identity.md,
+     matching the .brandmark shape and radius of the anchor mockups.
+     Colours are hardcoded (--acc / --acc-contrast) because a favicon cannot
+     read CSS custom properties; the light mark reads correctly on both themes. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Dioptra">
+  <rect width="32" height="32" rx="10" fill="#1F5E3C"/>
+  <text x="16" y="21.5" text-anchor="middle" fill="#FFFFFF"
+        font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
+        font-size="14" font-weight="700" letter-spacing="-0.5">DP</text>
+</svg>

@@ -1,0 +1,42 @@
+# Secrets — never committed (CLAUDE.md → Hard Rules)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/coverage/
+*.tsbuildinfo
+npm-debug.log*
+
+# Local runtime data
+data/
+workspaces/
+*.sqlite3
+*.db
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Panel agent scratch memory: local learning, not project history.
+.claude/agent-memory/

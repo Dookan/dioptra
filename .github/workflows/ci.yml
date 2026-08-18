@@ -1,0 +1,179 @@
+# CI. The gates themselves live in scripts/ci.sh so they are portable: this file
+# only installs toolchains and calls that script. Moving to GitLab or to an
+# on-premise runner means rewriting this file, never the gates.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.1"
+          enable-cache: true
+      - name: Install dependencies (locked)
+        run: uv sync --frozen
+        working-directory: backend
+      - run: scripts/ci.sh backend
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies (locked)
+        run: npm ci
+        working-directory: frontend
+      - run: scripts/ci.sh frontend
+
+  supply-chain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # Gitleaks scans history, not just the tip
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.1"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: uv sync --frozen
+        working-directory: backend
+      - run: npm ci
+        working-directory: frontend
+      - name: Build the bundle (the no-CDN gate inspects the output)
+        run: npm run build
+        working-directory: frontend
+      - name: Free licences only
+        run: uv run --project backend python scripts/license_gate.py
+      - name: No CDN in the built bundle
+        run: uv run --project backend python scripts/no_cdn_check.py --dist frontend/dist
+      - name: No secrets in the repository
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+  migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: dioptra
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: dioptra
+        options: >-
+          --health-cmd "pg_isready -U dioptra" --health-interval 5s
+          --health-timeout 3s --health-retries 20
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.1"
+      - run: uv sync --frozen
+        working-directory: backend
+      - name: Upgrade and downgrade against a real PostgreSQL
+        # A migration that cannot be rolled back is not a migration.
+        run: |
+          uv run alembic upgrade head
+          uv run alembic downgrade base
+          uv run alembic upgrade head
+        working-directory: backend
+        env:
+          DIOPTRA_ENV: test
+          DIOPTRA_JWT_SECRET: ci-only-secret-value-at-least-32-chars
+          DIOPTRA_DATABASE_URL: postgresql+psycopg://dioptra:ci-only-password@localhost:5432/dioptra
+
+      - name: The migration and the ORM metadata agree
+        # Local tests build the schema from Base.metadata; CI applies the
+        # migration. Nothing compared the two, so they could drift silently.
+        run: uv run alembic check
+        working-directory: backend
+        env:
+          DIOPTRA_ENV: test
+          DIOPTRA_JWT_SECRET: ci-only-secret-value-at-least-32-chars
+          DIOPTRA_DATABASE_URL: postgresql+psycopg://dioptra:ci-only-password@localhost:5432/dioptra
+
+      - name: The audit trail is append-only in the real database
+        # The suite runs on SQLite, which cannot exercise the plpgsql trigger.
+        # Creating it is not the same as proving it enforces, so assert here that
+        # UPDATE, DELETE and TRUNCATE are all refused (ASVS V7.1).
+        run: |
+          set -euo pipefail
+          psql "$PGURL" -c "INSERT INTO audit_log (id, occurred_at, actor_username, action, outcome) VALUES (gen_random_uuid(), now(), 'ci', 'ci.probe', 'OK');"
+          for stmt in "UPDATE audit_log SET action='tampered'" "DELETE FROM audit_log" "TRUNCATE audit_log"; do
+            if psql "$PGURL" -v ON_ERROR_STOP=1 -c "$stmt"; then
+              echo "::error::audit_log accepted '$stmt' — the append-only guarantee is broken"
+              exit 1
+            fi
+            echo "refused as expected: $stmt"
+          done
+          test "$(psql "$PGURL" -tAc 'SELECT count(*) FROM audit_log;')" = "1"
+        env:
+          PGURL: postgresql://dioptra:ci-only-password@localhost:5432/dioptra
+
+  dependency-vulnerabilities:
+    # BLOCKING. A known-vulnerable dependency is a security defect, not a
+    # freshness nit, so this one fails the build. Kept out of the advisory job
+    # below precisely so its failure cannot be mistaken for version drift.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - name: No known-vulnerable npm dependency
+        # If this fails with no upstream fix available, the answer is a reviewed,
+        # explicit allowlist entry — never deleting the step.
+        run: npm audit --audit-level=high
+        working-directory: frontend
+
+  dependency-currency:
+    # ADVISORY ONLY, on purpose. `npm outdated` trips on any newer minor version,
+    # so making it blocking would train us to disable the gate — a net security
+    # loss. Currency is reported; vulnerability is enforced above. Kept a separate
+    # job so an air-gapped runner can drop it without touching the real gates.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.1"
+      - name: Python dependencies are current
+        # --dry-run --upgrade prints what a fresh resolution would change.
+        run: uv lock --upgrade --dry-run || echo "::warning::python dependencies are behind"
+        working-directory: backend
+      - name: npm dependencies are current
+        run: npm outdated || echo "::warning::npm dependencies are behind"
+        working-directory: frontend

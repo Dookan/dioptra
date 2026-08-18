@@ -1,0 +1,96 @@
+/*
+ * Design tokens — the single source of colour, radius and spacing.
+ * Values are copied verbatim from docs/mockups/index.html (approved 2026-08-17);
+ * dioptra-mockup-fidelity compares this file against that anchor.
+ * No component may hard-code a colour.
+ */
+
+:root {
+  --ground: #fafaf7;
+  --s1: #ffffff;
+  --s2: #f1f4f1;
+  --s3: #e7ede8;
+  --line: #e3e7e2;
+  --line-strong: #c9d2cb;
+  --ink: #1c2420;
+  --t2: #5c6b62;
+  --t3: #93a096;
+  --acc: #1f5e3c;
+  --acc-soft: rgba(31, 94, 60, 0.1);
+  --acc-ring: rgba(31, 94, 60, 0.16);
+  --acc-contrast: #ffffff;
+  --err: #b3261e;
+  --err-bg: rgba(179, 38, 30, 0.1);
+  --warn: #96660a;
+  --warn-bg: rgba(150, 102, 10, 0.12);
+  --ok: #1f5e3c;
+  --ok-bg: rgba(31, 94, 60, 0.12);
+  --info: #2f6db3;
+  --info-bg: rgba(47, 109, 179, 0.1);
+  --chrome: #1c2420;
+  --chrome-text: #e8ede9;
+
+  --radius-frame: 14px;
+  --radius-card: 12px;
+  --radius-button: 9px;
+  --radius-badge: 5px;
+
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, Menlo, monospace;
+}
+
+/* Dark palette. Declared twice on purpose: once for the system preference and
+ * once for an explicit choice, so the toggle wins in both directions. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #121714;
+    --s1: #1a211c;
+    --s2: #202923;
+    --s3: #27332b;
+    --line: #2a332d;
+    --line-strong: #3a4740;
+    --ink: #e8ede9;
+    --t2: #9aa89f;
+    --t3: #66756b;
+    --acc: #7cc79a;
+    --acc-soft: rgba(124, 199, 154, 0.12);
+    --acc-ring: rgba(124, 199, 154, 0.18);
+    --acc-contrast: #121714;
+    --err: #f2867f;
+    --err-bg: rgba(242, 134, 127, 0.12);
+    --warn: #e0a94e;
+    --warn-bg: rgba(224, 169, 78, 0.12);
+    --ok: #7cc79a;
+    --ok-bg: rgba(124, 199, 154, 0.12);
+    --info: #85b4e8;
+    --info-bg: rgba(133, 180, 232, 0.12);
+    --chrome: #0c100e;
+    --chrome-text: #e8ede9;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground: #121714;
+  --s1: #1a211c;
+  --s2: #202923;
+  --s3: #27332b;
+  --line: #2a332d;
+  --line-strong: #3a4740;
+  --ink: #e8ede9;
+  --t2: #9aa89f;
+  --t3: #66756b;
+  --acc: #7cc79a;
+  --acc-soft: rgba(124, 199, 154, 0.12);
+  --acc-ring: rgba(124, 199, 154, 0.18);
+  --acc-contrast: #121714;
+  --err: #f2867f;
+  --err-bg: rgba(242, 134, 127, 0.12);
+  --warn: #e0a94e;
+  --warn-bg: rgba(224, 169, 78, 0.12);
+  --ok: #7cc79a;
+  --ok-bg: rgba(124, 199, 154, 0.12);
+  --info: #85b4e8;
+  --info-bg: rgba(133, 180, 232, 0.12);
+  --chrome: #0c100e;
+  --chrome-text: #e8ede9;
+}

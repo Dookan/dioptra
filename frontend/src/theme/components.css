@@ -1,0 +1,302 @@
+/*
+ * Component styles, mirroring the class vocabulary of docs/mockups/index.html
+ * so the fidelity audit can compare rule by rule. Colours, radii and fonts come
+ * from tokens.css exclusively.
+ */
+
+/* --- buttons ------------------------------------------------------------ */
+.btn {
+  display: inline-block;
+  border-radius: var(--radius-button);
+  padding: 7px 16px;
+  font-weight: 600;
+  font-size: 13px;
+  border: 1px solid var(--line-strong);
+  background: var(--s2);
+  color: var(--ink);
+}
+
+.btn.primary {
+  background: var(--acc);
+  border-color: var(--acc);
+  color: var(--acc-contrast);
+}
+
+.btn.ghost {
+  background: transparent;
+  color: var(--t2);
+}
+
+.btn[disabled] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* --- form fields -------------------------------------------------------- */
+.field {
+  margin-bottom: 13px;
+}
+
+.field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t2);
+  margin-bottom: 4px;
+}
+
+.input {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-button);
+  background: var(--ground);
+  padding: 8px 11px;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--acc);
+  box-shadow: 0 0 0 3px var(--acc-ring);
+}
+
+.hint {
+  color: var(--t3);
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+/* --- brand -------------------------------------------------------------- */
+.brandmark {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--acc);
+  color: var(--acc-contrast);
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+/* --- login screen (mockup 01) ------------------------------------------- */
+.login-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding: 60px 16px;
+  background: var(--ground);
+}
+
+.login {
+  width: 360px;
+  max-width: 100%;
+  background: var(--s1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-frame);
+  padding: 28px;
+}
+
+.login .brandrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.login .brandrow .brandmark {
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
+  border-radius: var(--radius-button);
+}
+
+.login h1 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.login .sub {
+  color: var(--t2);
+  font-size: 12.5px;
+  margin: 4px 0 20px;
+}
+
+.login .btn.primary {
+  width: 100%;
+  text-align: center;
+  margin-top: 4px;
+  padding: 9px;
+}
+
+.login .foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 18px;
+  color: var(--t3);
+  font-size: 11.5px;
+}
+
+/*
+ * The mockup renders this row's theme control as a plain 11.5px span. Making it
+ * a real button is correct for accessibility, but full .btn metrics would render
+ * it ~35% larger than the ES/EN pills and the version string beside it, breaking
+ * the flat row the mockup keeps deliberately even.
+ */
+.login .foot .btn.ghost {
+  padding: 0;
+  border-color: transparent;
+  font-size: inherit;
+  font-weight: 400;
+  color: inherit;
+}
+
+.lang {
+  display: flex;
+  gap: 4px;
+}
+
+.lang button {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-badge);
+  padding: 1px 8px;
+  background: transparent;
+  color: inherit;
+  font-size: 11.5px;
+}
+
+.lang button.on {
+  background: var(--acc);
+  border-color: var(--acc);
+  color: var(--acc-contrast);
+  font-weight: 600;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--t2);
+}
+
+/* --- feedback ----------------------------------------------------------- */
+.alert {
+  border-radius: var(--radius-button);
+  padding: 9px 12px;
+  font-size: 12.5px;
+  margin-bottom: 13px;
+  border: 1px solid var(--err);
+  background: var(--err-bg);
+  color: var(--err);
+}
+
+/* --- application shell (placeholder until phase 2) ---------------------- */
+.appbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--chrome);
+  color: var(--chrome-text);
+  padding: 10px 16px;
+}
+
+.appbar .brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 650;
+}
+
+.appbar .right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12.5px;
+}
+
+/*
+ * .btn.ghost defaults to --t2, which is theme-dependent; on the --chrome ground
+ * that is 2.83:1 in light theme. The appbar keeps its own text colour instead.
+ * The mockup never hits this because it renders these as plain spans.
+ */
+.appbar .btn.ghost {
+  color: var(--chrome-text);
+  border-color: transparent;
+}
+
+/*
+ * .lang pills sit on --chrome too, where --line-strong is 1.98:1 in dark — under
+ * the 3:1 minimum for a non-text boundary. Same rgba the mockup uses for
+ * .appbar .avatar, so the inactive pill keeps a visible frame in both themes.
+ */
+.appbar .lang button {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--acc-soft);
+  color: var(--acc);
+  border: 1px solid var(--acc);
+  font-size: 10.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/*
+ * The appbar paints --chrome in BOTH themes, so its contents cannot use
+ * theme-dependent tokens. These two literals are the mockup's own (index.html:70)
+ * and are scoped here so the generic .avatar above stays token-driven for the
+ * first screen that puts one on a --s1 surface.
+ */
+.appbar .avatar {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--chrome-text);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.content {
+  padding: 20px;
+}
+
+.pagehead h2 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.pagehead .sub {
+  color: var(--t2);
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.nextstep {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--acc-soft);
+  border: 1px solid var(--acc);
+  border-radius: var(--radius-card);
+  padding: 13px 16px;
+  margin-top: 18px;
+}
+
+.nextstep b {
+  font-size: 13.5px;
+}
+
+.nextstep div {
+  color: var(--t2);
+  font-size: 12.5px;
+}

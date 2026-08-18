@@ -1,0 +1,18 @@
+# Keep secrets, caches and build output out of every image layer.
+.env
+.env.*
+!.env.example
+.git
+.github
+docs
+tasks
+.claude
+**/node_modules
+**/dist
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/coverage
+**/*.tsbuildinfo

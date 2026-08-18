@@ -1,0 +1,63 @@
+{
+  "app": {
+    "name": "Dioptra",
+    "version": "v0.1.0",
+    "brandInitials": "DP"
+  },
+  "login": {
+    "title": "Iniciar sesión",
+    "greeting": "Hola de nuevo. Inicia sesión para continuar con tus análisis.",
+    "username": "Usuario",
+    "password": "Contraseña",
+    "submit": "Entrar",
+    "submitting": "Entrando…",
+    "noAccount": "¿No tienes cuenta? Pídele acceso a tu administrador."
+  },
+  "passwordChange": {
+    "title": "Cambia tu contraseña",
+    "reason": "Esta cuenta usa una contraseña inicial. Elige una nueva para continuar.",
+    "current": "Contraseña actual",
+    "new": "Contraseña nueva",
+    "hint": "Al menos 12 caracteres. Una frase larga es mejor que un símbolo raro.",
+    "submit": "Guardar contraseña",
+    "submitting": "Guardando…"
+  },
+  "home": {
+    "greeting": "Hola, {{name}}",
+    "subtitle": "Aquí verás tus análisis en curso.",
+    "nextStepTitle": "Siguiente paso",
+    "nextStepBody": "Todavía no hay análisis. La ingesta de código llega en la próxima fase.",
+    "signOut": "Cerrar sesión"
+  },
+  "roles": {
+    "admin": "Administrador",
+    "analyst": "Analista",
+    "developer": "Programador"
+  },
+  "theme": {
+    "toggle": "Cambiar tema",
+    "light": "Tema claro",
+    "dark": "Tema oscuro"
+  },
+  "language": {
+    "label": "Idioma",
+    "es": "ES",
+    "en": "EN"
+  },
+  "errors": {
+    "internal": "Algo falló de nuestro lado. Intenta de nuevo en un momento.",
+    "validation": "Revisa los datos: falta algo o tiene un formato inesperado.",
+    "network": "No pudimos contactar al servidor. Revisa tu conexión.",
+    "auth": {
+      "invalidCredentials": "Usuario o contraseña incorrectos.",
+      "accountLocked": "Demasiados intentos fallidos. Espera unos minutos antes de reintentar.",
+      "accountDisabled": "Esta cuenta está deshabilitada. Habla con tu administrador.",
+      "invalidToken": "Tu sesión no es válida. Inicia sesión de nuevo.",
+      "sessionRevoked": "Cerramos tu sesión por seguridad. Inicia sesión de nuevo.",
+      "passwordChangeRequired": "Debes cambiar tu contraseña antes de continuar.",
+      "weakPassword": "La contraseña es muy corta. Usa al menos 12 caracteres.",
+      "forbidden": "Tu rol no tiene permiso para esta acción.",
+      "invalidUsername": "El nombre de usuario debe ser inicial + apellido, en minúsculas y sin puntos."
+    }
+  }
+}

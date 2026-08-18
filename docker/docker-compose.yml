@@ -1,0 +1,84 @@
+# Dioptra — full stack, on premise, air-gap friendly.
+#
+#   cp .env.example .env && edit it, then:  docker compose -f docker/docker-compose.yml up --build
+#
+# Secrets come from .env (gitignored). No service reaches the public internet at
+# runtime; images are the only thing pulled, and only at build time.
+
+name: dioptra
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dioptra}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-dioptra}
+    volumes:
+      # PostgreSQL 18 images expect the mount one level up: the data directory
+      # is a version-named subdirectory so pg_upgrade can work in place.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dioptra} -d ${POSTGRES_DB:-dioptra}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  # Valkey (BSD-3) instead of Redis, whose licence stopped being free.
+  # Idle until phase 1 puts the analysis jobs on it.
+  valkey:
+    image: valkey/valkey:9-alpine
+    command: ["valkey-server", "--save", "60", "1", "--appendonly", "no"]
+    volumes:
+      - valkey-data:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    environment:
+      DIOPTRA_ENV: ${DIOPTRA_ENV:-prod}
+      DIOPTRA_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-dioptra}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-dioptra}
+      DIOPTRA_JWT_SECRET: ${DIOPTRA_JWT_SECRET:?DIOPTRA_JWT_SECRET is required (32+ characters)}
+      DIOPTRA_REFRESH_COOKIE_SECURE: ${DIOPTRA_REFRESH_COOKIE_SECURE:-true}
+      DIOPTRA_SEED_PASSWORD_AMEDINA: ${DIOPTRA_SEED_PASSWORD_AMEDINA:-}
+      DIOPTRA_SEED_PASSWORD_MMARIN: ${DIOPTRA_SEED_PASSWORD_MMARIN:-}
+      DIOPTRA_SEED_PASSWORD_CPEREZ: ${DIOPTRA_SEED_PASSWORD_CPEREZ:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    # Migrations run before the server accepts a single request.
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+    ports:
+      - "${DIOPTRA_HTTP_PORT:-8080}:8080"
+    depends_on:
+      - api
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  valkey-data:

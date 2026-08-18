@@ -1,0 +1,63 @@
+{
+  "app": {
+    "name": "Dioptra",
+    "version": "v0.1.0",
+    "brandInitials": "DP"
+  },
+  "login": {
+    "title": "Sign in",
+    "greeting": "Welcome back. Sign in to continue with your analyses.",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "noAccount": "No account yet? Ask your administrator for access."
+  },
+  "passwordChange": {
+    "title": "Change your password",
+    "reason": "This account still uses its initial password. Choose a new one to continue.",
+    "current": "Current password",
+    "new": "New password",
+    "hint": "At least 12 characters. A long phrase beats a strange symbol.",
+    "submit": "Save password",
+    "submitting": "Saving…"
+  },
+  "home": {
+    "greeting": "Hello, {{name}}",
+    "subtitle": "Your ongoing analyses will show up here.",
+    "nextStepTitle": "Next step",
+    "nextStepBody": "No analyses yet. Code ingest arrives in the next phase.",
+    "signOut": "Sign out"
+  },
+  "roles": {
+    "admin": "Administrator",
+    "analyst": "Analyst",
+    "developer": "Developer"
+  },
+  "theme": {
+    "toggle": "Switch theme",
+    "light": "Light theme",
+    "dark": "Dark theme"
+  },
+  "language": {
+    "label": "Language",
+    "es": "ES",
+    "en": "EN"
+  },
+  "errors": {
+    "internal": "Something failed on our side. Try again in a moment.",
+    "validation": "Check the data: something is missing or has an unexpected format.",
+    "network": "We could not reach the server. Check your connection.",
+    "auth": {
+      "invalidCredentials": "Wrong username or password.",
+      "accountLocked": "Too many failed attempts. Wait a few minutes before retrying.",
+      "accountDisabled": "This account is disabled. Talk to your administrator.",
+      "invalidToken": "Your session is not valid. Sign in again.",
+      "sessionRevoked": "We closed your session for safety. Sign in again.",
+      "passwordChangeRequired": "You must change your password before continuing.",
+      "weakPassword": "That password is too short. Use at least 12 characters.",
+      "forbidden": "Your role is not allowed to do this.",
+      "invalidUsername": "The username must be initial + lastname, lowercase, with no dots."
+    }
+  }
+}
