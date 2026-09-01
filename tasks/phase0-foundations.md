@@ -1,5 +1,7 @@
 # Task: Phase 0 — Foundations
 
+> **Status: DONE — closed 2026-08-18, commit `0fea480` (◆ deadline 2026-08-28).**
+
 ## Objective
 Stand up the skeleton the whole platform hangs from: repo layout, Docker
 Compose, backend and frontend scaffolds, authentication with the three roles,

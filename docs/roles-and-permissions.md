@@ -1,6 +1,6 @@
 # Roles and permissions
 
-> **Status: DESIGN SURFACE — not yet implemented.**
+> **Status: DESIGN SURFACE — roles, sessions and admin-only accounts are built (P0, `backend/app/auth/`); the per-stage permission rows are the target.**
 
 Usernames are initial + lastname, lowercase, no dots: `mmarin`, `cperez`,
 `amedina`. Roles are enforced on EVERY endpoint; the UI only mirrors them.
@@ -20,6 +20,10 @@ Usernames are initial + lastname, lowercase, no dots: `mmarin`, `cperez`,
 | Sign/lock a report version | — | ✓ | — |
 | Export report (PDF/DOCX/Markdown) | ✓ | ✓ | view |
 | Read audit log | ✓ | own projects | own actions |
+
+The software inventory (P5) has no rows yet: the work plan adds the module
+without a role matrix. The rows are written when P5 is designed
+(`tasks/phase5-survey.md`), not assumed before.
 
 ## Rules
 

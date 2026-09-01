@@ -3,7 +3,9 @@
 ## Project Identity
 
 - **Name**: **Dioptra** — after Hero of Alexandria's sighting instrument: you look *through* it, and you use it to check alignment against a reference. Brand mark `DP`, environment prefix `DIOPTRA_`. Rationale and naming rules: @docs/name-and-identity.md. "Análisis de caja blanca" stays as the name of the TECHNIQUE, never of the product.
-- **Purpose**: Web platform for white-box analysis of third-party, untested systems: automated audit pipeline (SAST, SCA/CVE, secrets, metrics), a gated testing workflow (E1–E8) that forces plan → design → pseudocode → tests written by the developer, and an editable institutional report (MINCYT template) with OWASP/CWE/CVSS classification.
+- **Purpose**: Web platform for white-box analysis of third-party, untested systems: automated audit pipeline (SAST, SCA/CVE, secrets, metrics), a software inventory per project (SBOM / CBOM / VEX in CycloneDX 1.6, correlated against a LOCAL vulnerability database), a gated testing workflow (E1–E8) that forces plan → design → pseudocode → tests written by the developer, and an editable institutional report with OWASP/CWE/CVSS classification.
+- **Institution**: deliberately unnamed — the platform serves whichever institution's software factory deploys it; docs say "the institution" and never a specific one. The anchor reports are the manual white-box analyses of the **MINCYT form systems** (`/home/user/Desktop/UTD/CAJA-BLANCA/*.pdf`) — "MINCYT" names the AUDITED SYSTEM, not the template; the template is the institution's.
+- **Work plan**: @docs/work-plan-reference.html (v1.0, 2026-08-21) — 20 business days, 2026-08-24 → 2026-09-18, one engineer, release **v1.0.0** with P0–P5 complete. The HTML is the reference; its distilled form (day table, milestones, dependencies, contingencies, scope-change log) is @docs/development-phases.md, which is what agents read.
 - **Target**: Self-hosted web app (Docker Compose). Backend: Python 3.13 + FastAPI. Frontend: React 19 + Vite + react-i18next, bundled and served locally. Queue: Valkey + RQ. DB: PostgreSQL + SQLAlchemy. PDF: Jinja2 + WeasyPrint.
 - **Standards**: OWASP Top 10:2021, OWASP API Security Top 10, OWASP ASVS 4.x (platform targets L2 for itself), CWE, CVSS 3.1, ISO/IEC 25010, ISO/IEC/IEEE 29119, McCabe basis-path testing. Full mapping: @docs/standards-mapping.md
 - **Deployment model**: On-premise inside the software factory, air-gap friendly. NO external runtime dependency of any kind — see Hard Rules → No CDNs.
@@ -15,12 +17,13 @@
 
 File-pattern triggers (when working on these paths):
 
-- `backend/app/analysis/**` (tool runners, SARIF normalizer, CWE→OWASP mapper): read @docs/analysis-pipeline.md
+- `backend/app/analysis/**` (tool runners, SARIF normalizer, CWE→OWASP mapper, SBOM generation): read @docs/analysis-pipeline.md
+- `backend/app/inventory/**` (SBOM/CBOM/VEX store, vulnerability database sync, BOM↔CVE correlation, statistics): read @docs/software-inventory.md and @docs/threat-model.md (rows SBOM generation, Inventory rendering, Vulnerability DB sync, VEX statements)
 - `backend/app/workflow/**` (stages E1–E8, gates, test briefs): read @docs/workflow-gates.md
 - `backend/app/auth/**`, `backend/app/audit/**`: read @docs/roles-and-permissions.md and @docs/threat-model.md
 - `backend/app/reports/**`, `backend/templates/**`: read @docs/report-format.md
-- `backend/app/sandbox/**`, `docker/**`: read @docs/threat-model.md → Sandbox
-- `backend/app/ingest/**` (ZIP/git intake): read @docs/threat-model.md → Ingestion
+- `backend/app/sandbox/**`, `docker/**`: read @docs/threat-model.md (row Test sandbox + section Sandbox escape tests)
+- `backend/app/ingest/**` (ZIP/git intake): read @docs/threat-model.md (rows ZIP ingest, git URL ingest)
 - `frontend/src/**`: read @docs/ui-model.md and the anchor mockups in @docs/mockups/
 - `frontend/src/locales/**`: read @docs/ui-model.md → i18n rules
 - `rules/semgrep/**` (our own SAST rules): read @docs/analysis-pipeline.md → Rule authoring
@@ -31,7 +34,7 @@ Task-type triggers (when doing these activities):
 - Starting a new phase: read @tasks/_TEMPLATE.md and the specific @tasks/phaseN*.md
 - Any security review or threat modeling: read @docs/threat-model.md
 - Audit prep, ASVS alignment questions: read @docs/standards-mapping.md
-- Planning work that crosses phase boundaries: read @docs/development-phases.md
+- Planning work that crosses phase boundaries, checking dates/milestones, or applying a contingency: read @docs/development-phases.md (distills @docs/work-plan-reference.html)
 - Writing a new task file: read @tasks/_TEMPLATE.md
 - Naming anything the user or an operator sees — a service, an environment
   variable, a cookie, a package, a report credit: read @docs/name-and-identity.md
@@ -52,7 +55,10 @@ Normative keywords in this document follow RFC 2119 and RFC 8174: **MUST**, **MU
 - **Gate**: a server-side precondition for entering the next stage. Gates are enforced by the API, never only by the UI.
 - **Test brief** ("consigna"): the deterministic per-function spec (min cases from cyclomatic complexity, branches with lines, boundary values, mandatory malicious case) computed from the AST + findings. No AI involved.
 - **Re-audit**: stage E7's check of the tests themselves — coverage vs. brief + mutation testing. A surviving mutant rejects the gate.
-- **Finding**: one detected issue with CWE, OWASP category, CVSS severity, file:line, snippet, mitigation.
+- **Finding**: one detected issue with CWE, OWASP category, CVSS severity, file:line, snippet, mitigation. An unknown CWE is a VALID state of a finding, never an error.
+- **SBOM / CBOM / VEX**: the software, cryptographic and exploitability bills of materials of an audited system, all CycloneDX 1.6. The SBOM is produced at E2/E3 from lockfiles (metadata only); VEX statements come from the analyst's triage. See @docs/software-inventory.md
+- **Vulnerability database**: the platform's LOCAL mirror of OSV + NVD (CVE.org), refreshed by a scheduled sync or by importing a dump file. Never a live third-party query.
+- **Self-audit**: the platform's own code run through its own pipeline (last day of P5). It must come out with no high finding left open without justification.
 
 ---
 
@@ -76,12 +82,16 @@ Development roles (this repository):
 
 ## Current phase status
 
-- Phase 0: DONE (2026-08-18) — foundations (repo scaffold, Docker Compose, FastAPI + React skeletons, auth with Argon2id + JWT + roles, i18n es/en, light/dark theme, CI with license gate). See @tasks/phase0-foundations.md
-- Phase 1: DESIGN — audit MVP (ZIP/git ingest → Semgrep + Gitleaks + OSV pipeline → normalized findings → MINCYT PDF). Success criterion: automatically reproduce the existing MINCYT backend report.
-- Phase 2: DESIGN — findings UI (filters, triage, false-positive-with-justification) + report editor with version control.
-- Phase 3: DESIGN — workflow E1–E5 (risk matrix, AST flow diagrams, test briefs, pseudocode editor with approval).
-- Phase 4: DESIGN — E6–E7 (deterministic test scaffolding, sandbox execution, coverage vs. brief, mutation re-audit).
-- Phase 5: DESIGN — language wave 2 (PHP/Laravel, Java/Spring), full audit log, hardening, ASVS L2 self-audit.
+Dates are the work plan's **deadlines**, not start dates: we run ahead of the plan on purpose — a phase starts the moment the previous one closes — and the deadlines are never moved. Milestones ◆ close only with tests passing, docs updated and the phase's `tasks/phaseN-*.md` at DONE with a commit hash. Full day table: @docs/development-phases.md.
+
+- Phase 0: DONE (2026-08-18, ◆ deadline 2026-08-28) — foundations (repo scaffold, Docker Compose, FastAPI + React skeletons, auth with Argon2id + JWT + roles, i18n es/en, light/dark theme, CI with license gate). See @tasks/phase0-foundations.md. Two plan items deferred: the RQ worker service (lands with P1's first job) and a no-string-literal lint (oxlint has no such rule; parity test + mockup-fidelity panel cover it).
+- Phase 1: DESIGN — next up, ◆ deadline "P1 (PDF)" 2026-09-04 (plan days 6–10, critical path) — audit MVP: data model + ZIP/git ingest → Semgrep (own rules) + Gitleaks + OSV runners **+ SBOM CycloneDX 1.6** → SARIF normalizer (CWE/OWASP/CVSS, dedupe) → Jinja2 → HTML → WeasyPrint report + Markdown + basic DOCX export → a full day of PDF fidelity. Success criterion: the institutional backend report (MINCYT API) is reproduced automatically, indistinguishable in structure. See @tasks/phase1-audit-mvp.md
+- Phase 2: DESIGN — deadline 2026-09-08 (plan days 11–12) — findings viewer with filters, triage with mandatory justification, versioned report editor with visual executive summary. See @tasks/phase2-findings-ui.md
+- Phase 3: DESIGN — ◆ deadline "P2+P3" 2026-09-11 (plan days 13–15, critical path) — workflow E1–E5: risk matrix + server-side gates, AST → Mermaid flow diagrams (JS/TS, Python), test briefs, pseudocode editor with approval. See @tasks/phase3-workflow-e1-e5.md
+- Phase 4: DESIGN — deadline 2026-09-15 (plan days 16–17, critical path) — E6–E7: sandbox investigation gate, deterministic scaffolding (Jest/Vitest, pytest), sandbox execution, coverage vs. brief, mutation re-audit, sandbox escape tests. See @tasks/phase4-e6-e7.md
+- Phase 5: DESIGN — "Cierre", ◆ deadline "Release" 2026-09-18 (plan days 18–20) — day 1: **software inventory** (SBOM/CBOM/VEX per project and version, local OSV + NVD database, BOM↔CVE correlation, statistics panel, CycloneDX JSON + CSV export); day 2: PHP/Laravel + Java/Spring, full audit log, report sections "test debt" + "inventory" + annexes; day 3: buffer, hardening, self-audit, complete ASVS L2 checklist, final threat model, tag **v1.0.0**. See @tasks/phase5-closure.md
+- **Out of scope for v1.0.0** (already "on demand" in the development plan): language wave 3 (Go, C#/.NET) and Tauri offline packaging.
+- **Cut order under overrun**: PHP/Java moves to a second cycle first (release ships with JS/TS + Python). The software inventory is NEVER cut — it is a deliverable of the factory, not of a language.
 
 ---
 
@@ -97,21 +107,41 @@ Single authoritative mapping of analysis capabilities to tools. All other sectio
 | Metrics / complexity | Lizard + cloc | MIT / GPL-2.0 |
 | Config / IaC | Trivy config / Checkov | Apache-2.0 |
 | Mutation testing | Stryker (JS/TS), mutmut (Python), Pitest (Java), Infection (PHP) | Apache-2.0 / BSD-3 |
+| SBOM generation | Syft or cdxgen → CycloneDX 1.6 JSON, from lockfiles + dependency tree (metadata only — no package scripts run) | Apache-2.0 |
+| CBOM (cryptographic inventory) | Decided at the P5 survey — candidates: cdxgen CBOM output, IBM cbomkit, our own Semgrep crypto rules | Apache-2.0 / LGPL-2.1 |
+| VEX | Authored in-platform from the analyst's triage verdicts, emitted as CycloneDX VEX. No tool. | — |
+| Vulnerability database | LOCAL mirror of OSV + NVD (CVE.org) dumps — scheduled sync or file import, NEVER a live query. Dependency-Track is the accepted alternative if an external component is preferred. **Docker Scout is REJECTED** (proprietary cloud service). | OSV data CC-BY-4.0 / NVD public domain / Dependency-Track Apache-2.0 |
+| Flow diagrams (E5) | Mermaid, deterministic output from the AST, rendered by the bundled library | MIT |
 | PDF rendering | Jinja2 + WeasyPrint | BSD-3 |
+| DOCX export | python-docx (candidate, confirmed at the P1 survey) | MIT |
 
 ---
 
 ## Hard Rules
 
 - **The platform MUST NOT write tests.** No AI/LLM anywhere in the product. Scaffolding is deterministic only: file, imports, and case names derived from the AST and the approved pseudocode. Assertions, data, and logic are ALWAYS written by the developer — writing the test IS the learning.
-- **No CDNs — two levels.** (1) This platform loads nothing from external servers at runtime: every dependency installed, version-pinned, served locally. (2) Factory norm: audited code that loads scripts/styles/fonts from external domains gets an automatic finding (CWE-829, OWASP A08:2021) via our Semgrep rules.
+- **No CDNs — three levels.** (1) This platform loads nothing from external servers at runtime: every dependency installed, version-pinned, served locally. (2) Factory norm: audited code that loads scripts/styles/fonts from external domains gets an automatic finding (CWE-829, OWASP A08:2021) via our Semgrep rules. (3) Vulnerability data is a LOCAL mirror of OSV + NVD refreshed by a scheduled sync or an imported dump file, with the last-sync date visible in the panel; the platform never queries a third-party vulnerability service at request time, and Docker Scout is rejected on both license and this rule.
 - **Free licenses only.** Apache-2.0 / MIT / BSD / MPL / LGPL / GPL. No proprietary, source-available, or non-commercial-clause dependency. CI license gate MUST fail the build otherwise. Known-vulnerable npm dependencies MUST fail the build (`dependency-vulnerabilities`, `npm audit`); the Python side has no vulnerability scanner yet — OSV-Scanner covers it from P1, see Analysis Tool Source Authority; version currency is reported as a warning (`dependency-currency`), because a gate that trips on every upstream minor release gets disabled rather than obeyed.
 - **Gates are server-side.** The API rejects any stage transition whose gate is not satisfied. UI state is never the enforcement mechanism.
 - **Audited code is hostile.** It is parsed, rendered, and executed accordingly: ZIP ingest guards against zip-slip and size bombs; git URL ingest guards against SSRF; findings/snippets are escaped before ANY rendering (report HTML/PDF included — XSS via a hostile snippet into an analyst's browser is a real path); tests execute ONLY in Docker sandboxes with no network, CPU/RAM limits, and read-only FS except the workspace.
-- **English everywhere in code**: identifiers, comments, commits, docs. Spanish appears ONLY in UI locale files (`es.json` default, `en.json` complete parity).
+- **English everywhere in code**: identifiers, comments, commits, docs. Spanish appears ONLY in UI locale files (`es.json` default, `en.json` complete parity). Two reference artifacts kept verbatim are the exception: `docs/work-plan-reference.html` and `docs/mockups/index.html` are in Spanish because they are what the institution approved.
 - **Usernames are initial + lastname**, lowercase, no dots: `mmarin`, `cperez`, `amedina`.
 - **Auth**: Argon2id password hashing, short-lived JWT + refresh, lockout on failed attempts. Every sensitive action (confirm/discard finding, approve gate, edit report) records actor + justification in the append-only audit log.
 - **No secrets in the repo.** Ever. `.env*` gitignored; CI runs Gitleaks on ourselves.
+
+---
+
+## Release rules (from the work plan's contingency table)
+
+- A positive sandbox escape test means **no release** — it is fixed even if it consumes the whole buffer.
+- A dependency rejected by the license gate is **substituted**; the allowlist never gets exceptions.
+- Test briefs whose basis paths cannot be counted reliably → scope reduced to cyclomatic complexity ≤ 10, recorded as a non-goal.
+- PDF fidelity slipping past the P1 milestone consumes buffer; P2 starts anyway (it works on data, not on the PDF).
+- Two consecutive weekly milestones missed → PHP/Java goes to a second cycle; the release ships with JS/TS + Python. The inventory (BOM + CVE) is never cut.
+- No internet for the vulnerability database → the OSV/NVD dump is imported by file, and the last-update date stays visible. Never a live query.
+- A milestone is closed only with tests passing, docs updated and `tasks/phaseN-*.md` at DONE with a commit. A Friday that does not close is Monday's first item.
+- v1.0.0 is tagged on 2026-09-18 with P0–P5 complete. Breaking changes found in the first analyst cycle are documented as 1.x → 2.0, never as "unfinished".
+- Scope changes are recorded in @docs/development-phases.md → Scope-change log, with the date.
 
 ---
 

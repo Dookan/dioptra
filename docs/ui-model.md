@@ -1,6 +1,6 @@
 # UI model
 
-> **Status: DESIGN SURFACE — not yet implemented.** Visual anchor:
+> **Status: DESIGN SURFACE — tokens, both themes and i18n are built (P0, `frontend/src/theme/`, `frontend/src/locales/`); the screens are the target.** Visual anchor:
 > @docs/mockups/index.html (10 screens, approved 2026-08-17).
 
 ## Principles (from the approved mockups)
@@ -16,6 +16,26 @@
    ("Es real — incluir en el reporte").
 4. **Friendly, sober density** — greeting + avatars with initials, progress
    bars with percentages, no log consoles outside Bitácora.
+5. **Offline is visible** — the inventory panel always shows the date of the
+   last vulnerability-database update; nothing in the UI implies a live
+   lookup.
+
+## Screens added for the work plan (2026-08-28)
+
+The 10 screens approved 2026-08-17 predate the work plan v1.0 (2026-08-21).
+Added to `docs/mockups/index.html` on 2026-08-28, same tokens and principles:
+
+- **Inventario** (screen 11, P5): tab "Inventario" in the tabs bar of every
+  screen; statistics panel — components outdated / vulnerable, by severity,
+  project, license, trend between versions; the last vulnerability-database
+  update date always visible; buttons say what they do ("Descargar SBOM
+  (CycloneDX)", "Descargar CBOM", "Descargar CSV", "Actualizar la base
+  ahora", "Importar base de vulnerabilidades").
+- **Reporte (E8)**: sections "Inventario" and "Anexos (diagramas, tests,
+  SBOM/CBOM)" in the section list.
+- **Diseño de casos (E5)**: the flow diagram is rendered Mermaid, with its
+  editable Mermaid text underneath; the brief is computed from the code, not
+  from the edited diagram, and the screen says so.
 
 ## Tokens (frontend/src/theme/tokens.css — single source)
 

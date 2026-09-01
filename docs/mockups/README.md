@@ -1,9 +1,13 @@
 # Mockups
 
-`index.html` is the approved design contract (2026-08-17) — the 10 screens of
-the full flow, self-contained (open directly in a browser; no external
-resources, per the no-CDN rule). It renders both themes via `prefers-color-scheme`
-and the `data-theme` attribute.
+`index.html` is the design contract — the 10 screens of the full flow approved
+2026-08-17, plus the additions of 2026-08-28 for the work plan v1.0: screen 11
+"Inventario" (SBOM/CBOM, open CVEs, local vulnerability-database date, exports),
+the "Inventario" tab on every screen, the editable Mermaid text on "Diseño de
+casos (E5)", and the "Inventario" / "Anexos (diagramas, tests, SBOM/CBOM)" sections on "Reporte
+(E8)". Self-contained (open directly in a browser; no external resources, per
+the no-CDN rule). It renders both themes via `prefers-color-scheme` and the
+`data-theme` attribute.
 
 How to use it during implementation:
 

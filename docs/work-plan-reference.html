@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dioptra — Plan de trabajo</title>
+<style>
+  :root{
+    --bg:#EEF1F4; --panel:#FFFFFF; --ink:#1B2330; --ink-2:#4A5565; --ink-3:#8A94A3; --line:#D6DCE3;
+    --soft:#F7F9FB; --soft-2:#FAFBFC; --hl:#E7F0F8; --grid:#E6EAEF; --grid-2:#B8C0CB;
+    --intro-bg:#FFF8E6; --intro-bd:#F0D9A0; --intro-fg:#6B4E00;
+    --tip-bg:#1B2330; --tip-fg:#FFFFFF; --tip-h:#BFD3E6; --tip-ex:#CBD3DC; --tip-acr:#DCE6F0;
+    --wp-head:#1F3864; --wp-bd:#9AA5B1;
+    --p0:#3C6E9F; --p1:#D9822B; --p2:#4F9D69; --p3:#8F5FA8; --p4:#C8443F; --p5:#3F9C9C; --buf:#A9B1BC;
+    --crit:#C8443F; --ok:#2F8F5B;
+    --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;
+    --r:6px;
+    color-scheme:light;
+  }
+  html[data-theme="dark"]{
+    --bg:#111519; --panel:#1A2027; --ink:#E7EBF1; --ink-2:#B7C0CC; --ink-3:#808B99; --line:#2A333F;
+    --soft:#1F262F; --soft-2:#1E252D; --hl:#253342; --grid:#232B35; --grid-2:#3A4653;
+    --intro-bg:#2A2414; --intro-bd:#5A4A1E; --intro-fg:#F0D9A0;
+    --tip-bg:#F2F5F8; --tip-fg:#1B2330; --tip-h:#3C6E9F; --tip-ex:#4A5565; --tip-acr:#2F3E50;
+    --wp-head:#2B4C85; --wp-bd:#3A4653;
+    --p0:#5B8FC4; --p1:#E8954A; --p2:#66B37E; --p3:#A97DC0; --p4:#DA5F5A; --p5:#55B3B3; --buf:#7F8A99;
+    --crit:#E0605B; --ok:#4CB07A;
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--sans)}
+  a{color:inherit}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 80px}
+
+  header{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:end;border-bottom:2px solid var(--ink);padding-bottom:16px;margin-bottom:22px}
+  .eyebrow{font:600 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px}
+  h1{font-size:30px;line-height:1.1;margin:0;font-weight:700;letter-spacing:-.01em}
+  h1 small{display:block;font-size:15px;font-weight:400;color:var(--ink-2);margin-top:6px}
+  .meta{font:12.5px/1.6 var(--mono);color:var(--ink-2);text-align:right}
+  .meta b{color:var(--ink);font-weight:600}
+
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:0 0 22px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+  .kpi .l{font:600 11px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+  .kpi .v{font-size:22px;font-weight:700;margin-top:6px;font-variant-numeric:tabular-nums}
+  .kpi .v span{font-size:13px;font-weight:400;color:var(--ink-2);margin-left:4px}
+  .bar{height:6px;background:var(--line);border-radius:3px;margin-top:8px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--ok);width:0%;transition:width .3s}
+
+  section{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;margin-bottom:16px}
+  section h2{font-size:13px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);margin:0 0 12px;display:flex;align-items:center;gap:10px}
+  section h2 .n{font:600 11px/1 var(--mono);color:var(--ink-3)}
+  p{margin:0 0 10px}
+  details summary{cursor:pointer;color:var(--ink-2);font-size:14px;user-select:none}
+  details[open] summary{margin-bottom:10px}
+  .risk-list{margin:8px 0 0;padding-left:18px}
+  .risk-list li{margin-bottom:6px}
+
+  /* Gantt */
+  .gantt-wrap{overflow-x:auto}
+  svg.gantt{display:block;min-width:900px;width:100%;height:auto;font-family:var(--sans)}
+  .gantt text{fill:var(--ink-2);font-size:11px}
+  .gantt .lbl{fill:var(--ink);font-size:12px}
+  .gantt .wk{fill:var(--ink-3);font:600 10px var(--mono);letter-spacing:.08em}
+  .gantt .grid{stroke:var(--grid);stroke-width:1}
+  .gantt .wkline{stroke:var(--grid-2);stroke-width:1;stroke-dasharray:3 3}
+  .gantt .today{stroke:var(--ink);stroke-width:1.5}
+  .gantt .bar{cursor:pointer;transition:opacity .15s}
+  .gantt .bar:hover rect.fill{filter:brightness(.9)}
+  .gantt .bar.sel rect.fill{stroke:var(--ink);stroke-width:2}
+  .gantt .bar.done rect.fill{opacity:.45}
+  .gantt .bar.done .chk{display:block}
+  .gantt .chk{display:none;fill:var(--panel);font-size:11px;font-weight:700}
+  .gantt .ms{fill:var(--ink)}
+  .gantt .ms-l{fill:var(--ink);font-size:10.5px;font-weight:700}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font:12px var(--mono);color:var(--ink-2);margin-top:10px}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend i{width:14px;height:10px;border-radius:2px;display:inline-block}
+  .legend i.hatch{background:repeating-linear-gradient(135deg,var(--panel) 0 3px,var(--crit) 3px 5px);border:1px solid var(--crit)}
+
+  /* Detail */
+  .detail{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media (max-width:800px){.detail{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}header{grid-template-columns:1fr}.meta{text-align:left}}
+  .day{border-left:4px solid var(--ph);padding:4px 0 4px 14px}
+  .day .h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .day .d{font:600 12px var(--mono);color:var(--ink-3);letter-spacing:.05em}
+  .day .t{font-size:18px;font-weight:700;margin:2px 0 8px}
+  .tag{display:inline-block;font:600 10.5px var(--mono);letter-spacing:.06em;padding:2px 7px;border-radius:3px;background:var(--ph);color:#fff;vertical-align:middle}
+  .tag.crit{background:var(--crit)}
+  .tag.buf{background:var(--buf)}
+  .day .body p{margin:0 0 8px}
+  .crit-box{border:1px solid var(--line);background:var(--soft);border-radius:var(--r);padding:10px 12px;margin-top:8px;font-size:14px}
+  .crit-box .l{font:600 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}
+  .chkrow{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13.5px;color:var(--ink-2)}
+  .chkrow input{width:16px;height:16px;accent-color:var(--ok)}
+  .nav{display:flex;gap:8px;margin-top:12px}
+  .nav button,.tabs button{font:13px var(--sans);border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:6px 12px;border-radius:4px;cursor:pointer}
+  .nav button:hover,.tabs button:hover{border-color:var(--ink-2)}
+  .nav button:focus-visible,.tabs button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+  .tabs button.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+  .weekbox h3{font-size:15px;margin:0 0 6px}
+  .weekbox .obj{color:var(--ink-2);font-size:14px;margin-bottom:10px}
+  .weekbox .cl{border-top:1px dashed var(--line);padding-top:10px;margin-top:10px;font-size:14px}
+  .weekbox .cl b{font:600 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);display:block;margin-bottom:4px}
+  .dl{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;margin-top:4px}
+  .dl div{border:1px solid var(--line);border-radius:4px;padding:8px 10px;font-size:13.5px;background:var(--soft-2)}
+  .dl div.done-item{opacity:.55;text-decoration:line-through}
+
+  /* deps */
+  svg.deps{display:block;width:100%;height:auto;max-width:900px;font-family:var(--sans)}
+  .deps text{font-size:11.5px;fill:var(--ink)}
+  .deps .node{fill:var(--panel);stroke:var(--ink-2);stroke-width:1.2;rx:4}
+  .deps .node.crit{stroke:var(--crit);stroke-width:2}
+  .deps .edge{stroke:var(--ink-3);stroke-width:1.3;fill:none;marker-end:url(#arr)}
+  .deps .edge.crit{stroke:var(--crit);stroke-width:1.8}
+  .deps .edge.loop{stroke-dasharray:4 3}
+
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+  .foot{font:12px var(--mono);color:var(--ink-3);margin-top:18px}
+
+  .theme-btn{margin-top:8px;font:600 12px var(--sans);border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:5px 10px;border-radius:4px;cursor:pointer}
+  .theme-btn:hover{border-color:var(--ink-2)}
+  .theme-btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .persist{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:var(--panel);border:1px dashed var(--line);border-radius:var(--r);padding:10px 14px;margin:-8px 0 16px;font-size:13px;color:var(--ink-2)}
+  .persist-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .persist button{font:600 12px var(--sans);border:1px solid var(--ink-2);background:var(--panel);color:var(--ink);padding:5px 10px;border-radius:4px;cursor:pointer}
+  .persist button:hover{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+  .persist button.ghost{border-color:var(--line);color:var(--ink-3)}
+  .persist button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .persist .dirty{color:var(--p1);font-weight:600}
+  /* ---- vistas del cronograma ---- */
+  .view{display:none}.view.on{display:block}
+  .backbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+  .backbar button{font:600 13px var(--sans);border:1px solid var(--ink);background:var(--panel);color:var(--ink);padding:7px 14px;border-radius:4px;cursor:pointer}
+  .backbar button:hover{background:var(--ink);color:var(--panel)}
+  .backbar button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .backbar .pos{font:12px var(--mono);color:var(--ink-3)}
+  /* ---- tabla plan de trabajo ---- */
+  table.wp{border:1px solid var(--wp-bd);font-size:13.5px}
+  table.wp th{background:var(--wp-head);color:#fff;font:600 12px var(--sans);text-transform:none;letter-spacing:0;text-align:center;border:1px solid var(--wp-bd);padding:6px 8px}
+  table.wp td{border:1px solid var(--wp-bd);padding:5px 8px;vertical-align:middle}
+  table.wp td.id{text-align:center;font-variant-numeric:tabular-nums;width:44px}
+  table.wp td.dt{text-align:center;white-space:nowrap;width:110px;font-variant-numeric:tabular-nums}
+  table.wp td.num{text-align:center;width:64px;font-variant-numeric:tabular-nums}
+  table.wp tfoot td{background:var(--soft);color:var(--ink);font-weight:600;border:1px solid var(--wp-bd);padding:6px 8px}
+  table.wp td.nm{cursor:pointer}
+  table.wp td.nm:hover{background:var(--hl)}
+  table.wp td.nm .ph{font-weight:600}
+  table.wp tr.ms td.nm::after{content:" ◆";color:var(--ink)}
+  table.wp tr.done td{opacity:.55}
+  table.wp tr.done td.nm{text-decoration:line-through}
+  table.lg{border:1px solid var(--wp-bd);width:auto;min-width:420px;font-size:13.5px;margin-top:12px}
+  table.lg td{border:1px solid var(--wp-bd);padding:4px 10px}
+  table.lg td:first-child{font-weight:600;width:200px}
+  .wp-cap{font:600 13px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--wp-head);text-align:center;margin:4px 0 10px}
+  /* ---- guía / tooltips ---- */
+  .term{border-bottom:1.5px dotted var(--p0);cursor:help;text-decoration:none;color:inherit}
+  .term:hover,.term:focus{background:var(--hl);outline:none}
+  body.plain .term{border-bottom:none;cursor:inherit}
+  body.plain .term:hover{background:none}
+  #tip{position:fixed;z-index:50;max-width:320px;background:var(--tip-bg);color:var(--tip-fg);padding:10px 12px;border-radius:6px;font-size:13px;line-height:1.5;box-shadow:0 6px 24px rgba(0,0,0,.25);display:none;pointer-events:auto}
+  #tip b{display:block;font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--tip-h);margin-bottom:4px}
+  #tip .acr{display:block;font:12px var(--mono);color:var(--tip-acr);margin:-2px 0 6px;padding-bottom:6px;border-bottom:1px solid var(--tip-h)}
+  #tip .ex{display:block;margin-top:6px;color:var(--tip-ex);font-size:12.5px}
+  #tip .ex i{color:var(--tip-h);font-style:normal}
+  .intro{background:var(--intro-bg);border:1px solid var(--intro-bd);border-radius:var(--r);padding:16px 20px;margin-bottom:16px}
+  .intro h2{margin:0 0 8px;font-size:15px;color:var(--intro-fg)}
+  .intro p{font-size:14.5px;margin:0 0 8px}
+  .intro .how{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px}
+  .intro .how div{background:var(--panel);border:1px solid var(--intro-bd);border-radius:4px;padding:9px 11px;font-size:13.5px}
+  .intro .how b{display:block;font-size:13px;margin-bottom:3px}
+  .toggle{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);cursor:pointer;margin-top:10px}
+  .toggle input{accent-color:var(--p0)}
+  .why{font-size:13px;color:var(--ink-2);background:var(--soft);border-left:3px solid var(--p0);padding:8px 12px;margin:10px 0;border-radius:0 4px 4px 0}
+  .why b{color:var(--ink)}
+  .stepper{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;margin:10px 0 12px}
+  .stepper button{font:600 12px var(--mono);border:1px solid var(--line);background:var(--panel);padding:8px 4px;border-radius:4px;cursor:pointer;color:var(--ink-2)}
+  .stepper button.on{background:var(--p0);color:#fff;border-color:var(--p0)}
+  .stepper button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .stepbody{border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;background:var(--soft-2);font-size:14px}
+  .stepbody h4{margin:0 0 6px;font-size:15px}
+  .stepbody .who{font:600 10.5px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:6px}
+  .stepbody .who span{color:var(--ink)}
+  .faq details{border-top:1px solid var(--line);padding:8px 0}
+  .faq details:last-child{border-bottom:1px solid var(--line)}
+  .faq summary{font-weight:600;font-size:14px;color:var(--ink)}
+  .faq p{font-size:14px;color:var(--ink-2);margin:8px 0 0}
+  @media (max-width:700px){.stepper{grid-template-columns:repeat(4,1fr)}}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="tip" role="tooltip"></div>
+<div class="wrap">
+
+<header>
+  <div>
+    <div class="eyebrow">Plan de trabajo · v1.0 · 21/08/2026</div>
+    <h1 style="font-size:24px">Dioptra — Plataforma de análisis de caja blanca<small>Plan de trabajo · cronograma de construcción — roadmap P0–P5</small></h1>
+  </div>
+  <div class="meta">
+    <b>Período</b> 24/08 – 18/09/2026 · 4 semanas · 20 días hábiles<br>
+    <b>Recursos</b> 1 ingeniero, dedicación completa<br>
+    <b>Dificultad</b> alta para el plazo (ver §1)<br><b>Entrega</b> release v1.0.0 el 18/09 · alcance P0–P5 completo<br>
+    <button type="button" id="themeBtn" class="theme-btn" aria-pressed="false">☾ Modo oscuro</button>
+  </div>
+</header>
+
+
+<div class="intro">
+  <h2>Cómo leer este documento</h2>
+  <p>Este es el plan de trabajo de la plataforma, pero con ayudas para quien no vive en el mundo del código. Todo lo <span class="term" data-k="_demo">subrayado con puntos</span> tiene una explicación corta: pasa el cursor por encima (o tócalo en el teléfono). Las cajas azules marcadas "¿Por qué?" cuentan la razón de una decisión. Nada de esto cambia el contenido del plan; solo lo traduce.</p>
+  <div class="how">
+    <div><b>¿Qué es la plataforma?</b>Una aplicación web interna que revisa el código de un sistema por dentro, encuentra problemas de seguridad y calidad, arma el informe oficial, lleva el inventario de componentes (SBOM/CBOM) de cada proyecto y obliga a los programadores a escribir pruebas siguiendo un orden.</div>
+    <div><b>¿Qué es este plan?</b>Un calendario de 4 semanas (20 días hábiles) para construir esa aplicación, día por día, con una sola persona.</div>
+    <div><b>¿Qué se entrega al final?</b>La aplicación funcionando (versión 1.0.0), su documentación y un proyecto real que ya pasó por todo el proceso.</div>
+    <div><b>¿Cómo se usa esta página?</b>Haz clic en cualquier barra del cronograma para ver qué se hace ese día. Marca "día cerrado" para ir viendo el avance.</div>
+  </div>
+  <label class="toggle"><input type="checkbox" id="plainToggle"> Ocultar los subrayados de ayuda (vista limpia)</label>
+</div>
+<div class="kpis">
+  <div class="kpi"><div class="l">Avance</div><div class="v" id="kpiPct">0<span>%</span></div><div class="bar"><i id="kpiBar"></i></div></div>
+  <div class="kpi"><div class="l">Días cerrados</div><div class="v"><span id="kpiDone" style="font-size:22px;color:var(--ink);margin:0">0</span><span>/ 20</span></div></div>
+  <div class="kpi"><div class="l">Esfuerzo neto</div><div class="v">~80<span>h</span></div></div>
+  <div class="kpi"><div class="l">Hitos</div><div class="v" id="kpiMs">0<span>/ 4</span></div></div>
+</div>
+
+
+<div class="persist" id="persistBar">
+  <span id="persistMsg">El avance (días cerrados) se guarda solo en este navegador y en el enlace de la página.</span>
+  <span class="persist-actions">
+    <button type="button" id="copyLinkBtn">Copiar enlace con avance</button>
+    <button type="button" id="saveCopyBtn">Descargar copia con avance</button>
+    <button type="button" id="resetBtn" class="ghost">Reiniciar avance</button>
+  </span>
+</div>
+
+<section>
+  <h2><span class="n">§0</span> El sistema en 8 pasos — así trabaja la plataforma con un proyecto</h2>
+  <p style="font-size:14px;color:var(--ink-2)">Antes de ver el calendario conviene entender qué hace la herramienta, porque las semanas del plan construyen justamente estos pasos. Haz clic en cada uno.</p>
+  <div class="stepper" id="stepper"></div>
+  <div class="stepbody" id="stepbody"></div>
+  <div class="why"><b>¿Por qué tantos pasos?</b> Porque el código que llega nunca trae planificación, diseño ni pruebas: solo llega código. La herramienta reconstruye lo que faltó, en el orden en que debió existir. Y las etapas tienen "compuertas": el sistema no deja avanzar al paso siguiente si el anterior no está cerrado. La disciplina no depende de la buena voluntad de nadie.</div>
+</section>
+<section>
+  <h2><span class="n">§1</span> Estimación y nivel de riesgo</h2>
+  <p>Un solo recurso: no hay paralelismo real y cualquier bloqueo detiene todo. En un equipo de tres, el sandbox se investiga mientras otro arma el reporte; aquí no.</p>
+  <p>Tres componentes no se resuelven con horas de teclado sino con investigación y prueba: el <b>sandbox de ejecución</b> (código de terceros, hostil por definición; compuerta de investigación obligatoria y pruebas de escape antes de cerrar), el <b>reporte PDF</b> (el criterio de éxito de P1 es estructura indistinguible del informe institucional hecho a mano — WeasyPrint contra plantilla institucional requiere vueltas) y la <b>consigna desde el AST</b> (caminos base, ramas con línea, valores frontera; análisis estático propio, determinista, sin librería que lo regale).</p>
+  <p>Al alcance original se suma el módulo de inventario de software: SBOM, CBOM y VEX en CycloneDX, correlación contra una base CVE local (OSV + NVD) y estadísticas de lo vulnerable y desactualizado. Entra en la semana 4 y desplaza PHP/Java a un día de buffer; el buffer total baja de dos días a uno. Nota: Docker Scout queda descartado por licencia (servicio propietario); la equivalencia libre es OSV + NVD sincronizados localmente, o Dependency-Track (Apache-2.0) si se prefiere componente externo.<br><br>A eso se suma la disciplina de construcción que el mismo plan impone: ninguna fase cierra sin tests ni docs, revisión pre-commit con triage, CI que rompe por licencias o CDNs. Overhead asumido.</p>
+  <details>
+    <summary>Ver razonamiento del margen (~2×) y alternativa de recorte</summary>
+    <p>Esfuerzo neto de desarrollo: ~80 h. El resto del período va a investigación previa, iteración del reporte, pruebas del sandbox y documentación. El margen resultante está dentro de lo habitual para un greenfield unipersonal con componentes de seguridad.</p>
+    <p>Si el alcance se recorta a P0–P3 el plazo baja a 3 semanas. No se recomienda: P4 es donde el workflow deja de ser teórico.</p>
+  </details>
+  <div class="why"><b>¿Por qué?</b> En términos simples: escribir el código puro llevaría unas dos semanas. Las otras dos se van en investigar antes de tocar las partes peligrosas, en probar que el informe salga igual al oficial, en documentar y en verificar que nada se puede romper desde afuera. Si se quita ese tiempo, lo que se entrega funciona "en la máquina de quien lo hizo" y nada más.</div>
+</section>
+
+<section id="cronoSec">
+  <h2><span class="n">§2</span> Cronograma · clic en una barra para abrir el detalle del día</h2>
+  <div id="ganttView" class="view on">
+    <div class="gantt-wrap"><svg class="gantt" id="gantt" role="img" aria-label="Diagrama de Gantt del plan"></svg></div>
+    <div class="why"><b>Cómo leer el Gantt:</b> cada fila es una tarea, cada columna es un día hábil. La barra dice qué día se hace. Las barras con rayas rojas son la <span class="term" data-k="ruta crítica">ruta crítica</span>. Los rombos negros ◆ son <span class="term" data-k="hito">hitos</span>. Las barras grises del final son <span class="term" data-k="buffer">buffer</span>. Los colores son las <span class="term" data-k="fase">fases</span> P0 a P5. Al hacer clic en una barra, este mismo recuadro cambia al detalle del día; el botón "Volver al cronograma" regresa aquí.</div>
+    <div class="legend">
+      <span><i style="background:var(--p0)"></i>P0 Fundaciones</span>
+      <span><i style="background:var(--p1)"></i>P1 MVP auditoría</span>
+      <span><i style="background:var(--p2)"></i>P2 UI</span>
+      <span><i style="background:var(--p3)"></i>P3 Workflow E1–E5</span>
+      <span><i style="background:var(--p4)"></i>P4 E6–E7</span>
+      <span><i style="background:var(--p5)"></i>P5 Cierre</span>
+      <span><i style="background:var(--buf)"></i>Buffer</span>
+      <span><i class="hatch"></i>Ruta crítica</span>
+      <span>◆ Hito</span>
+    </div>
+  </div>
+  <div id="detailView" class="view">
+    <div class="backbar"><button type="button" id="backBtn">← Volver al cronograma</button><span class="pos" id="posLbl"></span></div>
+    <div class="tabs" id="tabs"></div>
+    <div class="detail">
+      <div id="dayPanel"></div>
+      <div id="weekPanel" class="weekbox"></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">§3</span> Plan de trabajo — resumen de actividades</h2>
+  <p style="font-size:14px;color:var(--ink-2);margin-bottom:10px">Las mismas 20 actividades del cronograma, en formato de tabla. Cada fila abre el detalle del día al hacer clic sobre el nombre. Las fechas son de inicio y fin de cada actividad (todas son de un día hábil, jornada de 8 horas); las marcadas con ◆ cierran un hito. El total de horas corresponde a dedicación completa; de esas, unas 80 son construcción pura y el resto investigación previa, pruebas de seguridad y documentación (ver §1).</p>
+  <div class="wp-cap">Plan de trabajo</div>
+  <div style="overflow-x:auto"><table class="wp" id="wpTable">
+    <thead><tr><th>ID</th><th>Nombre de tarea</th><th>Comienzo</th><th>Fin</th><th>Días</th><th>Horas</th></tr></thead>
+    <tbody></tbody>
+    <tfoot><tr><td colspan="4" style="text-align:right;font-weight:600">Total estimado</td><td class="dt" id="wpDays"></td><td class="dt" id="wpHours"></td></tr></tfoot>
+  </table></div>
+  <div class="wp-cap" style="margin-top:16px">Leyenda</div>
+  <table class="lg">
+    <tr><td style="color:var(--p0)">Color azul</td><td>Fase P0 — Fundaciones</td></tr>
+    <tr><td style="color:var(--p1)">Color naranja</td><td>Fase P1 — MVP de auditoría</td></tr>
+    <tr><td style="color:var(--p2)">Color verde</td><td>Fase P2 — Interfaz de hallazgos</td></tr>
+    <tr><td style="color:var(--p3)">Color violeta</td><td>Fase P3 — Workflow E1–E5</td></tr>
+    <tr><td style="color:var(--p4)">Color rojo</td><td>Fase P4 — Etapas E6–E7</td></tr>
+    <tr><td style="color:var(--p5)">Color turquesa</td><td>Fase P5 — Cierre</td></tr>
+    <tr><td style="color:var(--buf)">Color gris</td><td>Buffer (margen para desbordes)</td></tr>
+    <tr><td>◆</td><td>Actividad que cierra un hito semanal</td></tr>
+  </table>
+</section>
+
+<section>
+  <h2><span class="n">§4</span> Dependencias y ruta crítica</h2>
+  <svg class="deps" id="deps" viewBox="0 0 900 250" role="img" aria-label="Grafo de dependencias"></svg>
+  <div class="why"><b>Cómo leer el grafo:</b> cada caja es un bloque de trabajo y cada flecha dice "esto no puede empezar hasta que aquello termine". Las cajas con borde rojo son las que, si se atrasan, atrasan todo lo que viene después. La flecha punteada de abajo es un bucle: si al medir la <span class="term" data-k="cobertura">cobertura</span> no se llega a lo planificado, se vuelve a diseñar los casos.</div>
+  <p style="margin-top:8px;font-size:14px;color:var(--ink-2)">Ruta crítica: PDF de P1 → consigna de E5 → sandbox de E7. Son los tres puntos donde un desborde no se puede esquivar trabajando en otra cosa. El buffer existe para ellos.</p>
+</section>
+
+<section>
+  <h2><span class="n">§5</span> Contingencias</h2>
+  <table>
+    <thead><tr><th style="width:45%">Situación</th><th>Acción</th></tr></thead>
+    <tbody>
+      <tr><td>El PDF no alcanza fidelidad el viernes de S2</td><td>Se consume buffer de S4. P2 arranca igual: trabaja sobre datos, no sobre el PDF.</td></tr>
+      <tr><td>Prueba de escape del sandbox positiva</td><td>No hay release. Se corrige aunque consuma el buffer completo.</td></tr>
+      <tr><td>Consignas con caminos base mal contados</td><td>Alcance reducido a complejidad ≤ 10; documentado como non-goal.</td></tr>
+      <tr><td>CI rechaza una dependencia por licencia</td><td>Se sustituye. No se agregan excepciones a la allowlist.</td></tr>
+      <tr><td>Dos hitos semanales consecutivos sin cerrar</td><td>P5 (PHP/Java) pasa a un segundo ciclo. El release sale con JS/TS + Python. El inventario BOM + CVE no se recorta: es entregable de la fábrica, no de un lenguaje.</td></tr>
+      <tr><td>La base de vulnerabilidades no se puede sincronizar (sin salida a internet)</td><td>Se importa el dump de OSV/NVD a mano (archivo) y queda fecha de última actualización visible en el panel. Nunca se consulta un servicio externo en vivo.</td></tr>
+    </tbody>
+  </table>
+  <div class="why"><b>¿Por qué una tabla de contingencias?</b> Porque algo va a salir distinto a lo planeado; la pregunta no es si, sino qué. Decidir de antemano qué se hace evita improvisar bajo presión. Por ejemplo: si el sandbox falla una prueba de seguridad, no hay entrega ese día, punto. Eso está escrito ahora para que nadie lo negocie después.</div>
+  <p style="margin-top:10px;font-size:14px;color:var(--ink-2)">Regla general: un hito no se declara cerrado sin tests pasando, docs actualizadas y <code>tasks/Px.md</code> en DONE con commit. Si un viernes no cierra, el lunes se arranca por lo pendiente.</p>
+</section>
+
+<section>
+  <h2><span class="n">§6</span> Entregables al 18/09</h2>
+  <div class="dl" id="deliverables"></div>
+  <div class="crit-box" style="margin-top:14px">
+    <div class="l">Versión y alcance</div>
+    El release del 18/09 se etiqueta <b>v1.0.0</b>: cubre el roadmap completo P0–P5, es decir, todo lo definido en el plan de desarrollo de agosto. No es una versión parcial.<br>
+    Queda fuera, tal como ya lo dejaba el plan de desarrollo como "según demanda": fase 3 de lenguajes (Go, C#/.NET) y el empaquetado Tauri para uso offline. Ninguno de los dos condiciona el funcionamiento de la plataforma.<br>
+    <span style="color:var(--ink-2)">Nota sobre el número: 1.0 en SemVer implica API estable. La estabilidad real se confirma con el primer ciclo de uso por analistas; si en ese ciclo aparecen cambios rompientes, se documentan como 1.x → 2.0 y no como "no estaba terminado".</span>
+  </div>
+</section>
+
+
+<section class="faq">
+  <h2><span class="n">§7</span> Preguntas que suelen aparecer</h2>
+  <details><summary>¿Por qué una sola persona? ¿No sería más rápido con un equipo?</summary><p>Sería más rápido, sí, pero el plan está hecho con el recurso que hay. Por eso el calendario tiene margen: cuando una persona se traba, no hay otra avanzando en paralelo.</p></details>
+  <details><summary>¿Qué pasa si el 18 de septiembre no está listo?</summary><p>La tabla de contingencias lo dice: lo primero que se recorta es el soporte de PHP y Java, que pasa a una segunda ronda. Lo que sí o sí se entrega es la plataforma funcionando con JavaScript/TypeScript y Python, que es lo que más se usa en la fábrica.</p></details>
+  <details><summary>¿La herramienta escribe los tests por los programadores?</summary><p>No, y es a propósito. La herramienta arma el esqueleto del archivo (nombre, imports, títulos de los casos) y entrega una guía de qué hay que probar. Las pruebas reales las escribe el programador. La idea es que aprenda el hábito; si la máquina lo hiciera, no se aprendería nada.</p></details>
+  <details><summary>¿Usa inteligencia artificial?</summary><p>No. Todo lo que hace es análisis determinista: las mismas entradas dan siempre la misma salida. Eso importa para un informe oficial, donde se tiene que poder explicar de dónde salió cada hallazgo.</p></details>
+  <details><summary>¿Por qué tanto cuidado con las licencias y los CDNs?</summary><p>Dos razones. La plataforma exige a los sistemas que audita que no dependan de servidores externos; sería incoherente que ella sí. Y en el contexto local, depender de un servicio de terceros que puede caerse o bloquearse es un riesgo real, no teórico.</p></details>
+  <details><summary>¿Qué significa "la plataforma se audita a sí misma"?</summary><p>Que el último día se le pasa su propio análisis al código de la plataforma, como a cualquier otro sistema, y tiene que salir limpia (sin hallazgos graves abiertos sin explicación). Es la prueba de que la herramienta cumple lo que exige.</p></details>
+  <details><summary>¿Qué es eso del inventario de software (SBOM, CBOM)?</summary><p>Es la lista de materiales de cada sistema: qué librerías usa, en qué versión, con qué licencia y qué criptografía. Se guarda en un formato estándar (CycloneDX) y se cruza contra la base pública de vulnerabilidades. Así, cuando aparece una falla nueva en una librería, en minutos se sabe qué proyectos de la fábrica la tienen adentro y cuáles están fuera de versión. Sin eso, la respuesta es "revisar proyecto por proyecto a mano".</p></details>
+  <details><summary>¿Por qué no usar Docker Scout, que ya hace eso?</summary><p>Porque es un servicio propietario y en la nube, y el plan exige dos cosas: solo software con licencia libre, y funcionar aislado sin depender de terceros. La base de vulnerabilidades se descarga periódicamente desde fuentes públicas (OSV y NVD, que publica los CVE de CVE.org) y se consulta localmente.</p></details>
+  <details><summary>¿Por qué versión 1.0.0 y no 0.1?</summary><p>Porque el 18/09 se entrega todo lo que se definió en el plan de desarrollo, no una parte. Lo que queda fuera (Go, .NET, versión de escritorio) ya estaba fuera desde el diseño original. El número dice "completo según lo acordado".</p></details>
+</section>
+<div class="foot">Pendiente de revisión: fechas sujetas a confirmación de disponibilidad del recurso. Cambios de alcance se registran en <code>development-phases.md</code> con fecha. El avance marcado aquí se guarda en este navegador y en el enlace; para llevarlo a otro equipo usa "Descargar copia con avance".</div>
+</div>
+
+<script id="cbsState" type="application/json">{"done":"00000000000000000000"}</script>
+<script>
+const SRC_HTML = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+const PH = {P0:'--p0',P1:'--p1',P2:'--p2',P3:'--p3',P4:'--p4',P5:'--p5',BUF:'--buf'};
+const START = new Date(2026,7,24);
+const DOW = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+function bd(i){const w=Math.floor(i/5),d=i%5;const x=new Date(START);x.setDate(x.getDate()+w*7+d);return x;}
+function fmt(d){return DOW[d.getDay()]+' '+String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');}
+
+const HOURS_PER_DAY = 8;
+const DAYS = [
+ {ph:'P0',t:'Repo, docs, tasks/, commits',b:'Repo, estructura de directorios, <code>docs/</code> con los archivos base (<code>architecture.md</code>, <code>threat-model.md</code>, <code>standards-mapping.md</code>, <code>glossary.md</code>, <code>development-phases.md</code>), plantilla de <code>tasks/</code>, hooks de Conventional Commits. Se abre <code>tasks/P0.md</code> en IN_PROGRESS.'},
+ {ph:'P0',t:'Docker Compose + esqueletos',b:'Compose: API, frontend, Postgres, Valkey, worker RQ. Esqueleto FastAPI + SQLAlchemy + Alembic. Esqueleto React 19 + Vite, servido desde el servidor propio.',c:'<code>docker compose up</code> levanta todo, health checks en verde.'},
+ {ph:'P0',t:'Auth (compuerta + Argon2id / JWT / roles)',gate:true,b:'Pasa por compuerta de investigación primero (es auth). Después: Argon2id, JWT de corta vida + refresh, bloqueo por intentos, roles admin/analyst/developer, bitácora mínima. Se inicia <code>standards-mapping.md</code> con los controles ASVS que ya quedan cubiertos.'},
+ {ph:'P0',t:'i18n es/en + tema claro/oscuro',b:'react-i18next, <code>es.json</code> / <code>en.json</code>, ninguna cadena en código, lint que lo verifique. Tema con tokens. Revisar que las severidades se lean bien en ambos temas — es fácil que el rojo/naranja se pierda en oscuro.'},
+ {ph:'P0',t:'CI: licencias, sin CDNs, tests',ms:'Hito P0',b:'Lint, tests, verificador de licencias (allowlist: Apache-2.0, MIT, BSD, MPL, LGPL, GPL), detección de dependencias desactualizadas, prohibición de CDNs. Prueba negativa documentada: la CI debe fallar al meter una dependencia con licencia no libre.',c:'Cierre de <code>tasks/P0.md</code> en DONE con fecha y commit.'},
+ {ph:'P1',t:'Modelo de datos + ingesta ZIP/git',b:'Proyectos, sistemas con metadatos (E1), análisis, hallazgos. Ingesta ZIP y URL git (E2) con detección de lenguajes, frameworks y lockfiles. Encolado en RQ, estado consultable por API.'},
+ {ph:'P1',t:'Runners Semgrep / Gitleaks / OSV + SBOM CycloneDX',b:'Contenedores efímeros: Semgrep CE con reglas propias iniciales (incluida la de CDN → CWE-829 / A08:2021), Gitleaks, OSV-Scanner. En el mismo paso se genera el SBOM del proyecto en CycloneDX 1.6 (Syft / cdxgen, Apache-2.0) a partir de los lockfiles y del árbol de dependencias; es el insumo del SCA y del inventario. Timeout y límites de recursos por herramienta. Salida cruda persistida.'},
+ {ph:'P1',t:'Normalización SARIF + CWE/OWASP/CVSS',b:'Mapeo CWE → OWASP Top 10:2021, CVSS 3.1 calculado, dedupe. Lizard + cloc para métricas. Cada hallazgo queda con ruta:línea, fragmento, CWE, OWASP, CVSS y mitigación sugerida. "CWE desconocido" se modela como estado válido, no como error.'},
+ {ph:'P1',t:'Reporte Jinja2 → HTML → WeasyPrint',b:'Plantilla institucional completa (portada, introducción, resumen ejecutivo, detalles del sistema, control de versiones, hallazgos). Export MD y DOCX básico. Primer PDF con datos reales.'},
+ {ph:'P1',t:'Fidelidad PDF vs informe institucional',crit:true,ms:'Hito P1 (PDF)',b:'Día completo para iteración de fidelidad contra el informe institucional (backend) existente. Comparación sección por sección.',c:'Estructura indistinguible del informe manual. Criterio de éxito de P1.'},
+ {ph:'P2',t:'Visor + triage de hallazgos',b:'Filtros por severidad, OWASP, herramienta, archivo. Triage: confirmar / falso positivo con justificación obligatoria. Todo a bitácora.'},
+ {ph:'P2',t:'Editor de reporte versionado',b:'Editor por secciones, control de versiones del documento automático, export de la versión vigente. Resumen ejecutivo visual (distribución por severidad y categoría OWASP).'},
+ {ph:'P3',t:'E4 matriz de riesgo + compuertas',b:'Complejidad ciclomática × hallazgos × criticidad. Criterio de cobertura por módulo, justificado por escrito. Compuertas en servidor: la API rechaza avanzar sin la etapa anterior aprobada.',c:'Se prueba intentando saltar las compuertas por API directamente, sin UI.'},
+ {ph:'P3',t:'E5 AST → diagramas Mermaid',b:'Parseo de AST de funciones priorizadas (JS/TS y Python). Diagramas de flujo deterministas a Mermaid, editables.'},
+ {ph:'P3',t:'E5 consigna + pseudocódigo',crit:true,ms:'Hito P2+P3',b:'Firma, caminos base (McCabe), ramas con línea, valores frontera desde comparaciones, caminos de error, casos maliciosos asociados a hallazgos SAST. Editor de pseudocódigo con aprobación.',c:'Consignas para mínimo tres funciones reales con caminos base contados a mano y coincidentes.'},
+ {ph:'P4',t:'E6 sandbox (compuerta) + andamiaje',crit:true,gate:true,b:'Compuerta de investigación para el sandbox (survey, pseudocódigo, veredicto) — sin excepción. Luego E6: andamiaje determinista desde AST + pseudocódigo aprobado (Jest/Vitest, PyTest). La plataforma genera archivo, imports y nombres de casos; las aserciones las escribe el programador.'},
+ {ph:'P4',t:'E7 sandbox, cobertura, mutation',crit:true,b:'Docker sin red, CPU/RAM limitados, FS solo lectura salvo workspace. Cobertura de sentencias y ramas contra el criterio de E4, rama por rama. Reglas para tests sin aserciones o triviales. Mutation testing (Stryker, mutmut). Bucle E7 → E5 cuando la cobertura no alcanza.',c:'Pruebas de escape del sandbox, documentadas en <code>threat-model.md</code>.'},
+ {ph:'P5',t:'Inventario BOM + correlación CVE + estadísticas',b:'Módulo de inventario de software de la fábrica sobre los BOM CycloneDX: SBOM por proyecto y versión, CBOM (inventario criptográfico: algoritmos, tamaños de clave, protocolos, certificados) y VEX para marcar qué vulnerabilidades aplican y cuáles no. Base local de vulnerabilidades sincronizada periódicamente desde OSV y NVD (CVE.org) — sin consultas en vivo a terceros. Correlación BOM ↔ CVE y panel de estadísticas: componentes desactualizados, vulnerables, por severidad, por proyecto, por licencia, tendencia entre versiones. Export CycloneDX JSON y CSV.',c:'Para un proyecto real: SBOM válido contra el schema 1.6, CBOM con al menos los algoritmos detectados, y el panel mostrando qué componentes tienen CVE abiertos y cuáles están fuera de versión.'},
+ {ph:'P5',t:'PHP/Java, bitácora, anexos',b:'PHP/Laravel y Java/Spring (detector, andamiaje PHPUnit/JUnit, reglas Semgrep propias), Infection y Pitest. Bitácora completa. Sección de deuda de pruebas, sección de inventario (BOM y CVE abiertos) y anexos en el reporte (ASVS, diagramas, pseudocódigo, código de tests, SBOM/CBOM adjuntos). Es la primera tarea que se recorta si hubo desbordes en S2–S4.'},
+ {ph:'BUF',t:'Buffer / hardening / auto-auditoría + release v1.0.0',ms:'Release',b:'Buffer para desbordes de S2–S4. Hardening (headers de seguridad, rate limiting, rotación de refresh tokens). Auto-auditoría de la plataforma con su propio pipeline. Checklist ASVS L2 completo en <code>standards-mapping.md</code>. <code>threat-model.md</code> final. Tag v1.0.0. Fuera de alcance (ya previsto en el plan de desarrollo): fase 3 de lenguajes (Go, C#/.NET) y empaquetado Tauri offline.',c:'Un proyecto real recorre E1–E8; sandbox supera pruebas de escape; sin hallazgos altos abiertos sin justificación; docs en inglés; locales sin claves faltantes.'},
+];
+const WEEKS = [
+ {n:1,ph:'P0 Fundaciones',obj:'Que el repo nazca con las reglas puestas. CI, licencias, sin CDNs, tests desde el primer commit. Agregar eso después cuesta el doble.',hito:'Auth con roles, i18n, tema; CI verde con verificador de licencias.',risk:'Elección de librerías de JWT y Argon2 que cumplan licencia y tengan mantenimiento activo; fricción del verificador con dependencias transitivas. Mitigación: lista de dependencias cerrada antes de instalar nada.'},
+ {n:2,ph:'P1 MVP de auditoría',obj:'Replicar el proceso manual actual de punta a punta. Es la semana que más pesa: su criterio de éxito es el más concreto del plan.',hito:'Repo real → pipeline → PDF con la plantilla institucional, aprobado lado a lado.',risk:'WeasyPrint y los detalles finos de la plantilla (tablas largas, saltos de página, encabezados repetidos); hallazgos de Semgrep sin CWE; reglas del registro público de Semgrep con licencia restrictiva, por lo que solo se usan reglas propias. Por eso el viernes es entero para el PDF.'},
+ {n:3,ph:'P2 UI + P3 Workflow E1–E5',obj:'Que el analista trabaje dentro de la plataforma y que el workflow de reconstrucción llegue hasta el diseño de casos.',hito:'Triage en UI, editor versionado, workflow E1–E5 con compuertas de servidor.',risk:'Extracción de valores frontera en expresiones compuestas; diagramas Mermaid ilegibles en funciones grandes. Si aparece, se limita E5 a complejidad ≤ 10 y se registra como non-goal del MVP.'},
+ {n:4,ph:'P4 E6–E7 + P5 cierre',obj:'Cerrar el ciclo, sumar el inventario de software (BOM + CVE) y liberar. El buffer queda en el último día: el riesgo está concentrado en S2–S4 y es preferible tener el margen cuando ya se sabe qué se desbordó. PHP/Java es la tarea que salta primero si hace falta.',hito:'Sandbox, cobertura vs criterio, mutation, inventario BOM + CVE, PHP/Java, auto-auditoría. Release v1.0.0.',risk:'Prueba de escape del sandbox positiva → no hay release, se corrige aunque consuma todo el buffer.'},
+];
+const DELIV = [
+ 'Repositorio con P0–P5 en DONE, CI verde, release v1.0.0',
+ '<code>docs/</code> completo: architecture, threat-model, standards-mapping (ASVS L2 → código), glossary, development-phases',
+ 'Plataforma desplegable vía <code>docker compose up</code>; auth por roles, i18n es/en, tema claro/oscuro',
+ 'Pipeline de auditoría (Semgrep + reglas propias, Gitleaks, OSV/Trivy, Lizard/cloc) con salida SARIF normalizada',
+ 'Inventario de software de la fábrica: SBOM, CBOM y VEX en CycloneDX 1.6 por proyecto/versión; base CVE local (OSV + NVD) con sincronización periódica; estadísticas de componentes vulnerables y desactualizados',
+ 'Reporte institucional editable y versionado; export PDF/DOCX/MD; resumen visual, métricas, deuda de pruebas, anexos',
+ 'Workflow E1–E8 con compuertas de servidor, consignas deterministas, andamiaje de tests, sandbox, mutation testing',
+ 'Soporte JS/TS, Python, PHP/Laravel, Java/Spring',
+ 'Auto-auditoría ejecutada, sin hallazgos altos abiertos',
+];
+
+/* ---------- persistencia del avance (sin base de datos) ---------- */
+const LS_KEY='cbs-plan-v1-done';
+function packDone(){return done.map(x=>x?'1':'0').join('');}
+function unpackDone(str){if(!/^[01]{20}$/.test(str||''))return null;return [...str].map(c=>c==='1');}
+function readEmbedded(){try{const el=document.getElementById('cbsState');return unpackDone(JSON.parse(el.textContent).done);}catch(e){return null;}}
+function readHash(){const m=location.hash.match(/[#&]a=([01]{20})/);return m?unpackDone(m[1]):null;}
+function readLS(){try{return unpackDone(localStorage.getItem(LS_KEY));}catch(e){return null;}}
+let done = readHash() || readLS() || readEmbedded() || new Array(20).fill(false);
+let savedSnapshot = packDone();  // lo que tiene la última copia descargada / el archivo original
+function persistDone(){
+  const p=packDone();
+  try{localStorage.setItem(LS_KEY,p);}catch(e){}
+  try{history.replaceState(null,'','#a='+p);}catch(e){}
+  try{if(window.storage&&window.storage.set)window.storage.set('cbs-done',p,false).catch?.(()=>{});}catch(e){}
+  updatePersistMsg();
+}
+function updatePersistMsg(){
+  const el=document.getElementById('persistMsg'); if(!el)return;
+  const n=done.filter(Boolean).length;
+  const dirty=packDone()!==savedSnapshot;
+  el.innerHTML=`Avance guardado en este navegador y en el enlace · ${n} de 20 días cerrados.`+(dirty?' <span class="dirty">La copia descargada / el archivo no tiene estos cambios.</span>':'');
+}
+function downloadCopy(){
+  const html=SRC_HTML.replace(/<script id="cbsState" type="application\/json">[\s\S]*?<\/script>/,
+    '<script id="cbsState" type="application/json">'+JSON.stringify({done:packDone(),saved:new Date().toISOString()})+'<\/script>');
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download='plan-de-trabajo-v1.0-avance.html';document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
+  savedSnapshot=packDone();updatePersistMsg();
+}
+async function copyLink(){
+  const url=location.href.replace(/#.*$/,'')+'#a='+packDone();
+  try{await navigator.clipboard.writeText(url);flash('Enlace copiado.');}
+  catch(e){window.prompt('Copia este enlace:',url);}
+}
+function flash(t){const el=document.getElementById('persistMsg');if(!el)return;const old=el.innerHTML;el.innerHTML=t;setTimeout(updatePersistMsg,1800);}
+function resetDone(){
+  if(!confirm('¿Borrar el avance marcado (los 20 días quedan sin cerrar)?'))return;
+  for(let i=0;i<20;i++)done[i]=false;
+  persistDone();refreshGantt();renderDay();renderWeek();renderWp();updateKpis();
+  if(typeof wrapTerms==='function'){wrapTerms(document.getElementById('dayPanel'));wrapTerms(document.getElementById('weekPanel'));}
+}
+let sel = 0;
+
+/* ---------- Gantt ---------- */
+function drawGantt(){
+  const svg=document.getElementById('gantt');
+  const L=290, top=46, rowH=24, colW=38, W=L+20*colW+20, H=top+20*rowH+40;
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  const cs=getComputedStyle(document.documentElement);
+  let s=`<defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="${cs.getPropertyValue('--panel').trim()}"/><rect width="6" height="3" fill="${cs.getPropertyValue('--crit').trim()}"/></pattern></defs>`;
+  for(let i=0;i<=20;i++){const x=L+i*colW;s+=`<line class="${i%5===0?'wkline':'grid'}" x1="${x}" y1="${top-6}" x2="${x}" y2="${H-30}"/>`;}
+  for(let w=0;w<4;w++){s+=`<text class="wk" x="${L+w*5*colW+2.5*colW}" y="14" text-anchor="middle">SEMANA ${w+1} · ${fmt(bd(w*5)).slice(4)} – ${fmt(bd(w*5+4)).slice(4)}</text>`;}
+  for(let i=0;i<20;i++){const d=bd(i);s+=`<text x="${L+i*colW+colW/2}" y="${H-14}" text-anchor="middle" font-size="10">${DOW[d.getDay()][0]} ${String(d.getDate()).padStart(2,'0')}</text>`;}
+  DAYS.forEach((d,i)=>{
+    const y=top+i*rowH, col=cs.getPropertyValue(PH[d.ph]).trim();
+    s+=`<g class="bar" data-i="${i}" tabindex="0" role="button" aria-label="${d.t}">`;
+    s+=`<text class="lbl" x="${L-8}" y="${y+rowH/2+4}" text-anchor="end">${d.ph!=='BUF'?d.ph+' · ':''}${d.t}</text>`;
+    s+=`<rect class="fill" x="${L+i*colW+2}" y="${y+4}" width="${colW-4}" height="${rowH-8}" rx="3" fill="${col}"/>`;
+    if(d.crit) s+=`<rect x="${L+i*colW+2}" y="${y+4}" width="${colW-4}" height="${rowH-8}" rx="3" fill="url(#hatch)" opacity=".45" pointer-events="none"/>`;
+    s+=`<text class="chk" x="${L+i*colW+colW/2}" y="${y+rowH/2+4}" text-anchor="middle">✓</text>`;
+    s+=`</g>`;
+    if(d.ms){const x=L+(i+1)*colW;s+=`<path class="ms" d="M${x} ${top-20} l5 5 -5 5 -5 -5z"/><text class="ms-l" x="${x}" y="${top-24}" text-anchor="middle">${d.ms}</text>`;}
+  });
+  // today
+  const now=new Date(), t0=new Date(2026,7,24), t1=new Date(2026,8,19);
+  if(now>=t0&&now<t1){let i=Math.floor((now-t0)/86400000);const wk=Math.floor(i/7),dd=i%7;if(dd<5){const x=L+(wk*5+dd)*colW+colW/2;s+=`<line class="today" x1="${x}" y1="${top-6}" x2="${x}" y2="${H-30}"/><text x="${x+4}" y="${top-8}" font-size="10" font-weight="700">hoy</text>`;}}
+  svg.innerHTML=s;
+  svg.querySelectorAll('.bar').forEach(g=>{
+    g.addEventListener('click',()=>openDetail(+g.dataset.i));
+    g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDetail(+g.dataset.i);}});
+  });
+  refreshGantt();
+}
+function refreshGantt(){
+  document.querySelectorAll('#gantt .bar').forEach(g=>{const i=+g.dataset.i;g.classList.toggle('done',done[i]);g.classList.toggle('sel',i===sel);});
+}
+
+/* ---------- Detail ---------- */
+function select(i){sel=i;renderDay();renderWeek();refreshGantt();renderTabs();renderWp();
+  const p=document.getElementById('posLbl');if(p)p.textContent=`Día ${sel+1} de 20 · Semana ${Math.floor(sel/5)+1}`;}
+function openDetail(i){select(i);document.getElementById('ganttView').classList.remove('on');document.getElementById('detailView').classList.add('on');
+  document.getElementById('cronoSec').scrollIntoView({behavior:'smooth',block:'start'});
+  const b=document.getElementById('backBtn');if(b)b.focus({preventScroll:true});}
+function closeDetail(){document.getElementById('detailView').classList.remove('on');document.getElementById('ganttView').classList.add('on');
+  document.getElementById('cronoSec').scrollIntoView({behavior:'smooth',block:'start'});
+  const g=document.querySelector(`#gantt .bar[data-i="${sel}"]`);if(g)g.focus({preventScroll:true});}
+function renderDay(){
+  const d=DAYS[sel], cs=getComputedStyle(document.documentElement), col=cs.getPropertyValue(PH[d.ph]).trim();
+  const el=document.getElementById('dayPanel');
+  el.innerHTML=`<div class="day" style="--ph:${col}">
+    <div class="h"><span class="d">DÍA ${String(sel+1).padStart(2,'0')} · ${fmt(bd(sel)).toUpperCase()}</span>
+      <span>${d.ph!=='BUF'?`<span class="tag">${d.ph}</span>`:`<span class="tag buf">BUFFER</span>`}${d.crit?' <span class="tag crit">RUTA CRÍTICA</span>':''}${d.gate?' <span class="tag" style="background:var(--ink-2);color:var(--panel)">COMPUERTA</span>':''}${d.ms?' <span class="tag" style="background:var(--ink);color:var(--panel)">◆ '+d.ms.toUpperCase()+'</span>':''}</span></div>
+    <div class="t">${d.t}</div>
+    <div class="body"><p>${d.b}</p>${d.c?`<div class="crit-box"><div class="l">Criterio del día</div>${d.c}</div>`:''}</div>
+    <label class="chkrow"><input type="checkbox" id="doneChk" ${done[sel]?'checked':''}> Día cerrado (tests pasando, docs al día, tarea en DONE)</label>
+    <div class="nav"><button id="prev" ${sel===0?'disabled':''}>← Anterior</button><button id="next" ${sel===19?'disabled':''}>Siguiente →</button></div>
+  </div>`;
+  document.getElementById('doneChk').addEventListener('change',e=>{done[sel]=e.target.checked;persistDone();refreshGantt();renderWeek();renderWp();updateKpis();});
+  document.getElementById('prev').addEventListener('click',()=>select(sel-1));
+  document.getElementById('next').addEventListener('click',()=>select(sel+1));
+}
+function renderWeek(){
+  const w=WEEKS[Math.floor(sel/5)], i0=(w.n-1)*5;
+  const days=DAYS.slice(i0,i0+5).map((d,k)=>`<div class="${done[i0+k]?'done-item':''}">${fmt(bd(i0+k)).slice(0,3)} · ${d.t}</div>`).join('');
+  document.getElementById('weekPanel').innerHTML=`<h3>Semana ${w.n} — ${w.ph}</h3>
+    <div class="obj">${w.obj}</div>
+    <div class="dl" style="grid-template-columns:1fr">${days}</div>
+    <div class="cl"><b>Hito del viernes</b>${w.hito}</div>
+    <div class="cl"><b>Riesgo de la semana</b>${w.risk}</div>`;
+}
+function renderTabs(){
+  const t=document.getElementById('tabs');
+  t.innerHTML=WEEKS.map(w=>`<button class="${Math.floor(sel/5)===w.n-1?'on':''}" data-w="${w.n}">Semana ${w.n} · ${w.ph.split(' ')[0]}</button>`).join('');
+  t.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>select((+b.dataset.w-1)*5)));
+}
+function fmtFull(d){return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();}
+function renderWp(){
+  const tb=document.querySelector('#wpTable tbody'); if(!tb)return;
+  const cs=getComputedStyle(document.documentElement);
+  tb.innerHTML=DAYS.map((d,i)=>{const col=cs.getPropertyValue(PH[d.ph]).trim();const date=fmtFull(bd(i));
+    return `<tr class="${d.ms?'ms':''} ${done[i]?'done':''}" data-i="${i}"><td class="id">${i+1}</td><td class="nm" tabindex="0" role="button"><span class="ph" style="color:${col}">${d.ph==='BUF'?'Buffer':d.ph}:</span> <span style="color:${col}">${d.t}</span></td><td class="dt">${date}</td><td class="dt">${date}</td><td class="num">1</td><td class="num">${HOURS_PER_DAY}</td></tr>`;}).join('');
+  const dEl=document.getElementById('wpDays'),hEl=document.getElementById('wpHours');
+  if(dEl){dEl.textContent=DAYS.length+' días';hEl.textContent=(DAYS.length*HOURS_PER_DAY)+' h';}
+  tb.querySelectorAll('td.nm').forEach(td=>{const i=+td.parentElement.dataset.i;td.addEventListener('click',()=>openDetail(i));td.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openDetail(i);}});});
+}
+function updateKpis(){
+  const n=done.filter(Boolean).length, pct=Math.round(n/20*100);
+  document.getElementById('kpiPct').firstChild.nodeValue=pct;
+  document.getElementById('kpiBar').style.width=pct+'%';
+  document.getElementById('kpiDone').textContent=n;
+  const ms=[4,9,14,19].filter(i=>done[i]).length;
+  document.getElementById('kpiMs').firstChild.nodeValue=ms;
+}
+
+/* ---------- Deps ---------- */
+function drawDeps(){
+  const svg=document.getElementById('deps');
+  const N={
+    auth:{x:20,y:20,w:110,l:'P0 auth'},
+    ci:{x:20,y:62,w:110,l:'P0 CI licencias'},
+    comp:{x:20,y:104,w:110,l:'P0 Compose'},
+    pipe:{x:190,y:62,w:110,l:'P1 pipeline'},
+    pdf:{x:350,y:62,w:110,l:'P1 PDF',crit:1},
+    p2:{x:510,y:62,w:130,l:'P2 triage / editor'},
+    e4:{x:190,y:180,w:120,l:'P3 matriz (E4)'},
+    e5:{x:350,y:180,w:150,l:'P3 AST + consigna (E5)',crit:1},
+    e6:{x:540,y:180,w:120,l:'P4 andamiaje (E6)'},
+    e7:{x:700,y:180,w:180,l:'P4 sandbox + cobertura (E7)',crit:1},
+    rel:{x:760,y:62,w:110,l:'Release v1.0.0'},
+  };
+  const E=[['auth','pipe'],['ci','pipe'],['comp','pipe'],['pipe','pdf',1],['pdf','p2',1],['p2','e4'],['e4','e5',1],['e5','e6',1],['e6','e7',1],['e7','rel',1]];
+  let s=`<defs><marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8z" fill="var(--ink-3)"/></marker></defs>`;
+  const c=k=>({x:N[k].x+N[k].w/2,y:N[k].y+15});
+  E.forEach(([a,b,cr])=>{
+    const A=N[a],B=N[b];let x1,y1,x2,y2;
+    if(A.y===B.y){x1=A.x+A.w;y1=A.y+15;x2=B.x;y2=B.y+15;}
+    else if(A.x<B.x&&Math.abs(A.y-B.y)>60){x1=A.x+A.w/2;y1=A.y+30;x2=B.x+B.w/2;y2=B.y;}
+    else{x1=A.x+A.w;y1=A.y+15;x2=B.x;y2=B.y+15;}
+    if(a==='p2'&&b==='e4'){s+=`<path class="edge" d="M${N.p2.x+N.p2.w/2} ${N.p2.y+30} V150 H${N.e4.x+N.e4.w/2} V${N.e4.y}"/>`;return;}
+    if(a==='e7'&&b==='rel'){s+=`<path class="edge crit" d="M${N.e7.x+N.e7.w/2} ${N.e7.y} V${N.rel.y+30}"/>`;return;}
+    if(A.y===B.y) s+=`<path class="edge ${cr?'crit':''}" d="M${x1} ${y1} H${x2}"/>`;
+    else s+=`<path class="edge ${cr?'crit':''}" d="M${x1} ${y1} C${x1+30} ${y1} ${x2-30} ${y2} ${x2} ${y2}"/>`;
+  });
+  // loop E7 -> E5
+  s+=`<path class="edge loop" d="M${N.e7.x+20} ${N.e7.y+30} V235 H${N.e5.x+20} V${N.e5.y+30}"/>`;
+  s+=`<text x="${(N.e5.x+N.e7.x)/2}" y="247" font-size="10.5" fill="var(--ink-3)">E7 → E5 cuando la cobertura no alcanza</text>`;
+  Object.entries(N).forEach(([k,n])=>{s+=`<rect class="node ${n.crit?'crit':''}" x="${n.x}" y="${n.y}" width="${n.w}" height="30" rx="4"/><text x="${n.x+n.w/2}" y="${n.y+19}" text-anchor="middle">${n.l}</text>`;});
+  svg.innerHTML=s;
+}
+
+document.getElementById('deliverables').innerHTML=DELIV.map(d=>`<div>${d}</div>`).join('');
+drawGantt();drawDeps();select(0);updateKpis();updatePersistMsg();
+document.getElementById('copyLinkBtn').addEventListener('click',copyLink);
+document.getElementById('saveCopyBtn').addEventListener('click',downloadCopy);
+document.getElementById('resetBtn').addEventListener('click',resetDone);
+window.addEventListener('hashchange',()=>{const h=readHash();if(h){for(let i=0;i<20;i++)done[i]=h[i];refreshGantt();renderDay();renderWeek();renderWp();updateKpis();updatePersistMsg();}});
+(async()=>{try{if(window.storage&&window.storage.get&&!readHash()&&!readLS()){const r=await window.storage.get('cbs-done',false);const v=r&&unpackDone(r.value);if(v){for(let i=0;i<20;i++)done[i]=v[i];refreshGantt();renderDay();renderWeek();renderWp();updateKpis();updatePersistMsg();}}}catch(e){}})();
+document.getElementById('backBtn').addEventListener('click',closeDetail);document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('detailView').classList.contains('on'))closeDetail();});
+
+
+/* ---- tema claro / oscuro ---- */
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme',t);
+  const b=document.getElementById('themeBtn'); if(b){b.textContent=t==='dark'?'☀ Modo claro':'☾ Modo oscuro';b.setAttribute('aria-pressed',t==='dark');}
+  // re-render everything that reads colors at runtime
+  drawGantt();drawDeps();renderDay();renderWeek();renderWp();refreshGantt();
+  if(typeof wrapTerms==='function'){wrapTerms(document.getElementById('dayPanel'));wrapTerms(document.getElementById('weekPanel'));}
+}
+(function(){
+  const pref=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';
+  document.documentElement.setAttribute('data-theme',pref);
+  const b=document.getElementById('themeBtn'); if(b){b.textContent=pref==='dark'?'☀ Modo claro':'☾ Modo oscuro';b.setAttribute('aria-pressed',pref==='dark');
+    b.addEventListener('click',()=>applyTheme(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark'));}
+})();
+/* ================= Glosario (modo explicado) ================= */
+const G = {
+ "BOM":{t:"BOM — Bill of Materials",a:"BOM = Bill of Materials (lista de materiales)",d:"La lista completa de lo que compone un software: librerías, versiones, licencias, de dónde vino cada cosa. Igual que la lista de piezas de un producto físico."},
+ "SBOM":{t:"SBOM — Software Bill of Materials",a:"SBOM = Software Bill of Materials",d:"Inventario de todos los componentes de software de un proyecto (directos y transitivos), con versión y licencia. Es lo que permite saber, cuando sale una vulnerabilidad nueva, qué proyectos la tienen adentro.",ex:"Se genera en formato CycloneDX por cada proyecto y versión."},
+ "CBOM":{t:"CBOM — Cryptography Bill of Materials",a:"CBOM = Cryptography Bill of Materials",d:"Inventario de la criptografía que usa un sistema: algoritmos, tamaños de clave, protocolos, certificados, librerías. Sirve para saber qué habría que cambiar si un algoritmo queda obsoleto o roto.",ex:"Es parte del estándar CycloneDX desde la versión 1.6."},
+ "VEX":{t:"VEX — Vulnerability Exploitability eXchange",a:"VEX = Vulnerability Exploitability eXchange",d:"Documento que acompaña al SBOM y dice, para cada vulnerabilidad conocida de un componente, si de verdad afecta al proyecto o no (y por qué). Evita alarmas por CVEs que no aplican."},
+ "CycloneDX":{t:"CycloneDX",d:"Estándar abierto (de OWASP) para escribir BOMs en un formato que cualquier herramienta entiende. La versión 1.6 cubre SBOM, CBOM, VEX y otros.",ex:"Es un archivo JSON o XML; se puede validar contra un esquema oficial."},
+ "CycloneDX 1.6":{t:"CycloneDX 1.6",d:"Versión actual del estándar CycloneDX de OWASP; incluye SBOM, CBOM (criptografía) y VEX."},
+ "CVE":{t:"CVE — Common Vulnerabilities and Exposures",a:"CVE = Common Vulnerabilities and Exposures",d:"Identificador público y único de una vulnerabilidad conocida (ej. CVE-2023-30533). Lo asigna un programa internacional que mantiene CVE.org."},
+ "CVE.org":{t:"CVE.org",d:"El sitio oficial del programa CVE, donde se publican los identificadores de vulnerabilidades. De ahí (vía NVD) se toma la base que el sistema sincroniza localmente."},
+ "NVD":{t:"NVD — National Vulnerability Database",a:"NVD = National Vulnerability Database (del NIST, EE. UU.)",d:"Base de datos pública que enriquece cada CVE con puntuación CVSS, productos afectados y referencias. Es una de las dos fuentes (junto a OSV) que el sistema descarga periódicamente."},
+ "Dependency-Track":{t:"Dependency-Track",d:"Plataforma libre (Apache-2.0) de OWASP que guarda SBOMs y los cruza contra bases de vulnerabilidades de forma continua. Alternativa a implementar la correlación dentro de la plataforma."},
+ "Docker Scout":{t:"Docker Scout",d:"Servicio de Docker que analiza vulnerabilidades de imágenes y dependencias. Queda descartado: es propietario y en la nube, y la política del plan exige licencias libres y funcionamiento aislado."},
+ "Syft":{t:"Syft",d:"Herramienta libre que genera el SBOM de un proyecto o imagen en formato CycloneDX."},
+ "cdxgen":{t:"cdxgen",d:"Generador de SBOM CycloneDX multi-lenguaje, mantenido por la comunidad CycloneDX."},
+ "JSON":{t:"JSON",a:"JSON = JavaScript Object Notation",d:"Formato de texto estructurado, legible por máquinas y personas, muy usado para intercambiar datos."},
+ "CSV":{t:"CSV",a:"CSV = Comma-Separated Values",d:"Tabla en texto plano, separada por comas. Se abre en Excel."},
+ "PHP":{t:"PHP",a:"PHP = PHP: Hypertext Preprocessor (acrónimo recursivo)",d:"Lenguaje de programación web. Laravel es su framework más usado."},
+ "JS/TS":{t:"JS / TS",a:"JS = JavaScript · TS = TypeScript",d:"JavaScript y su variante con tipos, TypeScript. Los lenguajes más comunes de la fábrica."},
+ "IaC":{t:"IaC",a:"IaC = Infrastructure as Code",d:"Infraestructura descrita en archivos (Dockerfiles, pipelines). También se analiza en busca de configuraciones inseguras."},
+ "UI":{t:"UI",a:"UI = User Interface",d:"La interfaz: lo que el usuario ve y toca."},
+ "FS":{t:"FS",a:"FS = File System",d:"El sistema de archivos. En el sandbox es de solo lectura salvo la carpeta de trabajo."},
+ "CPU/RAM":{t:"CPU / RAM",a:"CPU = Central Processing Unit · RAM = Random Access Memory",d:"Procesador y memoria. En el sandbox se limitan para que un test descontrolado no tumbe el servidor."},
+ "Semgrep CE":{t:"Semgrep CE",a:"CE = Community Edition",d:"La edición libre del motor Semgrep. El registro de reglas públicas tiene otra licencia, por eso se escriben reglas propias."},
+ "MIT":{t:"Licencia MIT",a:"MIT = Massachusetts Institute of Technology",d:"Licencia libre muy permisiva."},
+ "GPL":{t:"Licencia GPL",a:"GPL = GNU General Public License",d:"Licencia libre que exige que las modificaciones se publiquen con la misma licencia."},
+ "LGPL":{t:"Licencia LGPL",a:"LGPL = GNU Lesser General Public License",d:"Variante de la GPL pensada para librerías."},
+ "BSD":{t:"Licencia BSD",a:"BSD = Berkeley Software Distribution",d:"Licencia libre permisiva."},
+ "MPL":{t:"Licencia MPL",a:"MPL = Mozilla Public License",d:"Licencia libre intermedia entre permisiva y copyleft."},
+ "Apache-2.0":{t:"Licencia Apache 2.0",d:"Licencia libre permisiva con cláusula de patentes. Muchas de las herramientas del plan la usan."},
+ "correlación":{t:"Correlación BOM ↔ CVE",d:"Cruzar cada componente del inventario (nombre + versión) contra la base de vulnerabilidades para saber cuáles tienen CVE abiertos."},
+ "inventario":{t:"Inventario de software",d:"El registro de qué componentes usa cada proyecto de la fábrica, en qué versión y con qué licencia, más su estado de vulnerabilidad. Se construye a partir de los SBOM/CBOM."},
+ "_demo":{t:"Así se ve una ayuda",d:"Pasa el cursor (o toca) cualquier término subrayado y aparece una explicación como esta."},
+ "P0":{t:"Fase P0 — Fundaciones",d:"Lo básico que tiene que existir antes de construir nada: el repositorio, los contenedores, el inicio de sesión, los idiomas y las reglas automáticas de calidad."},
+ "P1":{t:"Fase P1 — MVP de auditoría",a:"MVP = Minimum Viable Product",d:"La primera versión útil: se le entrega un proyecto y devuelve el informe oficial en PDF. Replica lo que hoy se hace a mano.",ex:"MVP = 'producto mínimo viable': lo mínimo que ya sirve."},
+ "P2":{t:"Fase P2 — Interfaz de hallazgos",d:"Las pantallas donde el analista revisa los problemas encontrados y edita el informe antes de exportarlo."},
+ "P3":{t:"Fase P3 — Workflow E1 a E5",d:"Los pasos del proceso que van desde registrar el sistema hasta diseñar las pruebas (sin escribirlas todavía)."},
+ "P4":{t:"Fase P4 — Etapas E6 y E7",d:"Escribir las pruebas, ejecutarlas en un entorno aislado y medir cuánto del código realmente probaron."},
+ "P5":{t:"Fase P5 — Cierre",d:"Más lenguajes (PHP, Java), registro completo de actividad, endurecimiento de seguridad y la entrega final."},
+ "fase":{t:"Fase",a:"P0…P5 = phase 0…5 (fase)",d:"Un bloque grande de trabajo del plan (P0 a P5). Cada una tiene un objetivo y un criterio claro para decir 'terminada'."},
+ "hito":{t:"Hito",d:"Un punto de control con fecha. El viernes de cada semana hay uno: si lo planeado no está listo, se sabe ese mismo día y no un mes después."},
+ "buffer":{t:"Buffer (colchón)",d:"Días sin tarea asignada, reservados para absorber retrasos. Si no hay retrasos se usan para mejorar la seguridad."},
+ "ruta crítica":{t:"Ruta crítica",d:"La cadena de tareas donde un retraso de un día atrasa la entrega final un día. No tienen holgura. Son las barras con rayas rojas.",ex:"En este plan: el PDF oficial, la guía de pruebas y el sandbox."},
+ "roadmap":{t:"Roadmap",d:"La hoja de ruta: la lista ordenada de fases que definió el plan de desarrollo de agosto."},
+ "sandbox":{t:"Sandbox",d:"Una 'caja cerrada': un contenedor aislado, sin acceso a internet y con memoria y CPU limitadas, donde se ejecuta código ajeno sin que pueda tocar el servidor.",ex:"Es la pieza más delicada de todo el sistema: si falla, código malicioso podría escapar."},
+ "compuerta de investigación":{t:"Compuerta de investigación",d:"Una regla del propio plan: antes de tocar una parte peligrosa (inicio de sesión, sandbox) hay que leer, escribir el diseño en pseudocódigo y dar un veredicto por escrito. Recién después se programa."},
+ "compuerta":{t:"Compuerta",d:"Un 'no pasa' automático: el sistema no deja avanzar a la siguiente etapa si la anterior no está aprobada. Lo controla el servidor, no la pantalla, así que no se puede saltar."},
+ "survey":{t:"Survey",d:"Lectura previa del código o del problema, de solo lectura, para entenderlo antes de cambiar nada."},
+ "pseudocódigo":{t:"Pseudocódigo",d:"Escribir la lógica en lenguaje humano ordenado, antes de escribir código real. Sirve para pensar y revisar sin perderse en detalles técnicos."},
+ "PDF":{t:"PDF del informe",a:"PDF = Portable Document Format",d:"El informe oficial de análisis de caja blanca. Hoy se redacta a mano con la plantilla institucional; la meta es que el sistema lo genere solo."},
+ "WeasyPrint":{t:"WeasyPrint",d:"Herramienta que convierte una página HTML en PDF. Se usa para generar el informe."},
+ "Jinja2":{t:"Jinja2",d:"Motor de plantillas: toma un documento con huecos y los rellena con los datos del análisis."},
+ "AST":{t:"AST (árbol de sintaxis)",a:"AST = Abstract Syntax Tree",d:"La representación estructurada del código: funciones, parámetros, ramas y condiciones. Permite analizarlo como datos en vez de como texto.",ex:"Es lo que permite contar caminos y encontrar valores frontera automáticamente."},
+ "consigna":{t:"Consigna de prueba",d:"Una guía generada por el sistema para cada función: cuántos casos de prueba mínimos, qué ramas cubrir, qué valores límite probar y qué entradas maliciosas hay que incluir.",ex:"Si el código dice 'si edad ≥ 18', la consigna exige probar 17, 18 y 19."},
+ "caminos base":{t:"Caminos base",d:"Cada ruta distinta que puede tomar una función al ejecutarse. Su cantidad marca el mínimo de pruebas necesarias."},
+ "McCabe":{t:"Complejidad ciclomática (McCabe)",d:"Un número que dice cuántos caminos distintos tiene una función. Más alto = más difícil de probar y más propensa a errores."},
+ "complejidad ciclomática":{t:"Complejidad ciclomática",d:"Un número que dice cuántos caminos distintos tiene una función. Más alto = más difícil de probar y más propensa a errores."},
+ "valores frontera":{t:"Valores frontera",d:"Los valores justo en el límite de una condición (para 'edad ≥ 18': 17, 18 y 19). Es donde más fallan los programas."},
+ "cobertura":{t:"Cobertura",d:"Qué porcentaje del código se ejecutó realmente al correr las pruebas. Se mide por líneas y por ramas (cada 'si/entonces')."},
+ "mutation testing":{t:"Mutation testing",d:"Romper el código a propósito (cambiar un + por un −, por ejemplo) y ver si las pruebas lo detectan. Si siguen en verde con el código roto, la prueba no sirve.",ex:"Stryker, mutmut, Pitest e Infection son las herramientas por lenguaje."},
+ "mutation":{t:"Mutation testing",d:"Romper el código a propósito y ver si las pruebas lo detectan. Si siguen en verde con el código roto, la prueba no sirve."},
+ "andamiaje":{t:"Andamiaje de tests",d:"El esqueleto del archivo de pruebas (nombre, imports, títulos de casos) generado automáticamente. El contenido real lo escribe el programador."},
+ "triage":{t:"Triage",d:"Revisión humana de los hallazgos automáticos: confirmar los reales y descartar los falsos positivos, siempre con justificación escrita."},
+ "falso positivo":{t:"Falso positivo",d:"Un problema que la herramienta reporta pero que, al revisarlo, no es un problema real."},
+ "hallazgos":{t:"Hallazgos",d:"Cada problema detectado: dónde está (archivo y línea), qué tipo es, qué tan grave y cómo corregirlo."},
+ "hallazgo":{t:"Hallazgo",d:"Un problema detectado: dónde está, qué tipo es, qué tan grave y cómo corregirlo."},
+ "SAST":{t:"SAST",a:"SAST = Static Application Security Testing",d:"Análisis del código fuente sin ejecutarlo, buscando patrones inseguros (inyección, contraseñas escritas en el código, etc.)."},
+ "SCA":{t:"SCA",a:"SCA = Software Composition Analysis",d:"Revisión de las librerías de terceros que usa el sistema, para ver si alguna tiene vulnerabilidades conocidas."},
+ "SARIF":{t:"SARIF",a:"SARIF = Static Analysis Results Interchange Format",d:"Un formato estándar de archivo para resultados de análisis. Todas las herramientas se traducen a este formato para que el informe los entienda igual."},
+ "Semgrep":{t:"Semgrep",d:"Herramienta de análisis de código que busca patrones definidos por reglas. Se escriben reglas propias, mapeadas al estándar OWASP."},
+ "Gitleaks":{t:"Gitleaks",d:"Herramienta que busca contraseñas, claves y tokens olvidados dentro del código o su historial."},
+ "OSV":{t:"OSV-Scanner",a:"OSV = Open Source Vulnerabilities",d:"Herramienta que cruza las librerías del proyecto contra bases públicas de vulnerabilidades."},
+ "OSV-Scanner":{t:"OSV-Scanner",a:"OSV = Open Source Vulnerabilities",d:"Herramienta que cruza las librerías del proyecto contra bases públicas de vulnerabilidades."},
+ "Trivy":{t:"Trivy",d:"Escáner de vulnerabilidades en dependencias y configuraciones (Dockerfiles, CI)."},
+ "Lizard":{t:"Lizard",d:"Herramienta que mide la complejidad de cada función del código."},
+ "cloc":{t:"cloc",a:"cloc = Count Lines Of Code",d:"Cuenta líneas de código por lenguaje. Sirve para dimensionar el proyecto."},
+ "CWE":{t:"CWE",a:"CWE = Common Weakness Enumeration",d:"Catálogo internacional de tipos de debilidad de software. Cada uno tiene un número (ej. CWE-79 es 'cross-site scripting')."},
+ "OWASP":{t:"OWASP",a:"OWASP = Open Worldwide Application Security Project",d:"Organización de referencia en seguridad de aplicaciones. Su 'Top 10' es la lista de los riesgos más críticos y es la clasificación principal del informe."},
+ "OWASP Top 10:2021":{t:"OWASP Top 10 (2021)",a:"OWASP = Open Worldwide Application Security Project",d:"Lista de las diez categorías de riesgo más críticas en aplicaciones. Es la clasificación principal de los hallazgos del informe."},
+ "CVSS":{t:"CVSS",a:"CVSS = Common Vulnerability Scoring System",d:"Fórmula estándar que da una nota de 0 a 10 a la gravedad de una vulnerabilidad, en lugar de ponerla 'a ojo'."},
+ "CVSS 3.1":{t:"CVSS 3.1",a:"CVSS = Common Vulnerability Scoring System",d:"Versión actual de la fórmula estándar que puntúa de 0 a 10 la gravedad de una vulnerabilidad."},
+ "ASVS":{t:"ASVS",a:"ASVS = Application Security Verification Standard",d:"Estándar OWASP con una lista verificable de controles de seguridad, por niveles. L2 es el nivel exigido a la propia plataforma."},
+ "ASVS L2":{t:"ASVS nivel 2",a:"ASVS = Application Security Verification Standard · L2 = nivel 2",d:"Nivel intermedio del estándar ASVS, el recomendado para aplicaciones que manejan datos sensibles. La plataforma tiene que cumplirlo ella misma."},
+ "A08:2021":{t:"OWASP A08:2021",a:"A08 = octava categoría del OWASP Top 10, edición 2021",d:"Categoría 'fallas de integridad de software y datos', que incluye cargar código desde sitios externos no confiables."},
+ "CWE-829":{t:"CWE-829",a:"CWE = Common Weakness Enumeration",d:"Debilidad: incluir funcionalidad desde un origen no confiable (por ejemplo, un script cargado desde otro servidor)."},
+ "CDN":{t:"CDN",a:"CDN = Content Delivery Network",d:"Servidor externo desde el que muchas webs cargan librerías o fuentes. Aquí está prohibido: todo se instala y se sirve localmente, para que el sistema funcione aislado."},
+ "CDNs":{t:"CDNs",a:"CDN = Content Delivery Network",d:"Servidores externos desde los que muchas webs cargan librerías o fuentes. Aquí están prohibidos: todo se instala y se sirve localmente."},
+ "licencias":{t:"Licencias de software",d:"Permisos de uso de cada librería. El plan solo admite licencias libres (MIT, Apache, BSD, GPL...). Nada propietario ni con restricciones comerciales."},
+ "allowlist":{t:"Allowlist",d:"Lista de lo único permitido. Si una licencia no está en la lista, la instalación falla automáticamente."},
+ "CI":{t:"CI (integración continua)",a:"CI = Continuous Integration",d:"Un robot que, cada vez que se guarda un cambio, revisa el código, corre las pruebas y verifica las reglas. Si algo falla, el cambio no entra."},
+ "tests":{t:"Tests (pruebas)",d:"Pequeños programas que verifican que una función hace lo que debe. En este plan nada se da por terminado sin ellos."},
+ "docs":{t:"Docs",d:"La documentación del proyecto, en archivos de texto dentro del repositorio."},
+ "repo":{t:"Repositorio (repo)",d:"El lugar donde vive el código con todo su historial de cambios (git)."},
+ "Repositorio":{t:"Repositorio",d:"El lugar donde vive el código con todo su historial de cambios (git)."},
+ "git":{t:"git",d:"Sistema de control de versiones: guarda cada cambio del código con autor, fecha y motivo."},
+ "Conventional Commits":{t:"Conventional Commits",d:"Convención para escribir los mensajes de cada cambio (feat:, fix:, docs:...) para que el historial sea legible y procesable."},
+ "Docker Compose":{t:"Docker Compose",d:"Archivo que describe todos los servicios del sistema (base de datos, API, etc.) para levantarlos juntos con un solo comando."},
+ "Docker":{t:"Docker",a:"(no es acrónimo; 'docker' = estibador)",d:"Tecnología de contenedores: cada pieza del sistema corre aislada en su propia 'caja', con lo justo que necesita."},
+ "Compose":{t:"Docker Compose",d:"Archivo que describe todos los servicios del sistema para levantarlos juntos con un solo comando."},
+ "FastAPI":{t:"FastAPI",d:"Framework de Python para construir la parte del servidor (la API)."},
+ "API":{t:"API",a:"API = Application Programming Interface",d:"La parte del sistema que recibe las órdenes de la pantalla y hace el trabajo (guardar, analizar, generar el informe)."},
+ "React 19":{t:"React 19",d:"Tecnología para construir la interfaz que ve el usuario en el navegador."},
+ "Vite":{t:"Vite",d:"Herramienta que empaqueta la interfaz para servirla desde el propio servidor."},
+ "Postgres":{t:"PostgreSQL",d:"La base de datos donde se guardan usuarios, proyectos, hallazgos e informes."},
+ "SQLAlchemy":{t:"SQLAlchemy",d:"Librería de Python para hablar con la base de datos desde el código."},
+ "Alembic":{t:"Alembic",d:"Herramienta que versiona los cambios de estructura de la base de datos."},
+ "Valkey":{t:"Valkey",d:"Memoria rápida compartida que se usa como cola de trabajos: los análisis largos se encolan ahí y un proceso aparte los va haciendo."},
+ "RQ":{t:"RQ",a:"RQ = Redis Queue",d:"Sistema de cola de trabajos en Python: los análisis pesados no bloquean la pantalla del usuario."},
+ "worker":{t:"Worker",d:"Proceso que toma trabajos de la cola y los ejecuta en segundo plano."},
+ "health checks":{t:"Health checks",d:"Comprobaciones automáticas de que cada servicio está vivo y respondiendo."},
+ "Argon2id":{t:"Argon2id",d:"Algoritmo moderno para guardar contraseñas de forma segura (nunca en texto claro). Es el recomendado por OWASP."},
+ "JWT":{t:"JWT",a:"JWT = JSON Web Token",d:"Credencial firmada que el navegador presenta en cada petición para demostrar que el usuario inició sesión. Dura poco y se renueva."},
+ "refresh":{t:"Refresh token",d:"Credencial de larga duración que sirve solo para obtener una nueva credencial corta, sin volver a pedir contraseña."},
+ "roles":{t:"Roles",d:"Tipos de usuario con permisos distintos: admin (gestiona), analyst (audita y firma informes), developer (recorre el proceso y escribe pruebas)."},
+ "bitácora":{t:"Bitácora de auditoría",d:"Registro inalterable de quién hizo qué y cuándo dentro de la plataforma."},
+ "i18n":{t:"i18n (internacionalización)",a:"i18n = internationalization (i + 18 letras + n)",d:"Tener todos los textos de la pantalla en archivos de idioma separados, para que la interfaz funcione en español e inglés sin tocar el código."},
+ "react-i18next":{t:"react-i18next",d:"Librería que gestiona los idiomas de la interfaz."},
+ "lint":{t:"Lint",d:"Revisión automática de estilo y errores comunes del código. Aquí además verifica que no haya textos sueltos fuera de los archivos de idioma."},
+ "hardening":{t:"Hardening",d:"Endurecer la seguridad: cerrar configuraciones, limitar intentos, añadir cabeceras de protección."},
+ "rate limiting":{t:"Rate limiting",d:"Limitar cuántas peticiones puede hacer alguien por minuto, para frenar ataques automáticos."},
+ "headers de seguridad":{t:"Headers de seguridad",d:"Instrucciones que el servidor envía al navegador para activar protecciones (ej. no permitir que la página se incruste en otra)."},
+ "threat-model":{t:"Modelo de amenazas",a:"threat model = modelo de amenazas",d:"Documento que lista qué podría salir mal, quién podría atacar y cómo se protege cada punto."},
+ "pruebas de escape":{t:"Pruebas de escape",d:"Intentos deliberados de salir del sandbox (leer archivos del servidor, usar la red, consumir recursos sin límite) para comprobar que no se puede."},
+ "tasks/":{t:"Carpeta tasks/",d:"Un archivo por fase con objetivo, entregables, restricciones y una lista verificable de 'terminado'. Su estado (DESIGN / IN_PROGRESS / DONE) es la fuente de verdad del avance."},
+ "IN_PROGRESS":{t:"IN_PROGRESS",a:"IN_PROGRESS = en curso",d:"Estado de una fase que está en curso."},
+ "DONE":{t:"DONE",a:"DONE = hecho",d:"Estado de una fase terminada: tests pasando, documentación al día, con fecha y commit registrados."},
+ "commit":{t:"Commit",d:"Un cambio guardado en el repositorio, con autor, fecha y mensaje."},
+ "non-goal":{t:"Non-goal",d:"Algo que se decide explícitamente no hacer en esta versión, y se deja escrito para que nadie lo dé por olvidado."},
+ "greenfield":{t:"Greenfield",d:"Proyecto que arranca desde cero, sin código previo. Más libertad, pero también más incertidumbre en la estimación."},
+ "SemVer":{t:"SemVer (versionado semántico)",a:"SemVer = Semantic Versioning",d:"Convención de números de versión MAYOR.MENOR.PARCHE. 1.0.0 significa 'primera versión completa'."},
+ "Mermaid":{t:"Mermaid",d:"Forma de dibujar diagramas escribiendo texto; el sistema genera así los diagramas de flujo de cada función, y se pueden editar."},
+ "dedupe":{t:"Dedupe",d:"Eliminar duplicados: si dos herramientas reportan el mismo problema, queda uno."},
+ "lockfiles":{t:"Lockfiles",d:"Archivos que fijan la versión exacta de cada librería que usa un proyecto. Leerlos permite saber qué dependencias tiene."},
+ "frameworks":{t:"Frameworks",d:"Estructuras base sobre las que se construyen las aplicaciones (Express, Django, Laravel, Spring...)."},
+ "ZIP":{t:"Ingesta por ZIP",d:"Subir el código comprimido en un archivo .zip como alternativa a darle la dirección del repositorio."},
+ "matriz de riesgo":{t:"Matriz de riesgo",d:"Lista ordenada de qué partes del código conviene probar primero, calculada como complejidad × hallazgos × importancia."},
+ "Jest/Vitest":{t:"Jest / Vitest",a:"JS = JavaScript · TS = TypeScript",d:"Frameworks de pruebas para JavaScript y TypeScript."},
+ "PyTest":{t:"PyTest",d:"Framework de pruebas para Python."},
+ "PHPUnit":{t:"PHPUnit",d:"Framework de pruebas para PHP."},
+ "JUnit":{t:"JUnit",d:"Framework de pruebas para Java."},
+ "Stryker":{t:"Stryker",d:"Herramienta de mutation testing para JavaScript/TypeScript."},
+ "mutmut":{t:"mutmut",d:"Herramienta de mutation testing para Python."},
+ "Pitest":{t:"Pitest",d:"Herramienta de mutation testing para Java."},
+ "Infection":{t:"Infection",d:"Herramienta de mutation testing para PHP."},
+ "Tauri":{t:"Tauri",d:"Tecnología para empaquetar la misma interfaz web como aplicación de escritorio. Queda fuera de esta entrega."},
+ "standards-mapping":{t:"standards-mapping.md",d:"Tabla que une cada control de seguridad del estándar ASVS con la parte del código que lo cumple. Es la evidencia de cumplimiento."},
+ "deuda de pruebas":{t:"Deuda de pruebas",d:"La diferencia entre la cobertura que el sistema debería tener y la que tiene. El informe la hace visible: antes y después."},
+ "anexos":{t:"Anexos del informe",d:"Al final del informe: la lista ASVS, los diagramas, el pseudocódigo y el código de las pruebas escritas."},
+ "E1":{t:"E1 — Registro",d:"Se anotan los datos del sistema a auditar (nombre, tecnología, base de datos, responsable)."},
+ "E2":{t:"E2 — Ingesta",d:"Se carga el código (ZIP o dirección del repositorio) y el sistema detecta qué lenguajes y herramientas usa."},
+ "E3":{t:"E3 — Análisis + triage",d:"Corren todas las herramientas automáticas y el analista confirma o descarta cada hallazgo."},
+ "E4":{t:"E4 — Plan de pruebas",d:"Se decide qué partes del código probar primero y con qué nivel de cobertura, por escrito."},
+ "E5":{t:"E5 — Diseño",d:"Diagramas de cada función, la guía de qué probar y el pseudocódigo de los casos, antes de escribir código de prueba."},
+ "E6":{t:"E6 — Escribir tests",d:"El programador escribe las pruebas sobre el esqueleto que genera el sistema."},
+ "E7":{t:"E7 — Ejecutar y medir",d:"Las pruebas corren en el sandbox; se mide la cobertura real y se comprueba que las pruebas detectan errores."},
+ "E8":{t:"E8 — Informe",d:"Se arma el documento final, se edita y se exporta."},
+ "E1–E8":{t:"Etapas E1 a E8",a:"E = etapa",d:"El proceso completo que recorre cada proyecto dentro de la plataforma: desde registrar el sistema hasta exportar el informe. Ver §0."},
+ "E1–E5":{t:"Etapas E1 a E5",a:"E = etapa",d:"La primera mitad del proceso: registrar, cargar, analizar, planificar y diseñar las pruebas."},
+ "E6–E7":{t:"Etapas E6 y E7",a:"E = etapa",d:"Escribir las pruebas y ejecutarlas midiendo cobertura."},
+};
+
+const STEPS = [
+ {k:"E1",t:"Registro del sistema",who:"Analista",d:"Se cargan los datos básicos del sistema que se va a revisar: cómo se llama, con qué tecnología está hecho, qué base de datos usa, quién lo desarrolló. Esos datos van directo a la tabla 'Detalles del sistema' del informe.",r:"Sin esto el informe no tiene encabezado. Es trivial, pero es el primer paso y no se salta."},
+ {k:"E2",t:"Ingesta del código",who:"Analista",d:"Se sube el código (un .zip o la dirección del repositorio). El sistema detecta solo qué lenguajes hay, qué frameworks y qué librerías usa.",r:"El código es lo único real que llega. Todo lo demás se reconstruye a partir de él."},
+ {k:"E3",t:"Análisis automático y triage",who:"Sistema, luego analista",d:"Corren las herramientas (SAST, SCA, secretos, métricas). Cada problema sale con archivo y línea, tipo (CWE/OWASP), gravedad (CVSS) y cómo corregirlo. Después el analista revisa uno por uno: confirma o descarta como falso positivo, siempre justificando.",r:"Las herramientas se equivocan. La revisión humana con justificación escrita es parte del método, no un parche."},
+ {k:"E4",t:"Planificación de pruebas",who:"Programador",d:"El sistema ordena las partes del código de más a menos riesgosas (complejidad × hallazgos × importancia). El programador decide qué se prueba y hasta qué nivel de cobertura, y lo deja por escrito.",r:"Esto reconstruye la planificación que nunca existió. Sin criterio escrito, después no hay contra qué medir."},
+ {k:"E5",t:"Diseño: diagramas, consigna y pseudocódigo",who:"Sistema genera, programador diseña",d:"Para cada función elegida, el sistema dibuja el diagrama de flujo y arma una guía (consigna): cuántos casos mínimos, qué ramas cubrir, qué valores límite probar, qué entradas maliciosas meter. Con eso a la vista, el programador escribe el pseudocódigo de sus casos.",r:"Pensar antes de programar. La consigna le muestra al programador exactamente qué tiene que demostrar."},
+ {k:"E6",t:"Escritura de tests",who:"Programador",d:"El sistema genera el esqueleto del archivo de pruebas (nombre, imports, títulos de los casos). El programador escribe las aserciones, los datos y la lógica. La plataforma no escribe pruebas por nadie.",r:"Escribir la prueba es el aprendizaje. Si la máquina lo hiciera, el hábito no se instalaría."},
+ {k:"E7",t:"Ejecución, cobertura y re-auditoría",who:"Sistema",d:"Las pruebas corren en el sandbox (sin red, recursos limitados). Se mide qué porcentaje del código se ejecutó y se compara rama por rama con lo planificado en E4. Además se rompe el código a propósito (mutation testing) para verificar que las pruebas lo detectan. Si no se alcanza el criterio, se vuelve a E5.",r:"Una prueba que sigue en verde con el código roto no prueba nada. Y si la cobertura no alcanza, casi siempre el problema fue el diseño de casos, no la prueba."},
+ {k:"E8",t:"Reporte final",who:"Sistema compone, analista edita",d:"Se arma el informe con todo lo anterior: hallazgos, métricas, cobertura antes/después, anexos. Se edita en la plataforma (con control de versiones automático) y se exporta a PDF, Word o Markdown.",r:"Reconstruye la documentación. Y lo editable importa: el analista firma el informe, así que tiene que poder corregirlo."},
+];
+
+/* ---- stepper ---- */
+let stepSel=0;
+function renderStepper(){
+  const st=document.getElementById('stepper');
+  st.innerHTML=STEPS.map((s,i)=>`<button class="${i===stepSel?'on':''}" data-i="${i}">${s.k}</button>`).join('');
+  st.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{stepSel=+b.dataset.i;renderStepper();}));
+  const s=STEPS[stepSel];
+  document.getElementById('stepbody').innerHTML=`<div class="who">Etapa ${s.k} · quién actúa: <span>${s.who}</span></div><h4>${s.t}</h4><p>${s.d}</p><div class="why" style="margin:8px 0 0"><b>¿Por qué existe?</b> ${s.r}</div>`;
+  wrapTerms(document.getElementById('stepbody'));
+}
+
+/* ---- term wrapping ---- */
+const KEYS = Object.keys(G).filter(k=>k!=='_demo').sort((a,b)=>b.length-a.length);
+const RX = new RegExp('(^|[^\\w/\\-.])('+KEYS.map(k=>k.replace(/[.*+?^${}()|[\]\\\/]/g,'\\$&')).join('|')+')(?![\\w\\-])','g');
+function wrapTerms(root){
+  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode(n){
+    if(!n.nodeValue.trim())return NodeFilter.FILTER_REJECT;
+    const p=n.parentElement; if(!p)return NodeFilter.FILTER_REJECT;
+    if(p.closest('.term,#tip,script,style,svg,button,summary,h1,h2,.eyebrow,.meta,.kpi,.tag,.legend,.stepper,.tabs,.d,#wpTable,.backbar,.wp-cap,table.lg,.persist'))return NodeFilter.FILTER_REJECT;
+    return NodeFilter.FILTER_ACCEPT;}});
+  const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
+  nodes.forEach(n=>{
+    const txt=n.nodeValue; RX.lastIndex=0; if(!RX.test(txt))return; RX.lastIndex=0;
+    const frag=document.createDocumentFragment(); let last=0,m;
+    while((m=RX.exec(txt))){
+      const start=m.index+m[1].length;
+      frag.appendChild(document.createTextNode(txt.slice(last,start)));
+      const a=document.createElement('span');a.className='term';a.dataset.k=m[2];a.tabIndex=0;a.textContent=m[2];frag.appendChild(a);
+      last=start+m[2].length;
+    }
+    frag.appendChild(document.createTextNode(txt.slice(last)));
+    n.parentNode.replaceChild(frag,n);
+  });
+}
+
+/* ---- tooltip ---- */
+const tip=document.getElementById('tip'); let tipPinned=null;
+function showTip(el){
+  const g=G[el.dataset.k]; if(!g)return;
+  tip.innerHTML=`<b>${g.t}</b>${g.a?`<span class="acr">${g.a}</span>`:''}${g.d}${g.ex?`<span class="ex"><i>Ejemplo · </i>${g.ex}</span>`:''}`;
+  tip.style.display='block';
+  const r=el.getBoundingClientRect(), tw=tip.offsetWidth, th=tip.offsetHeight;
+  let x=r.left, y=r.bottom+8;
+  if(x+tw>window.innerWidth-10)x=window.innerWidth-tw-10;
+  if(y+th>window.innerHeight-10)y=r.top-th-8;
+  tip.style.left=Math.max(6,x)+'px';tip.style.top=Math.max(6,y)+'px';
+}
+function hideTip(){if(tipPinned)return;tip.style.display='none';}
+document.addEventListener('mouseover',e=>{const t=e.target.closest('.term');if(t&&!document.body.classList.contains('plain'))showTip(t);});
+document.addEventListener('mouseout',e=>{if(e.target.closest('.term'))hideTip();});
+document.addEventListener('focusin',e=>{const t=e.target.closest('.term');if(t)showTip(t);});
+document.addEventListener('focusout',e=>{if(e.target.closest('.term'))hideTip();});
+document.addEventListener('click',e=>{
+  const t=e.target.closest('.term');
+  if(t){e.preventDefault();if(tipPinned===t){tipPinned=null;tip.style.display='none';}else{tipPinned=t;showTip(t);}return;}
+  if(!e.target.closest('#tip')){tipPinned=null;tip.style.display='none';}
+});
+window.addEventListener('scroll',()=>{if(tipPinned)showTip(tipPinned);},{passive:true});
+document.getElementById('plainToggle').addEventListener('change',e=>{document.body.classList.toggle('plain',e.target.checked);tipPinned=null;tip.style.display='none';});
+
+/* re-wrap after dynamic renders */
+const _renderDay=renderDay,_renderWeek=renderWeek;
+renderDay=function(){_renderDay();wrapTerms(document.getElementById('dayPanel'));};
+renderWeek=function(){_renderWeek();wrapTerms(document.getElementById('weekPanel'));};
+if(document.documentElement.getAttribute('data-theme')==='dark'){drawGantt();drawDeps();renderDay();renderWeek();renderWp();}
+renderStepper();
+['.intro','section:not(:has(#stepbody))','.foot'].forEach(sel=>document.querySelectorAll(sel).forEach(el=>wrapTerms(el)));
+select(sel);
+</script>
+</body>
+</html>

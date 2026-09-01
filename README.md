@@ -1,9 +1,11 @@
 # Dioptra
 
 Web platform for white-box analysis of third-party systems: an automated audit
-pipeline (SAST, dependency CVEs, secrets, metrics), a gated workflow that walks
-a developer from a test plan to tests they write themselves, and an editable
-institutional report with OWASP/CWE/CVSS classification.
+pipeline (SAST, dependency CVEs, secrets, metrics), a software inventory per
+project (SBOM/CBOM/VEX in CycloneDX, checked against a local OSV + NVD
+mirror), a gated workflow that walks a developer from a test plan to tests
+they write themselves, and an editable institutional report with
+OWASP/CWE/CVSS classification.
 
 Two rules shape everything else:
 
@@ -11,8 +13,10 @@ Two rules shape everything else:
   It generates deterministic scaffolding from the AST; assertions and logic are
   always the developer's — writing the test *is* the learning.
 - **Nothing is loaded from an external server at runtime.** Every dependency is
-  installed, pinned and served from this deployment. The same rule is applied to
-  the systems under audit: an external `<script>` there is a finding (CWE-829).
+  installed, pinned and served from this deployment; vulnerability data is a
+  local mirror refreshed by a scheduled sync or a file import, never a live
+  query. The same rule is applied to the systems under audit: an external
+  `<script>` there is a finding (CWE-829).
 
 Project lead: **Moises Marin** (`mmarin`).
 
@@ -20,9 +24,12 @@ Project lead: **Moises Marin** (`mmarin`).
 
 ## Status
 
-Phase 0 (foundations) is in progress: authentication, roles, audit trail,
-themes, i18n and the CI gates. Ingest, analysis and reporting arrive in phase 1.
-See `docs/development-phases.md`.
+Phase 0 (foundations) is done (2026-08-18): authentication, roles, audit
+trail, themes, i18n and the CI gates. The work plan (`docs/work-plan-reference.html`,
+distilled in `docs/development-phases.md`) runs 2026-08-24 → 2026-09-18 and
+ends with release v1.0.0: P1 audit pipeline + institutional PDF, P2 findings
+UI, P3 workflow E1–E5, P4 sandbox + mutation re-audit, P5 software inventory,
+PHP/Java, self-audit.
 
 ## Run it
 
@@ -83,10 +90,10 @@ cd frontend && npm ci && npm run dev
 ## Layout
 
 ```
-backend/    FastAPI app (auth, audit today; ingest, analysis, reports later)
+backend/    FastAPI app (auth, audit today; ingest, analysis, reports, workflow, sandbox, inventory later)
 frontend/   React 19 + Vite bundle, served locally, es/en, light/dark
 docker/     Compose stack and images
-docs/       Architecture, workflow gates, threat model, UI model, mockups
+docs/       Architecture, workflow gates, threat model, UI model, software inventory, mockups, work plan
 tasks/      One file per phase: objective, deliverables, definition of done
 scripts/    Our own gates (licences, no-CDN) and the CI entry point
 rules/      Our own Semgrep rules (phase 1)
