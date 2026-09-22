@@ -1,10 +1,10 @@
 # Task: Phase 4 — E6–E7
 
-> **Status: IN_PROGRESS — started 2026-09-22 (deadline 2026-09-15, plan days
-> 16–17, passed); survey `tasks/phase4-survey.md` SIGNED OFF by `mmarin`
-> 2026-09-22 (§5 answered: build without pruning, dependency-less tests as a
-> v1.0.0 non-goal, Stryker + mutmut confirmed).** Both days on the critical
-> path; day 16 opened with the mandatory sandbox investigation gate.
+> **Status: DONE — closed 2026-09-22; day 16 in commit `576993f` and day 17 in
+> the commit that carries this file. Deadline 2026-09-15 (plan days 16–17,
+> critical path), passed. Survey `tasks/phase4-survey.md` signed off by
+> `mmarin` 2026-09-22.** Both days on the critical path; day 16 opened with
+> the mandatory sandbox investigation gate.
 
 ## Objective
 Close the cycle where the workflow stops being theoretical: the developer
@@ -50,7 +50,7 @@ demonstrably rejects the gate.
      `docs/workflow-gates.md` now says it explicitly, but the Hard Rule's own
      wording is narrower than what is emitted. Decide whether to widen it.
 
-2. **Day 17 — E7 sandbox, coverage, mutation** — `backend/app/sandbox/`, `docker/sandbox-*.Dockerfile`, `backend/app/workflow/verify.py`, `frontend/src/screens/verification-screen.tsx`
+2. **Day 17 — E7 sandbox, coverage, mutation** — BUILT 2026-09-22 (`backend/app/sandbox/{workspace,executor,results,errors}.py`, `docker/sandbox.Dockerfile` + `docker/sandbox/`, `backend/app/workflow/{verify,verify_job}.py`, `backend/alembic/versions/0008_verification_runs.py`, `frontend/src/screens/verification-screen.tsx`)
    - Docker sandbox: `--network none`, CPU / RAM / pids limits, read-only
      rootfs + tmpfs workdir, timeout, non-root user, `no-new-privileges`, no
      Docker socket, no host mounts beyond the workspace; only declared result
@@ -65,6 +65,22 @@ demonstrably rejects the gate.
      Sandbox escape tests (network, FS writes, fork bomb, privilege
      escalation, socket/host mounts, exfiltration via result files).
    - Mockup anchor: "Verificación (E7)".
+   - **Deviations recorded.** (a) The module under test is copied FLAT into the
+     attempt directory and the scaffold imports it by basename: mutmut refuses
+     outright to mutate a module whose dotted path starts with `src.`, and one
+     attempt holds exactly one planned function so nothing can collide. This
+     changed day 16's generated imports. (b) The survey's "sized tmpfs for the
+     runs root" cannot be a Compose setting — a sibling container's mount is
+     resolved by the HOST daemon, so a tmpfs declared in the worker would be
+     invisible to the sandbox. The size bound is an OPERATOR step on the host
+     and `docker/docker-compose.yml` carries the command. (c) Each tool's
+     output shape is normalised by a wrapper INSIDE the image
+     (`docker/sandbox/run-{python,js}.sh`), so the host never learns a tool's
+     format and a version change stays a one-file problem.
+   - **Carried over from day 16 and DONE**: `leave_verification` is a pure row
+     predicate — the worker measures and writes the verdict down. (The same
+     treatment for `leave_tests` is left as it is: it is correct, bounded, and
+     its cost is documented in `docs/threat-model.md`.)
 3. Tests — `backend/tests/test_scaffold.py` and `test_tests_api.py` (day 16, written), `test_sandbox.py`, `test_verify.py` (day 17)
    - Scaffold determinism and assertion-freedom; the gate rejects an
      assertion-less test, a surviving mutant, coverage below criterion; every
@@ -80,14 +96,79 @@ demonstrably rejects the gate.
 ## Definition of Done
 - [x] `tasks/phase4-survey.md` written and signed off before the sandbox edits
       (written and signed off 2026-09-22, `mmarin`)
-- [ ] All deliverables implemented; ruff + mypy + oxlint + tsc clean
-- [ ] All specified tests passing (pytest / Vitest)
-- [ ] Mutation pass on `verify.py` and the gate module (phase-close) — we apply
-      to ourselves what we demand of the factory
-- [ ] No secrets in diff (Gitleaks clean); locale parity check green
-- [ ] `/precommit` returned `READY TO COMMIT` (coverage adversary included)
-- [ ] A surviving mutant demonstrably rejects the E7 gate on the P1 project
-- [ ] Every sandbox escape test negative and recorded in docs/threat-model.md
+- [x] All deliverables implemented; ruff + mypy + oxlint + tsc clean
+- [x] All specified tests passing (pytest / Vitest), including twelve live
+      sandbox tests behind the `sandbox` marker
+- [x] Mutation pass on `verify.py` and the gate module (phase-close) — we apply
+      to ourselves what we demand of the factory. mutmut 3.8 over
+      `gates / verify / brief / triage / test_plan / sandbox.results`,
+      2026-09-22: **1 276 mutants, 1 192 killed (93.4 %)**, and
+      **`gates.py` has ZERO survivors** — no mutant of any gate lives. Four
+      passes: the first left 206 survivors, and each round turned the
+      behavioural ones into tests (83 % → 88.9 % → 93 % → 93.4 %). What the
+      rounds actually found, and what was written because of it:
+      the sandbox-error path was never exercised (so the `finally` that
+      discards the attempt directory when the run RAISES was unpinned); the
+      reopen loop was only tested with a single failing function, so nothing
+      proved that a function which PASSED keeps its approval; the audit rows
+      of `verification.run` / `verification.reopen` did not have their actor
+      id, role, target and source IP asserted; `POST …/verify` had no
+      successful path at all; and `results.py` had never seen a half-shaped
+      document (a `statementMap` without its counters, a branch with no line
+      of its own, a survivor entry with no fields, non-UTF-8 JUnit, a
+      self-closing `<testcase/>` followed by a failing one).
+      The 84 remaining survivors, all inspected: 23 in `brief.py`, 12 in
+      `test_plan.py` and 5 in `triage.py` are P3's, already classified in
+      `tasks/phase3-workflow-e1-e5.md`; the 44 new ones are
+      **(a)** `or True` guards mutmut cannot make observable, **(b)** the
+      `detail` string of a typed error, which is log-only — the client sees
+      `{code, message_key}` (the same class as P3's 13), **(c)** cap
+      off-by-one (`[:255]`→`[:256]`, `[:400]`→`[:401]`), observable only at
+      exactly the boundary, **(d)** default values for a dict key that is
+      present in every reachable document (`item.get("id", "")` →
+      `"XXXX"`), **(e)** `continue`→`break` in loops whose fixtures hold one
+      element after the skipped one, and **(f)** `decode("utf-8")` →
+      `decode("UTF-8")`, which is exactly equivalent: Python codec names are
+      case-insensitive
+- [x] No secrets in diff (Gitleaks clean on the tree AND the history); locale
+      parity check green; the licence gate also run INSIDE the sandbox image
+      (230 packages, all free) — its runners are installed at build time and
+      are invisible to the repository's own lockfiles, so `scripts/ci.sh`
+      mounts the gate into the image. Where the image is not built that stage
+      prints a warning and passes, so it is BLOCKING only on a host that has
+      built it; the image's own `package-lock.json` is committed, so the tree
+      it checks is the tree that ships
+- [x] `/precommit` returned `READY TO COMMIT` (coverage adversary included).
+      Two rounds, and the panel earned its keep both times. Day 16: four UI
+      drifts and a locale-parity allowlist four keys short. Day 17: the E7
+      gate scored "nothing was measured" as "everything passed" (no result
+      document reads as 100 % of no lines, no failing test, no surviving
+      mutant, and the container's exit code was discarded); the audited code
+      could author its own verdict, because the three result files were
+      produced in the one directory it can write, as the same user;
+      `POST …/reopen-design` enforced its ten-character justification only in
+      the browser; verifying after a reopen crashed the job and rolled back
+      every row already written for the batch; a NUL in the audited code's
+      stderr would have done the same through the PostgreSQL driver; JUnit
+      failure attribution bled across `</testcase>`, so a passing case
+      inherited the next one's failure; **three of the nine escape probes
+      proved nothing** (`capsh` is not in the image, `mount -t proc` is
+      refused even privileged, and a fork bomb written with literal
+      backslash-n died of a `SyntaxError` before forking) and the rewritten
+      table had silently dropped the CPU, memory and `/proc` probes the
+      PENDING version listed. Every one is fixed, and every escape probe is
+      now checked to be ATTRIBUTABLE — it fails under the shipped flags and
+      succeeds when the flag it targets is removed. The coverage adversary
+      then found that `planned_keys`, the defence added DURING the panel, had
+      no test at all; writing one exposed a fail-OPEN the refactor had
+      introduced (a `functions` column that is not a list passed a truthiness
+      guard and then iterated zero times, opening the gate)
+- [x] A surviving mutant demonstrably rejects the E7 gate — proven twice: on a
+      crafted run (`test_verify.py::test_a_surviving_mutant_is_shown_to_the_developer_by_name`)
+      and on a real mutmut run against a real module
+      (`test_sandbox_live.py::test_a_weak_suite_leaves_surviving_mutants`)
+- [x] Every sandbox escape test negative and recorded in docs/threat-model.md
+      (nine probes, run 2026-09-22 with the shipped argv)
 - [ ] CLAUDE.md phase status + docs/development-phases.md: Phase 4 → DONE with date and commit
 
 ## Non-goals (explicit)

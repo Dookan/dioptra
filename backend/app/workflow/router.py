@@ -4,7 +4,8 @@ Phase 2: ``POST /api/v1/findings/{id}/verdict`` (E3 triage).
 Phase 3: ``POST /api/v1/analyses/{id}/stage/advance`` (the one transition),
 ``GET …/risk-matrix`` and ``GET|PUT …/test-plan`` (E4), ``GET|PUT …/diagram``,
 ``GET …/brief``, ``GET …/case-designs``, ``PUT …/cases`` and ``POST …/cases/approve`` (E5).
-Phase 4: ``GET …/scaffold`` and ``PUT …/tests`` (E6), ``GET …/test-files``.
+Phase 4: ``GET …/scaffold`` and ``PUT …/tests`` (E6), ``GET …/test-files``;
+``POST …/verify``, ``GET …/verification`` and ``POST …/reopen-design`` (E7).
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.auth.deps import ActiveUser, AnalystUser, DeveloperUser, client_ip
+from app.core.queue import enqueue_verification
 from app.db.session import get_db
 from app.ingest import service
 from app.projects.router import analysis_out
@@ -36,10 +38,11 @@ from app.projects.schemas import (
     TestPlanOut,
     TestsIn,
     VerdictIn,
+    VerificationRunOut,
     WritingStateOut,
     finding_out,
 )
-from app.workflow import authoring, design, stages, test_plan, triage
+from app.workflow import authoring, design, stages, test_plan, triage, verify
 from app.workflow.risk import risk_matrix
 
 router = APIRouter(prefix="/api/v1/findings", tags=["findings"])
@@ -241,6 +244,65 @@ def get_test_files(
     """Stage E6: cases written per planned function — the gate's state, for the banner."""
     analysis = service.get_analysis(db, analysis_id)
     return [WritingStateOut(**state) for state in authoring.writing_states(db, analysis)]
+
+
+@workflow_router.get("/verification", response_model=list[VerificationRunOut])
+def get_verification(
+    analysis_id: uuid.UUID, _user: ActiveUser, db: DbSession
+) -> list[VerificationRunOut]:
+    """Stage E7: the latest run per planned function — what the gate reads."""
+    analysis = service.get_analysis(db, analysis_id)
+    latest = verify.latest_runs(analysis)
+    return [VerificationRunOut.model_validate(run) for run in latest.values()]
+
+
+@workflow_router.post("/verify", response_model=AnalysisOut)
+def post_verify(
+    analysis_id: uuid.UUID,
+    request: Request,
+    user: DeveloperUser,
+    db: DbSession,
+) -> AnalysisOut:
+    """Stage E7 (developer only): run the tests in the sandbox and re-audit them.
+
+    The handler only ENQUEUES: running the tests starts containers, and the
+    API process never holds the Docker socket (docs/threat-model.md → Test
+    sandbox).
+    """
+    analysis = service.get_analysis(db, analysis_id)
+    verify.check_can_verify(analysis)
+    audit_username = user.username
+    db.commit()
+    enqueue_verification(analysis.id, audit_username)
+    del request
+    db.refresh(analysis)
+    return analysis_out(analysis)
+
+
+@workflow_router.post("/reopen-design", response_model=list[VerificationRunOut])
+def post_reopen_design(
+    analysis_id: uuid.UUID,
+    payload: JustificationIn,
+    request: Request,
+    user: DeveloperUser,
+    db: DbSession,
+) -> list[VerificationRunOut]:
+    """Stage E7 → E5 (developer only): reopen the functions whose run failed.
+
+    Not a backwards stage move — the machine stays monotonic. It clears the
+    approval of the failed functions and marks them reopened, so their design
+    and their tests become editable again while the analysis sits at E7.
+    """
+    analysis = service.get_analysis(db, analysis_id)
+    verify.reopen_design(
+        db,
+        analysis=analysis,
+        actor=user,
+        justification=payload.justification,
+        source_ip=client_ip(request),
+    )
+    latest = verify.latest_runs(analysis)
+    return [VerificationRunOut.model_validate(run) for run in latest.values()]
 
 
 @workflow_router.get("/test-plan", response_model=TestPlanOut)

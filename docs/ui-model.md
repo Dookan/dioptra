@@ -1,6 +1,6 @@
 # UI model
 
-> **Status: IN_PROGRESS — tokens, both themes and i18n (P0), the projects screens (P1), the findings / report screens (P2), the E4 plan screen with the status bar, the E5 design screen (P3, 2026-09-22) and the E6 test-writing screen (P4 day 16, 2026-09-22) are built; the E7 screen and Inventario are the target.** Visual anchor:
+> **Status: IN_PROGRESS — tokens, both themes and i18n (P0), the projects screens (P1), the findings / report screens (P2), the E4 plan screen with the status bar, the E5 design screen (P3, 2026-09-22) the E6 test-writing screen and the E7 verification screen (P4, 2026-09-22) are built; Inventario is the target.** Visual anchor:
 > @docs/mockups/index.html (10 screens, approved 2026-08-17).
 
 ## Principles (from the approved mockups)
@@ -184,3 +184,35 @@ Radii: frames 14, cards 12, buttons 9, badges 5. Borders 1px hairline.
   added to a screen the anchor gives neither, as on 04, 05, 06 and 09. The
   anchor's ghost button "← Revisar mis casos" IS implemented and returns to
   the design screen.
+
+- Route `#/projects/:id/analyses/:aid/verify` (screen 08 "Verificación (E7)");
+  the Workflow tab reaches it once the stage is `verification`.
+- **Verificación (E7)**: the subtitle states the method in the mockups' own
+  words — "Tus tests corren dentro de un contenedor aislado, sin red. Después
+  rompemos el código a propósito: un buen test debe fallar." The left column
+  lists one card per planned function with a Pasa/Falla chip (solid accent for
+  a pass, like E6's written chip), the coverage line in plain percentages, and
+  then every reason the run failed as its own sentence: the surviving mutant
+  with its line, the brief items not covered as id chips, the cases that
+  assert nothing, the cases that failed. Nothing is shown as a score. The
+  right column holds the two actions: "Ejecutar y medir" and, only when
+  something failed, "Reabrir el diseño de las que fallaron" behind a written
+  reason. The screen disables the button below ten characters; the FLOOR is
+  the server's (`verify.reopen_design` → `clean_justification`, the same
+  helper the stage transitions and the triage verdicts use), because the
+  screen is never the enforcement.
+- The copy says the stage does not move backwards ("La etapa no retrocede:
+  sigues en Verificación"), because that is what the machine does.
+- Mutant text and the sandbox's stderr come from the audited code's own
+  tooling: both render as React text nodes, the stderr inside a `.codeblock`.
+- The analyst and the admin see every result and neither button.
+- Recorded deviations from screen 08: the anchor shows ONE function with two
+  fixed questions side by side ("¿Probaste todo lo pedido?" / "¿Tus tests
+  detectan errores de verdad?") in a `1fr 1fr` split; the plan has N
+  functions, so the implementation lists one result card per function in a
+  `1fr 340px` split with "Resultado por función" / "Qué puedes hacer". The
+  anchor's coverage progress bar is dropped — the two percentages are a
+  sentence instead. The anchor puts the "← Revisar mis casos" ghost button
+  inside the banner; the implementation keeps the reopen in the right panel
+  because it needs a written reason first, which does not fit a banner
+  button. That last one is `mmarin`'s call to overrule.

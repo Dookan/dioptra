@@ -121,7 +121,7 @@ def test_the_scaffold_is_deterministic_and_holds_no_assertion() -> None:
     assert first.runner == "vitest"
 
     content = first.content
-    assert 'import { widthClass } from "./src/width-class.ts";' in content
+    assert 'import { widthClass } from "./width-class.ts";' in content
     assert 'it("C1 · Ancho cero cuando el total es 0", () => {' in content
     assert "// covers F1 — boundary" in content and "values: -1, 0, 1" in content
     for forbidden in ("expect(", "assert", "toBe", "toEqual", "==="):
@@ -142,7 +142,7 @@ def test_a_hostile_case_title_cannot_break_out_of_the_generated_file() -> None:
         _design(path="src/escape.py", function="mermaid_escape", cases=[{"title": HOSTILE_TITLE}])
     )
     assert py.filename == "test_escape_mermaid_escape_078855_dioptra.py"
-    assert py.runner == "pytest" and "from src.escape import mermaid_escape" in py.content
+    assert py.runner == "pytest" and "from escape import mermaid_escape" in py.content
     bodies = inspect_cases(py.content, "src/escape.py", py.cases)
     assert [body.id for body in bodies] == ["C1"] and not bodies[0].written
 
@@ -153,12 +153,15 @@ def test_an_unapproved_design_gets_no_scaffold() -> None:
 
 
 def test_a_path_python_cannot_import_becomes_a_todo_not_a_broken_import() -> None:
-    assert python_module("src/helpers/edad.py") == "src.helpers.edad"
-    assert python_module("my-lib/edad.py") is None
-    scaffold = build_scaffold(_design(path="my-lib/edad.py", function="obtener_edad"))
+    # The sandbox puts the module at the attempt directory's root, so the
+    # import is by basename — never the audited tree's dotted path.
+    assert python_module("src/helpers/edad.py") == "edad"
+    assert python_module("my-lib/edad-2.py") is None
+    scaffold = build_scaffold(_design(path="my-lib/edad-2.py", function="obtener_edad"))
     assert "\nfrom " not in scaffold.content
     assert (
-        "# TODO(developer): import the function under test from my-lib/edad.py" in scaffold.content
+        "# TODO(developer): import the function under test from my-lib/edad-2.py"
+        in scaffold.content
     )
 
 
@@ -373,12 +376,12 @@ def test_an_approved_design_without_its_snapshot_gets_no_scaffold() -> None:
 def test_a_function_name_that_is_not_an_identifier_degrades_instead_of_breaking() -> None:
     """A method (``obj.method``) cannot be imported by name in either language."""
     ts = build_scaffold(_design(function="obj.method"))
-    assert 'import * as subject from "./src/width-class.ts";' in ts.content
+    assert 'import * as subject from "./width-class.ts";' in ts.content
     assert "import { obj.method }" not in ts.content
 
     py = build_scaffold(
         _design(path="src/escape.py", function="obj.method", cases=[{"title": "Caso"}])
     )
-    assert "from src.escape import obj.method" not in py.content
+    assert "from escape import obj.method" not in py.content
     assert "# TODO(developer): import the function under test from src/escape.py" in py.content
     compile(py.content, "<scaffold>", "exec")

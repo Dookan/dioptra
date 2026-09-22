@@ -485,6 +485,56 @@ export function getWritingStates(
   });
 }
 
+export interface VerificationRun extends PlannedFunction {
+  status: 'passed' | 'failed' | 'errored';
+  reasons: string[];
+  coverage: {
+    statement_percent?: number;
+    branch_percent?: number;
+    missing_lines?: number[];
+    partial_branch_lines?: number[];
+    covered_branches?: number;
+    total_branches?: number;
+  };
+  uncovered_items: string[];
+  surviving_mutants: { id: string; line: string; mutant: string }[];
+  assertion_free_cases: string[];
+  failed_cases: string[];
+  detail: string | null;
+  duration_ms: number;
+  created_by_username: string;
+  created_at: string;
+}
+
+export function getVerification(
+  accessToken: string,
+  analysisId: string,
+): Promise<VerificationRun[]> {
+  return apiFetch<VerificationRun[]>(`/analyses/${encodeURIComponent(analysisId)}/verification`, {
+    accessToken,
+  });
+}
+
+export function startVerification(accessToken: string, analysisId: string): Promise<Analysis> {
+  return apiFetch<Analysis>(`/analyses/${encodeURIComponent(analysisId)}/verify`, {
+    method: 'POST',
+    accessToken,
+    body: {},
+  });
+}
+
+export function reopenDesign(
+  accessToken: string,
+  analysisId: string,
+  justification: string,
+): Promise<VerificationRun[]> {
+  return apiFetch<VerificationRun[]>(`/analyses/${encodeURIComponent(analysisId)}/reopen-design`, {
+    method: 'POST',
+    accessToken,
+    body: { justification },
+  });
+}
+
 export function getReportState(accessToken: string, analysisId: string): Promise<ReportState> {
   return apiFetch<ReportState>(`/analyses/${encodeURIComponent(analysisId)}/report/current`, {
     accessToken,

@@ -11,6 +11,12 @@ The generated comments are English like the rest of the code base
 (CLAUDE.md → English everywhere in code). That is also the technical answer:
 the file is compared byte for byte, so its content may not depend on the UI
 language of whoever happened to open the screen.
+
+The imports name the module by its BASENAME, because that is the layout the
+E7 sandbox provides: one attempt directory per planned function holding the
+module under test and this file, and nothing else (`app/sandbox/workspace.py`).
+Keeping the audited tree's directories would also break mutmut, which refuses
+outright to mutate a module whose dotted path starts with ``src.``.
 """
 
 from __future__ import annotations
@@ -112,8 +118,12 @@ def _covers_notes(covers: list[str], items: dict[str, dict[str, Any]]) -> list[s
     return notes
 
 
+def _basename(path: str) -> str:
+    return path.rsplit("/", 1)[-1]
+
+
 def _stem(path: str) -> str:
-    name = path.rsplit("/", 1)[-1]
+    name = _basename(path)
     return name.rsplit(".", 1)[0] if "." in name else name
 
 
@@ -150,7 +160,7 @@ def _javascript_scaffold(design: CaseDesign, language: str) -> ScaffoldFile:
     stem = slug(_stem(design.path), fallback="module")
     mark = _discriminator(design.path, design.line)
     filename = f"{stem}.{slug(function, fallback='fn')}.{mark}.dioptra.test.{suffix}"
-    specifier = "./" + design.path.lstrip("./")
+    specifier = "./" + _basename(design.path)
 
     named = bool(_JS_IDENTIFIER.match(function))
     if named:
@@ -211,12 +221,15 @@ def _docstring_safe(text: str) -> str:
 
 
 def python_module(path: str) -> str | None:
-    """The dotted module of a path, or ``None`` when a segment is not importable."""
-    stem = path[:-3] if path.endswith(".py") else path
-    segments = [segment for segment in stem.split("/") if segment not in ("", ".")]
-    if not segments or not all(_PY_IDENTIFIER.match(segment) for segment in segments):
-        return None
-    return ".".join(segments)
+    """The module name the sandbox will expose, or ``None`` when it is not importable.
+
+    The sandbox puts the module under test at the root of the attempt
+    directory, so the import is by basename — ``src/helpers/edad.py`` becomes
+    ``edad``. A stem that is not a Python identifier (``my-lib.py``) has no
+    import at all and the scaffold says so instead of emitting a broken one.
+    """
+    stem = _stem(path)
+    return stem if _PY_IDENTIFIER.match(stem) else None
 
 
 def _python_scaffold(design: CaseDesign) -> ScaffoldFile:

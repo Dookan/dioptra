@@ -143,3 +143,61 @@ class TestFile(Base):
             postgresql_nulls_not_distinct=True,
         ),
     )
+
+
+class VerificationStatus(StrEnum):
+    """How one verification attempt on one planned function ended."""
+
+    PASSED = "passed"
+    #: It ran and the re-audit rejected it: coverage, a failing test, an
+    #: assertion-less case, or a surviving mutant.
+    FAILED = "failed"
+    #: It could not run at all (no sandbox, a timeout, unreadable results).
+    ERRORED = "errored"
+
+
+#: Reason codes a failed run carries, in `VerificationRun.reasons`. Every one
+#: of them has an i18n key the screen resolves; the developer never reads a
+#: server-authored sentence.
+REASON_TESTS_FAILED = "tests_failed"
+REASON_ASSERTION_FREE = "assertion_free"
+REASON_COVERAGE_SHORT = "coverage_short"
+REASON_BRIEF_UNCOVERED = "brief_uncovered"
+REASON_MUTANT_SURVIVED = "mutant_survived"
+REASON_SANDBOX_ERROR = "sandbox_error"
+
+
+class VerificationRun(Base):
+    """E7: one sandbox attempt on one planned function.
+
+    Runs are append-only in practice — the gate reads the LATEST per function,
+    and the history is what the report's "test debt" section is built from.
+    """
+
+    __tablename__ = "verification_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(default=uuid.uuid4, primary_key=True)
+    analysis_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("analyses.id", ondelete="CASCADE"), index=True
+    )
+    path: Mapped[str] = mapped_column(String(1024))
+    function: Mapped[str] = mapped_column(String(200))
+    line: Mapped[int | None] = mapped_column(Integer, default=None)
+    status: Mapped[VerificationStatus] = mapped_column(
+        Enum(VerificationStatus, native_enum=False, length=8, validate_strings=True)
+    )
+    #: Reason codes (above); empty on a pass.
+    reasons: Mapped[list[str]] = mapped_column(JSON, default=list)
+    #: ``app.sandbox.results.Coverage.as_dict``.
+    coverage: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    #: Brief item ids whose line never ran, or whose branch stayed partial.
+    uncovered_items: Mapped[list[str]] = mapped_column(JSON, default=list)
+    #: ``[{id, line, mutant}]`` — the exact mutant the developer is shown.
+    surviving_mutants: Mapped[list[dict[str, str]]] = mapped_column(JSON, default=list)
+    assertion_free_cases: Mapped[list[str]] = mapped_column(JSON, default=list)
+    failed_cases: Mapped[list[str]] = mapped_column(JSON, default=list)
+    #: Tail of the sandbox's stderr, bounded; audited output, rendered as text.
+    detail: Mapped[str | None] = mapped_column(Text, default=None)
+    duration_ms: Mapped[int] = mapped_column(Integer, default=0)
+    created_by_username: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)

@@ -107,7 +107,9 @@
         "testPlanMissing": "The test plan is missing: at least one function, the coverage strictness and your rationale.",
         "notBuilt": "This stage cannot be closed yet in this version of the platform.",
         "casesNotApproved": "Some functions of the plan still lack approved cases.",
-        "testsNotWritten": "Some cases are still unwritten. Write something of your own in each before moving to verification."
+        "testsNotWritten": "Some cases are still unwritten. Write something of your own in each before moving to verification.",
+        "notVerified": "Some functions have never been verified. Run the verification before moving to the report.",
+        "verificationFailed": "Some functions do not pass verification. Fix the tests or redesign their cases."
       },
       "stageNotReached": "That stage has not started yet: the previous ones close first.",
       "caseItemUnknown": "A case points at a brief item that no longer exists. Reload the page.",
@@ -128,6 +130,12 @@
       "parseFailed": "The function has syntax errors; fix them in the code before designing.",
       "tooDeep": "The function is nested beyond the limit; simplify it before designing.",
       "functionNotInPlan": "That function is not in the test plan."
+    },
+    "sandbox": {
+      "failed": "The run inside the isolated container could not complete.",
+      "unavailable": "The isolated environment is not available on this server.",
+      "timeout": "The run exceeded its time limit and the container was stopped.",
+      "resultsUnreadable": "The run's results could not be read."
     }
   },
   "nav": {
@@ -545,5 +553,50 @@
       "blocked_other": "Cases still to write: {{written}} of {{count}}."
     },
     "backToDesign": "← Review my cases"
+  },
+  "verify": {
+    "title": "Verification",
+    "subtitle": "Your tests run inside an isolated container with no network. Then we break the code on purpose: a good test must fail.",
+    "passed": "Passes",
+    "failed": "Fails",
+    "coverage": "Coverage: {{statements}} % of statements, {{branches}} % of branches.",
+    "failedCases": "Cases that failed:",
+    "assertionFreeCases": "Cases that check nothing:",
+    "uncoveredItems": "Brief items not covered:",
+    "survivorsTitle": "Mutants that survived: {{count}}",
+    "line": "line",
+    "runsTitle": "Result per function",
+    "noRuns": "No verification has been run yet.",
+    "actionsTitle": "What you can do",
+    "actionsNote": "Running takes a while: every function runs in its own container, with coverage and the mutation run.",
+    "run": "Run and measure",
+    "started": "Verification queued. Come back to this screen in a moment.",
+    "reopenTitle": "Back to the design",
+    "reopenNote": "Reopen the functions that failed so you can redesign their cases. The stage does not move back: you stay in Verification.",
+    "reasonLabel": "Why you are going back to the design",
+    "reopen": "Reopen the design of the failing ones",
+    "reopened": "Done: those functions are editable again.",
+    "readOnly": "Only the developer runs the verification, and only during this stage.",
+    "reason": {
+      "tests_failed": "A test failed when it ran.",
+      "assertion_free": "Some cases run the code but check nothing. A test with no assertion always passes.",
+      "coverage_short": "Coverage falls short of the criterion you chose in the plan.",
+      "brief_uncovered": "Some brief items have a line that never ran, or a branch left half taken.",
+      "mutant_survived": "We broke the code on purpose and your tests stayed green. That mutant is what is left to prove.",
+      "sandbox_error": "The run could not be carried out. Check the detail and try again."
+    },
+    "nextStep": {
+      "notYetTitle": "Verification is not due yet",
+      "notYetBody": "The tests of every case have to be written first.",
+      "neverRunTitle": "Never run",
+      "neverRunBody": "Run the tests to measure how much they really cover and whether they detect errors.",
+      "resultBody": "Every function has to pass in full: tests green, coverage at the criterion, every brief item executed and no mutant alive.",
+      "resultTitle_one": "{{passed}} of {{count}} function passes verification",
+      "resultTitle_other": "{{passed}} of {{count}} functions pass verification"
+    },
+    "advance": {
+      "label": "Go to the report →",
+      "blocked": "Some functions still do not pass verification."
+    }
   }
 }

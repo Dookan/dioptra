@@ -47,6 +47,22 @@ run_supply_chain() {
   log "supply chain: free licences only"
   uv run --project backend python scripts/license_gate.py
 
+  # The E7 sandbox image installs its own runners (pytest, coverage, mutmut,
+  # vitest, Stryker) at BUILD time, so they are invisible to the checks above:
+  # they live inside the image, not in backend/.venv or frontend/node_modules.
+  # Run the same gate in there, against the image's own trees.
+  log "supply chain: free licences inside the E7 sandbox image"
+  if command -v docker >/dev/null 2>&1 \
+     && docker image inspect "${DIOPTRA_SANDBOX_IMAGE:-dioptra-sandbox:latest}" >/dev/null 2>&1
+  then
+    docker run --rm --network none \
+      -v "$(pwd)/scripts/license_gate.py:/tmp/license_gate.py:ro" \
+      "${DIOPTRA_SANDBOX_IMAGE:-dioptra-sandbox:latest}" \
+      python3 /tmp/license_gate.py --backend-venv /usr/local --node-modules /opt/dioptra-js/node_modules
+  else
+    echo "sandbox image not built here — build it (docker compose build sandbox-image) to check its licences"
+  fi
+
   log "supply chain: no CDN in the built bundle"
   uv run --project backend python scripts/no_cdn_check.py --dist frontend/dist
 

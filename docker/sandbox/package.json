@@ -1,0 +1,13 @@
+{
+  "name": "dioptra-sandbox-runners",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The JS/TS runners the E7 sandbox executes the developer's tests with. Installed at BUILD time into /opt/dioptra-js so the audited tree cannot shadow them with its own node_modules, and so the image ships to an air-gapped factory as one artefact. Licences: vitest MIT, @vitest/coverage-v8 MIT, Stryker Apache-2.0 (Stryker is the plan's mutation tool for JS/TS, CLAUDE.md -> Analysis Tool Source Authority; the test runner and its coverage provider are not in that table, which names the analysis pipeline's capabilities). Verified by scripts/ci.sh, which runs the licence gate inside the built image.",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/vitest-runner": "10.0.0",
+    "@vitest/coverage-v8": "5.0.1",
+    "vitest": "5.0.1"
+  }
+}

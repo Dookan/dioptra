@@ -28,6 +28,9 @@ os.environ.setdefault("DIOPTRA_WORKSPACE_ROOT", tempfile.mkdtemp(prefix="dioptra
 # runner "available" so its (fixture or absent) execution is exercised.
 os.environ.setdefault("DIOPTRA_RULES_DIR", str(Path(__file__).resolve().parents[2] / "rules"))
 os.environ.setdefault("DIOPTRA_OSV_DB_DIR", tempfile.mkdtemp(prefix="dioptra-test-osv-"))
+# P4: the E7 attempt directories. A real sandbox run is opt-in (marker
+# `sandbox`); everything else uses a fake executor and never starts a container.
+os.environ.setdefault("DIOPTRA_SANDBOX_RUNS_ROOT", tempfile.mkdtemp(prefix="dioptra-test-runs-"))
 
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -86,6 +89,8 @@ def app(session_factory: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch)
     application = create_app()
     # The inline pipeline opens its own session, exactly like the worker does.
     monkeypatch.setattr("app.analysis.pipeline.get_session_factory", lambda: session_factory)
+    # The E7 verification job opens its own session too, like the worker does.
+    monkeypatch.setattr("app.workflow.verify_job.get_session_factory", lambda: session_factory)
 
     def override_get_db() -> Iterator[Session]:
         session = session_factory()
@@ -148,3 +153,23 @@ def admin(db: Session) -> User:
     )
     db.commit()
     return user
+
+
+@pytest.fixture
+def sandbox_available() -> bool:
+    """Whether a real E7 run can happen here: Docker present and the image built."""
+    import shutil
+    import subprocess
+
+    from app.core.config import get_settings
+
+    if shutil.which("docker") is None:
+        return False
+    docker = shutil.which("docker") or "docker"
+    probe = subprocess.run(  # noqa: S603 — fixed argv, resolved binary
+        [docker, "image", "inspect", get_settings().sandbox_image],
+        capture_output=True,
+        check=False,
+        timeout=60,
+    )
+    return probe.returncode == 0

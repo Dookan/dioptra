@@ -166,11 +166,10 @@ def test_leave_plan_checks_every_clause_of_the_plan(db: Session) -> None:
 
 def test_every_unbuilt_gate_is_closed() -> None:
     analysis = Analysis()
-    result = gates.check(Stage.VERIFICATION, analysis)
-    assert result.open is False and result.reason == "gate_not_built"
-    # DESIGN (day 15) and TESTS (P4 day 16) are built: closed for their own
-    # reason on an empty analysis, never open by default.
-    for stage in (Stage.DESIGN, Stage.TESTS):
+    # Every stage's gate is built now (P4 day 17 closed VERIFICATION): each
+    # one is closed for its OWN reason on an empty analysis, never open by
+    # default. REPORT still has no entry, and a missing entry is CLOSED.
+    for stage in (Stage.DESIGN, Stage.TESTS, Stage.VERIFICATION):
         assert gates.check(stage, analysis).open is False, stage
     # REGISTER is the project's (always open); REPORT has no gate entry and
     # the default for a missing entry is CLOSED, never open.
@@ -304,3 +303,90 @@ def test_leave_tests_checks_every_clause_of_its_own(db: Session) -> None:
     db.flush()
     # A design with no case may not open the gate: there is nothing to have written.
     assert gates.leave_tests(analysis).reason == "tests_not_written"
+
+
+def test_a_malformed_plan_row_closes_every_gate_and_raises_in_none(db: Session) -> None:
+    """`planned_keys` exists for exactly this, and nothing tested it.
+
+    Skipping a row that is not a dict would OPEN the gate for a function
+    nobody checked; letting `row.get` run on it would turn a stage transition
+    into a 500. Only `test_plan.save_test_plan` writes this column, so a row
+    like these means the column was corrupted underneath us.
+    """
+    good: dict[str, Any] = {"path": "a.js", "function": "f", "line": 1, "ccn": 1}
+    corrupted: list[list[Any]] = [[good, "not a dict"], [None], [[]], [good, 7]]
+    for rows in corrupted:
+        analysis = seed_done_analysis(db, [])
+        analysis.test_plan = workflow_models.TestPlan(
+            analysis_id=analysis.id,
+            rationale="Porque sí, con razón escrita.",
+            functions=rows,
+            created_by_username="cperez",
+        )
+        db.flush()
+        for gate in (gates.leave_design, gates.leave_tests, gates.leave_verification):
+            result = gate(analysis)
+            assert result.open is False, (gate.__name__, rows)
+
+    # A `functions` column that is not a list at all is no plan.
+    analysis = seed_done_analysis(db, [])
+    analysis.test_plan = workflow_models.TestPlan(
+        analysis_id=analysis.id,
+        rationale="Porque sí, con razón escrita.",
+        functions="nonsense",
+        created_by_username="cperez",
+    )
+    db.flush()
+    for gate in (gates.leave_design, gates.leave_tests, gates.leave_verification):
+        assert gate(analysis).reason == "test_plan_missing", gate.__name__
+
+
+def test_a_malformed_row_keeps_the_gate_shut_even_when_every_real_row_is_done(
+    db: Session,
+) -> None:
+    """The exposure is a plan whose legitimate functions are ALL satisfied.
+
+    Skipping the corrupt row would then leave nothing to check and the gate
+    would OPEN for a function nobody ever looked at. That is why
+    `planned_keys` emits an unmatchable key instead of dropping the row.
+    """
+    good: dict[str, Any] = {"path": "a.js", "function": "f", "line": 1, "ccn": 1}
+    analysis = seed_done_analysis(db, [])
+    analysis.test_plan = workflow_models.TestPlan(
+        analysis_id=analysis.id,
+        rationale="Porque si, con razon escrita.",
+        functions=[good],
+        created_by_username="cperez",
+    )
+    analysis.case_designs = [
+        workflow_models.CaseDesign(
+            path="a.js",
+            function="f",
+            line=1,
+            cases=[{"title": "Un caso", "covers": []}],
+            brief={"items": []},
+            approved_at=utc_now(),
+            approved_by_username="cperez",
+            created_by_username="cperez",
+        )
+    ]
+    analysis.verification_runs = [
+        workflow_models.VerificationRun(
+            analysis_id=analysis.id,
+            path="a.js",
+            function="f",
+            line=1,
+            status=workflow_models.VerificationStatus.PASSED,
+            created_by_username="cperez",
+        )
+    ]
+    db.flush()
+    # Everything real is done, so both gates are open...
+    assert gates.leave_design(analysis).open is True
+    assert gates.leave_verification(analysis).open is True
+
+    # ...and one corrupt row shuts them again.
+    analysis.test_plan.functions = [good, "not a dict"]  # type: ignore[list-item]
+    db.flush()
+    assert gates.leave_design(analysis).reason == "cases_not_approved"
+    assert gates.leave_verification(analysis).reason == "not_verified"

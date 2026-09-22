@@ -1214,3 +1214,43 @@ button.card:focus-visible {
 .cols.tests {
   grid-template-columns: 300px 1fr;
 }
+
+/* --- E7: a rejection has to LOOK like one (mockup 08) ------------------- */
+/* Without this the failing chip falls back to bare `.chip`, which is the
+   accent tint — so pass and fail differ only in fill weight of the same hue,
+   the exact trap `.chip.ok` above was written to avoid. */
+.chip.err {
+  background: var(--err-bg);
+  color: var(--err);
+}
+
+/* The "next step" banner is accent by default. On a rejection the next step
+   is going back to the design, and the anchor paints that banner warn. */
+.nextstep.warn {
+  border-color: var(--warn);
+  background: var(--warn-bg);
+}
+
+/* `.sub` has no bare rule — only descendant ones. Inside a result card it was
+   inheriting `.panel ul` by accident, which also made the function name
+   muted instead of ink. */
+.caserow .sub {
+  font-size: 12px;
+  color: var(--t2);
+}
+
+.caserow b {
+  color: var(--ink);
+}
+
+/* The sentence that says WHY a run was rejected is the point of the screen;
+   `.hint` is --t3, which is below AA at this size. */
+.caserow .reason {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.caserow .reason.bad {
+  color: var(--err);
+}

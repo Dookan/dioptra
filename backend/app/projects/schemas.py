@@ -18,7 +18,12 @@ from app.analysis.models import (
     ToolStatus,
     Verdict,
 )
-from app.workflow.models import MAX_CASES, MAX_TEST_FILE_CHARS, CoverageCriterion
+from app.workflow.models import (
+    MAX_CASES,
+    MAX_TEST_FILE_CHARS,
+    CoverageCriterion,
+    VerificationStatus,
+)
 
 
 class SystemProfileIn(BaseModel):
@@ -281,6 +286,26 @@ class WritingStateOut(BaseModel):
     cases: int
     written: int
     parse_error: bool
+
+
+class VerificationRunOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    path: str
+    function: str
+    line: int | None
+    status: VerificationStatus
+    #: Reason codes; the UI resolves each to a sentence of its own.
+    reasons: list[str]
+    coverage: dict[str, Any]
+    uncovered_items: list[str]
+    surviving_mutants: list[dict[str, str]]
+    assertion_free_cases: list[str]
+    failed_cases: list[str]
+    detail: str | None
+    duration_ms: int
+    created_by_username: str
+    created_at: datetime
 
 
 class VerdictIn(BaseModel):

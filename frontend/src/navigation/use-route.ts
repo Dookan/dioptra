@@ -16,19 +16,24 @@ export type Route =
   | { kind: 'plan'; id: string; analysisId: string }
   | { kind: 'design'; id: string; analysisId: string }
   | { kind: 'tests'; id: string; analysisId: string }
+  | { kind: 'verify'; id: string; analysisId: string }
   | { kind: 'report'; id: string; analysisId: string };
 
 export type AnalysisRoute = Extract<Route, { analysisId: string }>;
 
 const PROJECT = /^#\/projects\/([A-Za-z0-9-]+)$/;
 const ANALYSIS =
-  /^#\/projects\/([A-Za-z0-9-]+)\/analyses\/([A-Za-z0-9-]+)\/(findings|plan|design|tests|report)$/;
+  /^#\/projects\/([A-Za-z0-9-]+)\/analyses\/([A-Za-z0-9-]+)\/(findings|plan|design|tests|verify|report)$/;
 
-const ANALYSIS_KINDS: Record<string, 'findings' | 'plan' | 'design' | 'tests' | 'report'> = {
+const ANALYSIS_KINDS: Record<
+  string,
+  'findings' | 'plan' | 'design' | 'tests' | 'verify' | 'report'
+> = {
   findings: 'findings',
   plan: 'plan',
   design: 'design',
   tests: 'tests',
+  verify: 'verify',
   report: 'report',
 };
 
@@ -56,6 +61,7 @@ export function hrefFor(route: Route): string {
     case 'plan':
     case 'design':
     case 'tests':
+    case 'verify':
     case 'report':
       return `#/projects/${route.id}/analyses/${route.analysisId}/${route.kind}`;
   }

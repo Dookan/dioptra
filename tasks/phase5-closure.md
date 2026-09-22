@@ -1,8 +1,10 @@
 # Task: Phase 5 — Cierre (inventory, wave 2, self-audit, release)
 
-> **Status: DESIGN — deadline ◆ "Release" 2026-09-18 (plan days 18–20); starts
-> the moment P4 closes.** Tag v1.0.0 on the deadline at the latest. Day 20 is
-> the buffer.
+> **Status: IN_PROGRESS — started 2026-09-22, the moment P4 closed. Deadline
+> ◆ "Release" 2026-09-18 (plan days 18–20), passed.** Tag v1.0.0 when the
+> Definition of Done below is met. Day 20 is the buffer. The plan-first survey
+> for day 18 (`tasks/phase5-survey.md`) has NOT been written yet, and it gates
+> the inventory edits.
 
 ## Objective
 Add the software inventory of the factory (SBOM/CBOM/VEX + local CVE

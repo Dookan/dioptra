@@ -34,8 +34,14 @@
 - **SBOM**: software bill of materials — every direct and transitive
   component of the audited system with version, PURL and license, generated
   from lockfiles (metadata only) in CycloneDX 1.6, one per ingested version.
-- **Scaffold**: deterministic test skeleton (file, imports, case names from
-  AST + approved pseudocode). Never contains assertions or logic.
+- **Sandbox**: the ephemeral container E7 runs the developer's tests in — no
+  network, read-only root, no capabilities, non-root, hard CPU/RAM/pids
+  limits, one writable mount discarded afterwards, and nothing of the audited
+  project installed (`backend/app/sandbox/`, `docker/sandbox.Dockerfile`).
+- **Scaffold**: deterministic test skeleton (file name, imports and one named
+  case per approved case, plus a comment naming the brief items each case
+  declared). Never contains an assertion, test data or an oracle
+  (`backend/app/workflow/scaffold/`).
 - **Self-audit**: the platform run through its own pipeline on the last day;
   must end with no high finding open without justification.
 - **Test brief** (Spanish UI: "consigna"): the per-function deterministic spec
@@ -43,6 +49,14 @@
   boundaries, `E` error paths, `M` malicious cases) and a minimum case count
   (`backend/app/workflow/brief.py`). See docs/workflow-gates.md.
 - **Test debt**: gap between required and actual coverage; reported in E8.
+- **Verification run**: one E7 sandbox attempt on one planned function, with
+  its verdict — coverage, the brief items left uncovered, the mutants that
+  survived, the cases that assert nothing, the cases that failed. The gate
+  reads the LATEST run per function (`backend/app/workflow/verify.py`).
+- **Reopen (E7 → E5)**: the explicit action that clears the approval of the
+  functions whose latest run failed and marks them reopened, so their design
+  and tests become editable again WITHOUT moving the stage backwards — the
+  machine stays monotonic.
 - **Triage**: human review of automatic findings — confirm, or discard as
   false positive with written justification.
 - **VEX**: vulnerability exploitability exchange — per CVE × component, the

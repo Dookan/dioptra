@@ -11,7 +11,7 @@ parsed (analysis), rendered (findings, reports) and executed (tests).
 | git URL ingest | SSRF against internal services (I) | HTTPS only, no credentials or non-443 ports, host resolved and refused when private / loopback / link-local / multicast; the clone runs in the worker (never in the request) with `http.followRedirects=false`, `protocol.allow=never` except https, depth 1, timeout — `backend/app/ingest/git_source.py` (P1, built). Residual: the worker container still has LAN reachability for the clone itself; a per-clone network namespace is P4/P5 hardening |
 | Finding snippets | Stored XSS into analyst's browser or PDF renderer (T, E) | escape at every render; CSP on the app; report templates run with Jinja2 autoescape, the Markdown export escapes too, and WeasyPrint's URL fetcher refuses every reference outside the template's own assets — `backend/app/reports/engine.py` (P1, built); the findings screen renders title, path, message and snippet as React text nodes only, and the catalog prose shown beside them is ours — `frontend/src/screens/findings-screen.tsx` (P2, built) |
 | Test scaffolds and files (E6) | The generator turns developer prose and audited identifiers into SOURCE CODE: a case title could close a string or a comment and inject statements into a file another developer opens in their editor, or the stored file could carry control characters into the sandbox (T, E) | Every value is escaped at the generator's boundary (`backend/app/workflow/scaffold/text.py`): titles become JSON-quoted JS literals or Python `repr()` literals with U+2028/U+2029 folded, identifiers are ASCII slugs, comment text is collapsed to one line with `*/` neutralised, and the function name falls back to a namespace import when it is not a bare identifier. The scaffold contains no assertion and no data, so there is nothing to smuggle a value through. The developer's own file is stored as TEXT (control characters stripped, 200 000 chars), rendered in a `<textarea>` and a `<pre>` as text, never as markup, and never executed outside the E7 sandbox; the gate PARSES it with tree-sitter and treats a parse failure as "unwritten" rather than raising — `backend/app/workflow/{authoring,gates}.py`, `frontend/src/screens/test-writing-screen.tsx` (P4 day 16, built). Residual: the gate parses the stored text inside the API process, like the E5 row — but with its OWN bound, not E5's 512 KiB: `MAX_TEST_FILE_CHARS` is 200 000 characters (up to ~800 KB of UTF-8) per file, times at most `MAX_FUNCTIONS` = 200 planned functions on one `stage/advance`. The content is developer-authored and authenticated, the walk is iterative, and the only callers are `stages.advance` and `GET …/test-files`. Revisit trigger: P4 day 17 stores the per-case result at save time, which turns `leave_tests` back into a pure row predicate and removes the parse from the gate entirely |
-| Test sandbox | Sandbox escape, resource exhaustion, exfiltration (E, D, I) | Docker: `--network none`, CPU/RAM/pids limits, read-only rootfs + tmpfs workdir, timeout, non-root user |
+| Test sandbox | Sandbox escape, resource exhaustion, exfiltration (E, D, I) | One ephemeral container per verification attempt with `--network none --read-only --cap-drop ALL --security-opt no-new-privileges --user <non-root> --memory/--memory-swap (equal, no swap) --cpus --pids-limit`, a `/tmp` tmpfs, a shorter timeout than analysis (120 s) and a NAMED container so the timeout kills the container and not just the docker client. **Exactly one mount**: the per-attempt run directory, read-write — no jail, no rules, and never the Docker socket (only the `worker` service holds it, and the API never does). Nothing of the audited project is installed: the image ships pytest / coverage / mutmut / vitest / Stryker preinstalled, the module under test is COPIED FLAT into the attempt directory through the jailed loader, and the audited tree's own `vitest.config.js`, `conftest.py`, `pytest.ini` and `package.json` are never copied — they run code at collection time and would point the runner anywhere. Only three declared file names are read back (`coverage.json`, `junit.xml`, `mutation.json`), each capped and parsed as data with defensive shapes; a malformed one measures nothing rather than raising. The run directory is discarded after every attempt — `backend/app/sandbox/`, `docker/sandbox.Dockerfile` (P4 day 17, built). Residual: the runs root must be size-bounded BY THE OPERATOR on the host (a tmpfs or a quota), because a sibling container's mount is resolved by the host daemon and a tmpfs declared in Compose would be invisible to it — `docker/docker-compose.yml` carries the command |
 | Analysis containers | Malicious build hooks (npm postinstall etc.); a tool phoning home turns the analysis into a live third-party query (E, I) | dependency installation for analysis is metadata-only (lockfile parsing); no package scripts executed outside the sandbox; every runner container runs `--network none --read-only --cap-drop ALL --security-opt no-new-privileges --user <DIOPTRA_RUNNER_USER, 10001:10001 by default, root refused by the settings pattern> -w /tmp` with memory / cpu / pids limits and a timeout, the tree mounted read-only, tools in offline mode against mounted local data; every scanner is pointed at OUR policy (`rules/gitleaks/gitleaks.toml`, `rules/osv-scanner/osv-scanner.toml`, `rules/semgrep/`) with `--config` and a tmpfs working directory, so a config file shipped inside the audited tree (proven: a `.gitleaks.toml` allowlisting `.*`) is never honoured, a tree-level `.gitleaksignore` is removed from the jail before the first scan and inline `gitleaks:allow` comments are ignored (`--ignore-gitleaks-allow`); findings are capped per analysis worst-first with the cap recorded as a coverage gap; a run that exceeds its timeout has its named container killed (the timeout alone only kills the docker client); only the `worker` service holds the Docker socket, the API never does. Known and contained: a ZIP that ships a `.git/` directory can drive `git log -p` through an attacker-controlled `.git/config` (`diff.<driver>.textconv` runs a command) — that is code execution INSIDE the analysis container, exactly what these flags exist to contain, so they must never be relaxed — `backend/app/analysis/runners/executor.py`, `docker/docker-compose.yml` (P1, built) |
 | Auth | Credential stuffing, token theft (S, E) | Argon2id, lockout/backoff, short-lived JWT + refresh rotation, audit log |
 | Audit log | Repudiation (R) | append-only table; every sensitive action stores actor, timestamp, justification |
@@ -26,19 +26,54 @@ parsed (analysis), rendered (findings, reports) and executed (tests).
 
 ## Sandbox escape tests (P4, day 17)
 
-> **Status: PENDING — filled in when P4 closes.** The plan makes this the
-> release blocker: a positive escape test means no release, fixed even if it
-> consumes the whole buffer. Each test below is recorded here with its date,
-> the command run and the observed result.
+> **Status: RUN 2026-09-22, all negative.** The plan makes this the release
+> blocker: a positive escape test means no release, fixed even if it consumes
+> the whole buffer. They live in `backend/tests/test_sandbox_live.py`, marked
+> `sandbox`, and are skipped only where Docker or `dioptra-sandbox:latest` is
+> absent.
 
-| Test | Expectation | Result |
-|---|---|---|
-| Outbound network from a test (`fetch`, `socket`) | connection refused / no route | pending |
-| Write outside the workspace (`/`, `/etc`, `/usr`) | read-only FS error | pending |
-| Fork bomb / CPU spin / memory balloon | killed by pids / CPU / RAM limits within the timeout | pending |
-| Privilege escalation (`setuid`, capabilities, `/proc` writes) | non-root user, `no-new-privileges`, no capabilities | pending |
-| Escape via mounted Docker socket or host paths | no socket, no host mount beyond the workspace | pending |
-| Exfiltration through the coverage / mutation report files | only the declared result files are read back, size-capped, parsed as data | pending |
+Every probe runs with the argv `app/sandbox/executor.py::command` ships, with
+the command swapped — and with `--user`, which the fixture sets to the test
+process's own uid so the container can write the attempt directory it created
+(both values are non-root; the shipped images run as 10001).
+
+**Each probe was checked to be ATTRIBUTABLE**: it fails under the shipped
+flags AND succeeds when the flag it targets is removed. That check is not
+ceremony. Three earlier probes passed for free and proved nothing — `capsh`
+is not installed in the image, so the capability probe exited non-zero
+whatever the capability set; `mount -t proc` is refused even when privileged,
+because `/proc` is already mounted; and a fork bomb written with literal
+backslash-n died of a `SyntaxError` before forking anything. A negative
+control that cannot go positive is not evidence.
+
+| Test | Command inside the container | Shipped flags | Flag removed |
+|---|---|---|---|
+| Outbound network | `socket.create_connection(('1.1.1.1',53))` | refused | succeeds without `--network none` |
+| Write outside the workspace | `touch /etc/dioptra-pwned` | refused | succeeds as root without `--read-only` |
+| Write into the image's own tree | `touch /usr/local/bin/dioptra-pwned` | refused | succeeds as root without `--read-only` |
+| Write to `/proc` | `echo 1 > /proc/sys/kernel/core_uses_pid` | refused | succeeds privileged |
+| Escape via the Docker socket | `test -S /var/run/docker.sock` | absent | succeeds when the socket is bind-mounted |
+| Gain capabilities | `grep '^Cap(Prm\|Eff\|Bnd):' /proc/self/status` — every set must be all zeros | all zeros | non-zero without `--cap-drop ALL` |
+| Keep the right to gain privileges | `grep 'NoNewPrivs:\t0' /proc/self/status` | `NoNewPrivs: 1` | `0` without `no-new-privileges` |
+| Become root | `os.setuid(0)` | refused | succeeds as `--user 0:0` |
+| Mount a filesystem | `mount -t tmpfs tmpfs /mnt` | refused (exit 32) | succeeds privileged |
+| Fork bomb | `os.fork()` until `OSError`, then `exit 7` | **exit 7** — a fork WAS refused | runs to completion with a high `--pids-limit` |
+| Memory balloon | 64 MiB chunks until death | killed | — |
+| CPU spin (a test that never returns) | `while True: pass` | the named container is killed at the timeout, in under 90 s | **a raw `subprocess.run` leaves it spinning** — the timeout kills the docker CLIENT, not the container |
+
+Exit 7 is the fork-bomb probe's own `OSError` branch, so it can only happen
+when a fork was actually refused: a missing binary or a syntax error gives 1
+or 2. The CPU-spin test goes through `executor.run` rather than a command
+swap, because what stops an endless loop is the named container plus the
+`docker kill` hook — verified by watching a raw invocation still spin two
+minutes later.
+
+Three further properties are asserted by the same suite: a canary written into
+the attempt directory appears in none of the three files read back nor in the
+stderr; the run directory no longer exists afterwards; and a thorough suite on
+a real module reaches 100 % statements with no partial branch while a
+one-assertion suite leaves mutants alive — the plan's own release criterion,
+measured rather than asserted.
 
 ## Accepted residual risks
 
@@ -51,3 +86,4 @@ Consciously accepted, each with the trigger that reopens it.
 | The DB role that owns `audit_log` can `DROP TRIGGER`, defeating the append-only guarantee | Separating a migration role from a restricted runtime role is P5 hardening work | The P5 ASVS L2 self-audit |
 | Valkey on the Compose network has no authentication: any container on that network can write to the queue | The worker accepts only JSON payloads and a job class that refuses every callable except the pipeline and ignores the callback and webhook fields RQ would otherwise resolve from the hash (`backend/app/core/queue.py`), so a broker write can enqueue an analysis id at most, never code or an outbound request; the network is internal to Compose with no published port | Valkey reachable from outside the Compose network, or rootless Docker adopted for the worker |
 | Logout revokes every refresh token but an already-issued access token stays valid until it expires (≤15 min). A password change DOES invalidate it (`password_changed_at`) | Logout is user-intent, not a compromise signal; the window is bounded by a 15-minute TTL | Session revocation is needed for a compromise signal other than a password change |
+| **The audited code can forge its own E7 verdict.** The tests execute in the same container as the runner that reports on them, as the same user. The artefacts are now produced on the container's own tmpfs and copied into the shared mount only after every runner process has exited (`docker/sandbox/run-*.sh`), which removes the easy tricks — rewriting `junit.xml` from an `atexit` hook after pytest flushed it, or deleting the coverage data so a planted document survives. It does not make the verdict tamper-proof: code that runs at all can write to that tmpfs before the copy | Real integrity would mean producing the verdict outside the container the code runs in — a second container, or re-deriving it from a stream the audited code cannot reach. That is a redesign of E7, not a day-17 fix. What bounds the damage is who is harmed: a project that forges a pass deceives its OWN report, and the analyst still signs it. Absence is no longer a pass — a missing or unparseable document is `ERRORED`, never a verdict (`workflow/verify.py`), so forging now requires producing a plausible document rather than removing one | The P5 self-audit, or the first time an E7 pass is used as evidence outside the institution |

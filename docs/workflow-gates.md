@@ -1,6 +1,6 @@
 # Workflow gates (E1–E8)
 
-> **Status: IN_PROGRESS — stage machine, gates for leaving E2/E3/E4/E5/E6, the E4 risk matrix and test plan, the E5 diagrams, brief and cases (2026-09-22) and the E6 scaffolds and test files (P4 day 16, 2026-09-22) are built (`backend/app/workflow/{stages,gates,risk,test_plan,design,brief,authoring}.py`, `workflow/scaffold/`); E7's gate lands with P4 day 17 — until then that stage is CLOSED (fails closed), proven by `backend/tests/test_gates.py`, `test_cases_api.py` and `test_tests_api.py`.**
+> **Status: IN_PROGRESS — every gate E2→E7 is built (2026-09-22): the stage machine, the E4 risk matrix and test plan, the E5 diagrams, brief and cases, the E6 scaffolds and test files, and the E7 sandbox run with its re-audit (`backend/app/workflow/{stages,gates,risk,test_plan,design,brief,authoring,verify}.py`, `workflow/scaffold/`, `backend/app/sandbox/`). E8 has no gate of its own — the analyst signs. Proven by `backend/tests/{test_gates,test_cases_api,test_tests_api,test_verify,test_sandbox,test_sandbox_live}.py`.**
 
 ## How the machine works (P3)
 
@@ -41,7 +41,7 @@ discipline does not depend on anyone's goodwill.
 | E4 Test plan | developer | risk matrix selection + coverage criterion + written rationale | ≥1 function selected, criterion chosen, rationale non-empty — `gates.leave_plan` (built); the plan save itself refuses a function E5 could never approve (the AST layer cannot parse it, or its basis paths exceed `MAX_CASES` = 200), naming it — `test_plan.check_briefable` (built) |
 | E5 Case design | developer | AST flow diagrams (Mermaid, deterministic, editable) + test brief + the developer's cases with approval | every planned function has its cases approved — `gates.leave_design` (built); approval itself (`design.approve_cases`) is refused until every brief item is covered by a case and there are at least `min_cases` cases |
 | E6 Test writing | developer | tests (assertions/logic 100% human) over deterministic scaffolds | every approved case has a body the developer wrote — `gates.leave_tests` (built) |
-| E7 Verification | system | coverage vs. brief + mutation results | coverage meets E4 criterion AND zero surviving mutants AND no assertion-less tests |
+| E7 Verification | system | coverage vs. brief + mutation results | the LATEST run of every planned function passed — `gates.leave_verification` (built) |
 | E8 Report | analyst | editable versioned report | analyst signs; export enabled |
 
 ## Test brief (deterministic — no AI)
@@ -151,12 +151,38 @@ measurement, not this gate's opinion.
 
 ## E7 re-audit rules
 
-1. Coverage (statements + decisions) measured in the sandbox against the E4
-   criterion; each brief branch checked by line.
-2. Assertion-less / trivial tests detected by our own rules → reject.
-3. Mutation testing (Stryker/mutmut/Pitest/Infection) over the branches the
-   tests claim to cover. A surviving mutant → gate rejected → back to E5 with
-   the exact mutant shown to the developer.
-4. Coverage below the E4 criterion → also back to E5 (the plan's loop): when
-   coverage falls short the problem is almost always case design, not the
-   test.
+Built 2026-09-22 (`backend/app/workflow/verify.py`, `backend/app/sandbox/`).
+Four questions per planned function, in this order; any "no" closes the gate
+and each one is shown to the developer BY NAME, never as a score:
+
+1. **Did the tests pass?** Read from the run's JUnit document.
+2. **Does every case assert something?** Our own rule over the test file's AST
+   (`scaffold/inspect.py::assertion_free_cases`): a case whose body calls no
+   `expect`/`assert` family function, or holds no `assert` statement, is
+   rejected. Deliberately generous — whether the assertion is a GOOD one is
+   question 4's answer, not this one's.
+3. **Coverage.** Measured in the sandbox and normalised to one shape for both
+   languages. The E4 criterion is applied to the module (`statements` ⊂
+   `decisions` ⊂ `paths`), AND every brief item's line is checked
+   individually: an item counts only when its line executed *and* its branch
+   was fully taken — a half-taken branch covers neither side.
+4. **Mutation.** Stryker (JS/TS) / mutmut (Python) over the module under test.
+   A surviving mutant rejects the gate, and the developer is shown the exact
+   mutant with its line.
+
+The loop back to E5 is an explicit action, `POST …/reopen-design` (developer,
+written reason, audited) — **not** a backwards stage move: the machine stays
+monotonic. It clears the approval of the functions whose latest run failed and
+sets `CaseDesign.reopened_at`, which is what lets E5's and E6's writers accept
+those functions again while the analysis sits at E7. Approving again clears
+the flag; until every planned function has a PASSED latest run, the gate stays
+closed.
+
+The run itself happens in the WORKER, never in a request: it starts
+containers, and only the worker holds the Docker socket. The handler enqueues
+and returns.
+
+**Recorded non-goal of v1.0.0**: the sandbox installs nothing of the audited
+project, so a test that needs the project's own dependencies cannot run —
+`npm install` on a hostile tree executes lifecycle scripts, which is remote
+code execution by design (`tasks/phase4-survey.md` §5).

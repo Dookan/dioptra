@@ -35,6 +35,8 @@ GATE_MESSAGE_KEYS: dict[str, str] = {
     "gate_not_built": "errors.workflow.gate.notBuilt",
     "cases_not_approved": "errors.workflow.gate.casesNotApproved",
     "tests_not_written": "errors.workflow.gate.testsNotWritten",
+    "not_verified": "errors.workflow.gate.notVerified",
+    "verification_failed": "errors.workflow.gate.verificationFailed",
 }
 
 

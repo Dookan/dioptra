@@ -99,6 +99,12 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
 filterwarnings = ["error"]
+markers = [
+    # The E7 sandbox tests start real containers from `dioptra-sandbox:latest`.
+    # They are skipped where Docker or the image is absent, and they are the
+    # only tests in the suite that need either.
+    "sandbox: needs Docker and the built sandbox image",
+]
 
 [tool.mutmut]
 # Phase-close targets only (CLAUDE.md → Code Conventions → Tests): the gate,
@@ -112,6 +118,8 @@ only_mutate = [
     "app/workflow/brief.py",
     "app/workflow/triage.py",
     "app/workflow/test_plan.py",
+    "app/workflow/verify.py",
+    "app/sandbox/results.py",
 ]
 pytest_add_cli_args_test_selection = [
     "tests/test_gates.py",
@@ -119,4 +127,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_cases_api.py",
     "tests/test_triage.py",
     "tests/test_test_plan.py",
+    "tests/test_verify.py",
+    "tests/test_sandbox.py",
+    "tests/test_tests_api.py",
 ]

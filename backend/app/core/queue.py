@@ -19,11 +19,15 @@ from app.core.config import get_settings
 logger = logging.getLogger("dioptra.queue")
 
 PIPELINE_JOB = "app.analysis.pipeline.run_pipeline"
+VERIFY_JOB = "app.workflow.verify_job.run_verification_job"
+#: The ONLY callables the worker may execute. Adding one here is a security
+#: decision: the worker is the process holding the Docker socket.
+ALLOWED_JOBS = frozenset({PIPELINE_JOB, VERIFY_JOB})
 QUEUE_NAME = "analysis"
 
 
 class PipelineJob(Job):
-    """The only job the worker executes.
+    """The only jobs the worker executes (``ALLOWED_JOBS``).
 
     RQ resolves a job's callable from a dotted path stored in the broker, so
     anything able to write to Valkey could otherwise make the worker — the one
@@ -34,8 +38,9 @@ class PipelineJob(Job):
 
     @property
     def func(self) -> Callable[..., Any]:
-        if self.func_name != PIPELINE_JOB:
-            message = f"refusing job {self.func_name!r}: only {PIPELINE_JOB} may run here"
+        if self.func_name not in ALLOWED_JOBS:
+            allowed = ", ".join(sorted(ALLOWED_JOBS))
+            message = f"refusing job {self.func_name!r}: only {allowed} may run here"
             raise PermissionError(message)
         parent: Callable[..., Any] = super().func
         return parent
@@ -83,3 +88,32 @@ def enqueue_pipeline(analysis_id: uuid.UUID) -> None:
     job_timeout = settings.runner_timeout_seconds * 8 + settings.git_clone_timeout_seconds
     queue.enqueue(PIPELINE_JOB, str(analysis_id), job_timeout=job_timeout, result_ttl=0)
     logger.info("enqueued analysis=%s", analysis_id)
+
+
+def enqueue_verification(analysis_id: uuid.UUID, actor_username: str) -> None:
+    """Schedule the E7 run for one analysis. The rows MUST be committed already.
+
+    Like the pipeline, this starts containers, so it never happens inside a
+    request handler (tasks/phase4-survey.md §4).
+    """
+    settings = get_settings()
+    if settings.queue_inline:
+        from app.workflow.verify_job import run_verification_job
+
+        run_verification_job(str(analysis_id), actor_username)
+        return
+
+    from redis import Redis
+    from rq import Queue
+    from rq.serializers import JSONSerializer
+
+    connection = Redis.from_url(settings.redis_url)
+    queue = Queue(
+        QUEUE_NAME, connection=connection, serializer=JSONSerializer, job_class=PipelineJob
+    )
+    # One attempt per planned function, each bounded by the sandbox timeout.
+    job_timeout = settings.sandbox_timeout_seconds * 32
+    queue.enqueue(
+        VERIFY_JOB, str(analysis_id), actor_username, job_timeout=job_timeout, result_ttl=0
+    )
+    logger.info("enqueued verification analysis=%s", analysis_id)

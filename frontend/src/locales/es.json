@@ -107,7 +107,9 @@
         "testPlanMissing": "Falta el plan de pruebas: al menos una función, la exigencia de cobertura y tu justificación.",
         "notBuilt": "Esta etapa todavía no se puede cerrar en esta versión de la plataforma.",
         "casesNotApproved": "Faltan funciones del plan con sus casos aprobados.",
-        "testsNotWritten": "Todavía hay casos sin escribir. Escribe algo propio en cada uno antes de pasar a la verificación."
+        "testsNotWritten": "Todavía hay casos sin escribir. Escribe algo propio en cada uno antes de pasar a la verificación.",
+        "notVerified": "Todavía hay funciones que no se han verificado nunca. Ejecuta la verificación antes de pasar al reporte.",
+        "verificationFailed": "Hay funciones que no pasan la verificación. Corrige los tests o vuelve a diseñar sus casos."
       },
       "stageNotReached": "Esa etapa todavía no empezó: primero se cierran las anteriores.",
       "caseItemUnknown": "Un caso apunta a un punto de la consigna que ya no existe. Recarga la página.",
@@ -128,6 +130,12 @@
       "parseFailed": "La función tiene errores de sintaxis; corrígelos en el código antes de diseñar.",
       "tooDeep": "La función está anidada más allá del límite; simplifícala antes de diseñar.",
       "functionNotInPlan": "Esa función no está en el plan de pruebas."
+    },
+    "sandbox": {
+      "failed": "La ejecución en el contenedor aislado no pudo completarse.",
+      "unavailable": "El entorno aislado no está disponible en este servidor.",
+      "timeout": "La ejecución superó el tiempo límite y se detuvo el contenedor.",
+      "resultsUnreadable": "No se pudieron leer los resultados de la ejecución."
     }
   },
   "nav": {
@@ -545,5 +553,50 @@
       "blocked_other": "Te faltan casos por escribir: {{written}} de {{count}}."
     },
     "backToDesign": "← Revisar mis casos"
+  },
+  "verify": {
+    "title": "Verificación",
+    "subtitle": "Tus tests corren dentro de un contenedor aislado, sin red. Después rompemos el código a propósito: un buen test debe fallar.",
+    "passed": "Pasa",
+    "failed": "Falla",
+    "coverage": "Cobertura: {{statements}} % de sentencias, {{branches}} % de ramas.",
+    "failedCases": "Casos que fallaron:",
+    "assertionFreeCases": "Casos que no comprueban nada:",
+    "uncoveredItems": "Ítems de la consigna sin cubrir:",
+    "survivorsTitle": "Mutantes que sobrevivieron: {{count}}",
+    "line": "línea",
+    "runsTitle": "Resultado por función",
+    "noRuns": "Todavía no se ha ejecutado ninguna verificación.",
+    "actionsTitle": "Qué puedes hacer",
+    "actionsNote": "Ejecutar tarda: cada función se corre en su propio contenedor, con la cobertura y la prueba de mutación.",
+    "run": "Ejecutar y medir",
+    "started": "Verificación encolada. Vuelve a esta pantalla en un momento.",
+    "reopenTitle": "Volver al diseño",
+    "reopenNote": "Reabre las funciones que fallaron para rediseñar sus casos. La etapa no retrocede: sigues en Verificación.",
+    "reasonLabel": "Por qué vuelves al diseño",
+    "reopen": "Reabrir el diseño de las que fallaron",
+    "reopened": "Listo: esas funciones vuelven a ser editables.",
+    "readOnly": "Solo el programador ejecuta la verificación, y solo durante esta etapa.",
+    "reason": {
+      "tests_failed": "Algún test falló al ejecutarse.",
+      "assertion_free": "Hay casos que ejecutan el código pero no comprueban nada. Un test sin aserción pasa siempre.",
+      "coverage_short": "La cobertura no alcanza el criterio que elegiste en el plan.",
+      "brief_uncovered": "Hay ítems de la consigna cuya línea nunca se ejecutó, o cuya rama quedó a medias.",
+      "mutant_survived": "Rompimos el código a propósito y tus tests siguieron en verde. Ese mutante es el que falta probar.",
+      "sandbox_error": "La ejecución no pudo llevarse a cabo. Revisa el detalle y vuelve a intentarlo."
+    },
+    "nextStep": {
+      "notYetTitle": "Todavía no toca verificar",
+      "notYetBody": "Primero hay que escribir los tests de cada caso.",
+      "neverRunTitle": "Nunca se ha ejecutado",
+      "neverRunBody": "Ejecuta los tests para medir cuánto cubren de verdad y si detectan errores.",
+      "resultBody": "Cada función tiene que pasar entera: tests en verde, cobertura al criterio, cada ítem de la consigna ejecutado y ningún mutante vivo.",
+      "resultTitle_one": "{{passed}} de {{count}} función pasa la verificación",
+      "resultTitle_other": "{{passed}} de {{count}} funciones pasan la verificación"
+    },
+    "advance": {
+      "label": "Pasar al reporte →",
+      "blocked": "Todavía hay funciones que no pasan la verificación."
+    }
   }
 }

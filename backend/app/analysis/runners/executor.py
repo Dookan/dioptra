@@ -18,6 +18,7 @@ import subprocess
 import time
 import uuid
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from app.analysis.models import ToolStatus
@@ -36,7 +37,7 @@ def _stderr_text(raw: bytes | None) -> str:
     return raw[-STDERR_CAP:].decode("utf-8", errors="replace")
 
 
-def _read_output(path: Path, cap: int) -> tuple[bytes | None, bool]:
+def read_output(path: Path, cap: int) -> tuple[bytes | None, bool]:
     """Read the report file back, never more than ``cap`` bytes."""
     if not path.is_file():
         return None, False
@@ -58,7 +59,7 @@ def _finish(
 ) -> ExecutionResult:
     """Classify a completed process: RAN when the exit code is normal AND the report exists."""
     duration_ms = int((time.monotonic() - started) * 1000)
-    output, truncated = _read_output(out_dir / spec.output_file, cap)
+    output, truncated = read_output(out_dir / spec.output_file, cap)
     if exit_code in spec.ok_exit_codes and output is not None:
         return ExecutionResult(
             status=ToolStatus.RAN,
@@ -85,6 +86,70 @@ def _finish(
     )
 
 
+@dataclass(frozen=True)
+class ProcessOutcome:
+    """What running one argv produced, before any tool-specific interpretation.
+
+    ``status`` is already classified for the two cases that are not about the
+    tool at all: it never started (MISSING) or it was killed (TIMEOUT).
+    """
+
+    status: ToolStatus | None
+    exit_code: int | None
+    stderr: str
+    duration_ms: int
+    detail: str | None
+
+
+def run_argv(
+    argv: list[str],
+    *,
+    cwd: Path | None,
+    timeout_seconds: int,
+    on_timeout: Callable[[], None] | None = None,
+) -> ProcessOutcome:
+    """Run ``argv`` with a timeout and a kill hook. Shared with the E7 sandbox.
+
+    The E7 sandbox needs exactly this and a different result contract (three
+    files instead of one), so the process handling lives here once rather than
+    being written a second time (tasks/phase4-survey.md → Verdict).
+    """
+    started = time.monotonic()
+    try:
+        completed = subprocess.run(  # noqa: S603 — argv is built from our own specs, never from input
+            argv,
+            cwd=cwd,
+            capture_output=True,
+            timeout=timeout_seconds,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        if on_timeout is not None:
+            on_timeout()
+        return ProcessOutcome(
+            status=ToolStatus.TIMEOUT,
+            exit_code=None,
+            stderr=_stderr_text(exc.stderr),
+            duration_ms=int((time.monotonic() - started) * 1000),
+            detail=f"killed after {timeout_seconds}s",
+        )
+    except FileNotFoundError:
+        return ProcessOutcome(
+            status=ToolStatus.MISSING,
+            exit_code=None,
+            stderr="",
+            duration_ms=int((time.monotonic() - started) * 1000),
+            detail=f"{argv[0]} not found",
+        )
+    return ProcessOutcome(
+        status=None,
+        exit_code=completed.returncode,
+        stderr=_stderr_text(completed.stderr),
+        duration_ms=int((time.monotonic() - started) * 1000),
+        detail=None,
+    )
+
+
 def _run_process(
     spec: RunnerSpec,
     argv: list[str],
@@ -98,40 +163,21 @@ def _run_process(
     # A report left by an earlier run (a retry, a sibling spec writing the same
     # name) must never be read back as this run's result.
     (out_dir / spec.output_file).unlink(missing_ok=True)
-    try:
-        completed = subprocess.run(  # noqa: S603 — argv is built from our own specs, never from input
-            argv,
-            cwd=cwd,
-            capture_output=True,
-            timeout=spec.timeout_seconds,
-            check=False,
-        )
-    except subprocess.TimeoutExpired as exc:
-        if on_timeout is not None:
-            on_timeout()
+    outcome = run_argv(argv, cwd=cwd, timeout_seconds=spec.timeout_seconds, on_timeout=on_timeout)
+    if outcome.status is not None:
         return ExecutionResult(
-            status=ToolStatus.TIMEOUT,
+            status=outcome.status,
             exit_code=None,
-            stderr=_stderr_text(exc.stderr),
+            stderr=outcome.stderr,
             output=None,
             truncated=False,
-            duration_ms=int((time.monotonic() - started) * 1000),
-            detail=f"killed after {spec.timeout_seconds}s",
-        )
-    except FileNotFoundError:
-        return ExecutionResult(
-            status=ToolStatus.MISSING,
-            exit_code=None,
-            stderr="",
-            output=None,
-            truncated=False,
-            duration_ms=int((time.monotonic() - started) * 1000),
-            detail=f"{argv[0]} not found",
+            duration_ms=outcome.duration_ms,
+            detail=outcome.detail,
         )
     return _finish(
         spec,
-        exit_code=completed.returncode,
-        stderr=_stderr_text(completed.stderr),
+        exit_code=outcome.exit_code,
+        stderr=outcome.stderr,
         out_dir=out_dir,
         started=started,
         cap=cap,

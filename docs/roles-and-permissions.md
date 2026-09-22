@@ -1,6 +1,6 @@
 # Roles and permissions
 
-> **Status: IN_PROGRESS — roles, sessions and admin-only accounts (P0, `backend/app/auth/`), the E1–E2 rows (P1), the E3 triage / E8 edit-and-sign rows (P2), the E4 test-plan row, the E5 design row (diagram text, cases, approval), the per-stage transition roles (P3, `backend/app/workflow/{router,stages,design}.py`) and the E6 test-writing row (P4 day 16, `backend/app/workflow/authoring.py`) are enforced; the E7 row is the target.**
+> **Status: IN_PROGRESS — roles, sessions and admin-only accounts (P0, `backend/app/auth/`), the E1–E2 rows (P1), the E3 triage / E8 edit-and-sign rows (P2), the E4 test-plan row, the E5 design row (diagram text, cases, approval), the per-stage transition roles (P3, `backend/app/workflow/{router,stages,design}.py`) the E6 test-writing row and the E7 verification row (P4, `backend/app/workflow/{authoring,verify}.py`) are enforced.**
 
 Usernames are initial + lastname, lowercase, no dots: `mmarin`, `cperez`,
 `amedina`. Roles are enforced on EVERY endpoint; the UI only mirrors them.
@@ -15,7 +15,7 @@ Usernames are initial + lastname, lowercase, no dots: `mmarin`, `cperez`,
 | Build test plan, choose coverage criterion (E4) | view | view | ✓ |
 | Design cases: diagram text, cases, approval (E5) | view | view | ✓ |
 | Write tests (E6): store the test file | view | view | ✓ |
-| Run verification, see mutants (E7) | — | view | ✓ |
+| Run verification, see mutants (E7) | view | view | ✓ (runs it, and reopens the design of what failed) |
 | Edit report sections (E8) | — | ✓ | — |
 | Sign/lock a report version | — | ✓ | — |
 | Export report (PDF/DOCX/Markdown) | ✓ | ✓ | ✓ (may download; "view" never meant a screen-only copy — the developer needs the findings to plan tests) |

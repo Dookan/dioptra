@@ -42,6 +42,13 @@ _PY_SKIP_MARKER = "skip"
 
 _PY_EMPTY = frozenset({"pass_statement"})
 
+#: Roots of a call that asserts something. OUR rule, deterministic and
+#: deliberately generous: E7 rejects a case with NO assertion at all, it does
+#: not judge whether the assertion is a good one — that is what the mutation
+#: run measures. Anything narrower would start guessing at intent.
+_JS_ASSERT_ROOTS = frozenset({"expect", "expectTypeOf", "assert", "assertType", "chai"})
+_PY_ASSERT_CALLS = ("assert", "raises", "warns", "approx", "fail")
+
 
 @dataclass(frozen=True)
 class CaseBody:
@@ -197,6 +204,97 @@ def _record_js_case(node: Node, found: dict[str, int]) -> None:
         found[case_id] = 1
         return
     found[case_id] = _meaningful(body)
+
+
+def _js_asserts(node: Node) -> bool:
+    for descendant in _walk(node):
+        if descendant.type != "call_expression":
+            continue
+        callee = descendant.child_by_field_name("function")
+        root = callee
+        while root is not None and root.type == "member_expression":
+            root = root.child_by_field_name("object")
+        if root is not None and root.type == "identifier" and _text(root) in _JS_ASSERT_ROOTS:
+            return True
+    return False
+
+
+def _py_asserts(node: Node) -> bool:
+    for descendant in _walk(node):
+        if descendant.type == "assert_statement":
+            return True
+        if descendant.type == "call":
+            callee = _text(descendant.child_by_field_name("function")).lower()
+            if any(name in callee for name in _PY_ASSERT_CALLS):
+                return True
+    return False
+
+
+def assertion_free_cases(content: str, path: str, cases: Sequence[ScaffoldCase]) -> list[str]:
+    """Ids of the cases whose body asserts nothing at all.
+
+    E7's own rule (docs/workflow-gates.md → E7 re-audit rules, 2): a test that
+    runs the code and checks nothing passes for free. Whether the assertion
+    PROVES anything is the mutation run's answer, not this one's.
+    """
+    language = language_for(path)
+    root = parse(content.encode("utf-8"), language)
+    if root.has_error:
+        raise UnparsableTests(path[:200])
+    bodies = _python_case_nodes(root) if language == "python" else _js_case_nodes(root)
+    asserts = _py_asserts if language == "python" else _js_asserts
+    free: list[str] = []
+    for case in cases:
+        node = bodies.get(case.id)
+        if node is not None and not asserts(node):
+            free.append(case.id)
+    return free
+
+
+def _python_case_nodes(root: Node) -> dict[str, Node]:
+    found: dict[str, Node] = {}
+    for node in _walk(root):
+        if node.type != "function_definition":
+            continue
+        match = _PY_CASE_ID.match(_text(node.child_by_field_name("name")))
+        if match is None or _py_skipped(node):
+            continue
+        body = node.child_by_field_name("body")
+        if body is not None:
+            found[f"C{int(match.group(1))}"] = body
+    return found
+
+
+def _js_case_nodes(root: Node) -> dict[str, Node]:
+    found: dict[str, Node] = {}
+    stack: list[tuple[Node, bool]] = [(root, False)]
+    while stack:
+        node, skipped = stack.pop()
+        inherited = skipped
+        if node.type == "call_expression":
+            callee = node.child_by_field_name("function")
+            if _js_skipped_callee(callee):
+                inherited = True
+            elif not skipped and _js_callee_ok(callee):
+                case_id, body = _js_case_node(node)
+                if case_id is not None and body is not None:
+                    found[case_id] = body
+        for child in reversed(node.named_children):
+            stack.append((child, inherited))
+    return found
+
+
+def _js_case_node(node: Node) -> tuple[str | None, Node | None]:
+    arguments = node.child_by_field_name("arguments")
+    if arguments is None:
+        return None, None
+    args = [child for child in arguments.named_children if child.type != "comment"]
+    if len(args) < 2 or args[0].type not in ("string", "template_string"):
+        return None, None
+    match = _JS_CASE_ID.match(_string_value(args[0]))
+    if match is None:
+        return None, None
+    return f"C{int(match.group(1))}", args[1]
 
 
 def inspect_cases(content: str, path: str, cases: Sequence[ScaffoldCase]) -> list[CaseBody]:

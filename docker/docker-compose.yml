@@ -93,6 +93,8 @@ services:
       DIOPTRA_ANALYSIS_IMAGE: dioptra-analysis:latest
       DIOPTRA_RULES_DIR: /srv/app/rules
       DIOPTRA_OSV_DB_DIR: /var/lib/dioptra/osv
+      DIOPTRA_SANDBOX_IMAGE: dioptra-sandbox:latest
+      DIOPTRA_SANDBOX_RUNS_ROOT: /var/lib/dioptra/runs
       XDG_CACHE_HOME: /tmp
     volumes:
       # Bind mounts handed to `docker run` are resolved by the HOST daemon, so
@@ -102,6 +104,21 @@ services:
       # container. The default keeps host path == container path.
       - ${DIOPTRA_DATA_DIR:-/var/lib/dioptra}/workspaces:/var/lib/dioptra/workspaces
       - ${DIOPTRA_DATA_DIR:-/var/lib/dioptra}/osv:/var/lib/dioptra/osv:ro
+      # E7 attempt directories. Host path == container path, like the jail,
+      # because the sibling container's mount is resolved by the HOST daemon —
+      # which is also why this CANNOT be the sized tmpfs the P4 survey §2
+      # described: a tmpfs declared here exists only inside the worker and the
+      # sandbox container would never see it. The size bound is therefore an
+      # OPERATOR step on the host, and it is not optional: the sandbox mounts
+      # one of these read-write, so a test that writes forever would otherwise
+      # fill the host disk, PostgreSQL included. Mount it as its own sized
+      # filesystem before starting the stack, e.g.
+      #   mount -t tmpfs -o size=512m,uid=10001,gid=10001,mode=0770 \
+      #         tmpfs ${DIOPTRA_DATA_DIR:-/var/lib/dioptra}/runs
+      # (or give the directory its own volume / XFS project quota).
+      - type: bind
+        source: ${DIOPTRA_DATA_DIR:-/var/lib/dioptra}/runs
+        target: /var/lib/dioptra/runs
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
@@ -109,6 +126,8 @@ services:
       valkey:
         condition: service_healthy
       analysis-image:
+        condition: service_completed_successfully
+      sandbox-image:
         condition: service_completed_successfully
     # JSON payloads and a job class that refuses every callable but the
     # pipeline: a write to Valkey must not become code execution in the one
@@ -134,6 +153,17 @@ services:
       context: ..
       dockerfile: docker/analysis.Dockerfile
     image: dioptra-analysis:latest
+    command: ["true"]
+    restart: "no"
+
+  # Build-only, like analysis-image: the E7 sandbox the worker starts one
+  # container from per verification attempt. It ships the test runners and the
+  # mutation tools preinstalled, and installs NOTHING of the audited project.
+  sandbox-image:
+    build:
+      context: ..
+      dockerfile: docker/sandbox.Dockerfile
+    image: dioptra-sandbox:latest
     command: ["true"]
     restart: "no"
 

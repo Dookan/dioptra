@@ -43,11 +43,13 @@ function tabsFor(route: Route, stage: string | undefined): { key: TabKey; route:
     const workflow =
       stage === undefined
         ? 'plan'
-        : stageIndex(stage) >= stageIndex('tests')
-          ? 'tests'
-          : stageIndex(stage) >= stageIndex('design')
-            ? 'design'
-            : 'plan';
+        : stageIndex(stage) >= stageIndex('verification')
+          ? 'verify'
+          : stageIndex(stage) >= stageIndex('tests')
+            ? 'tests'
+            : stageIndex(stage) >= stageIndex('design')
+              ? 'design'
+              : 'plan';
     tabs.push(
       { key: 'findings', route: { kind: 'findings', id, analysisId } },
       { key: 'workflow', route: { kind: workflow, id, analysisId } },
@@ -59,9 +61,8 @@ function tabsFor(route: Route, stage: string | undefined): { key: TabKey; route:
 
 function isActive(tab: Route, route: Route): boolean {
   if (tab.kind === 'projects') return route.kind === 'projects' || route.kind === 'project';
-  if (tab.kind === 'plan' || tab.kind === 'design' || tab.kind === 'tests') {
-    return route.kind === 'plan' || route.kind === 'design' || route.kind === 'tests';
-  }
+  const WORKFLOW_KINDS = ['plan', 'design', 'tests', 'verify'];
+  if (WORKFLOW_KINDS.includes(tab.kind)) return WORKFLOW_KINDS.includes(route.kind);
   return tab.kind === route.kind;
 }
 

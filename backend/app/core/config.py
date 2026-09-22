@@ -94,6 +94,31 @@ class Settings(BaseSettings):
     #: Caps on what is read back from a tool: hostile output must not fill the DB.
     max_tool_output_bytes: int = Field(default=32 * 1024 * 1024, ge=1024)
 
+    # --- E7 sandbox (P4 day 17) -------------------------------------------
+    # The analysis containers PARSE hostile code; the sandbox EXECUTES it, so
+    # every limit here is tighter than its analysis counterpart and the
+    # writable mount is the only one (tasks/phase4-survey.md §2).
+    sandbox_image: str = "dioptra-sandbox:latest"
+    #: Root of the per-attempt run directories. Its filesystem MUST be
+    #: size-bounded by the operator (a tmpfs or a quota on the host): the
+    #: sandbox mounts one of these read-write, and Compose cannot bound it
+    #: because a sibling container's mount is resolved by the host daemon.
+    #: `sandbox_max_file_bytes` bounds any SINGLE file regardless.
+    sandbox_runs_root: Path = Path("/var/lib/dioptra/runs")
+    #: Shorter than the analysis timeout: a test that needs two minutes is a
+    #: test that is not going to pass.
+    sandbox_timeout_seconds: int = Field(default=120, ge=10)
+    sandbox_memory: str = "1g"
+    sandbox_cpus: str = "1"
+    sandbox_pids_limit: int = Field(default=256, ge=16)
+    #: Each declared result file is read back capped. They are attacker-
+    #: controlled data, parsed as data, never evaluated.
+    max_sandbox_result_bytes: int = Field(default=8 * 1024 * 1024, ge=1024)
+    #: `--ulimit fsize`: no single file the sandbox writes may exceed this.
+    #: It costs nothing and it holds even where the operator forgot to bound
+    #: the runs filesystem.
+    sandbox_max_file_bytes: int = Field(default=256 * 1024 * 1024, ge=1024 * 1024)
+
     @model_validator(mode="after")
     def _prod_requires_a_secure_refresh_cookie(self) -> Settings:
         """Refuse to boot a production instance that would leak the refresh token.
