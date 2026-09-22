@@ -1,0 +1,32 @@
+rules:
+  - id: python-unsafe-deserialization
+    message: Deserializing untrusted data with pickle/marshal/yaml.load can execute code; use json or yaml.safe_load.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      cwe: "CWE-502"
+      owasp: "A08:2021"
+      category: security
+      confidence: HIGH
+    pattern-either:
+      - pattern: pickle.loads(...)
+      - pattern: pickle.load(...)
+      - pattern: cPickle.loads(...)
+      - pattern: marshal.loads(...)
+      - pattern: yaml.load($X)
+      - pattern: yaml.load($X, Loader=yaml.Loader)
+      - pattern: yaml.load($X, Loader=yaml.UnsafeLoader)
+      - pattern: yaml.load($X, Loader=yaml.FullLoader)
+  - id: js-unsafe-deserialization
+    message: node-serialize / js-yaml unsafe load on untrusted input executes code; use JSON.parse or yaml.load with the default safe schema.
+    severity: ERROR
+    languages: [javascript, typescript]
+    metadata:
+      cwe: "CWE-502"
+      owasp: "A08:2021"
+      category: security
+      confidence: HIGH
+    pattern-either:
+      - pattern: $S.unserialize(...)
+      - pattern: "$YAML.load($X, { ..., schema: $YAML.DEFAULT_FULL_SCHEMA, ... })"
+      - pattern: $YAML.unsafeLoad(...)

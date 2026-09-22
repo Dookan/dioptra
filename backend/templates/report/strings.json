@@ -1,0 +1,108 @@
+{
+  "_comment": "Report CONTENT of the institutional template (Spanish, verbatim from the anchor reports). Loaded by app/reports/strings.py. CLAUDE.md -> Hard Rules -> English everywhere in code names this file as the carve-out.",
+  "author": "Moises Marin",
+  "not_available": "N/A",
+  "cwe_unknown": "CWE desconocido",
+  "owasp_unclassified": "Sin clasificar",
+  "path_unknown": "(desconocido)",
+  "severity": {
+    "critical": "Crítica",
+    "high": "Alta",
+    "medium": "Media",
+    "low": "Baja",
+    "info": "Informativa"
+  },
+  "severity_summary": {
+    "critical": "crítica",
+    "high": "alta",
+    "medium": "media",
+    "low": "baja",
+    "info": "informativa"
+  },
+  "tool_status": {
+    "ran": "ejecutada",
+    "failed": "error",
+    "missing": "no disponible",
+    "timeout": "tiempo agotado"
+  },
+  "months": [
+    "Enero",
+    "Febrero",
+    "Marzo",
+    "Abril",
+    "Mayo",
+    "Junio",
+    "Julio",
+    "Agosto",
+    "Septiembre",
+    "Octubre",
+    "Noviembre",
+    "Diciembre"
+  ],
+  "summary_sentence": "El análisis identificó {total} hallazgo(s) ({breakdown}). A continuación se detallan, con su código OWASP/CWE, impacto y mitigación recomendada, seguidos de las prácticas de código observadas.",
+  "version_control_default": {
+    "version": "1",
+    "areas": "Todas",
+    "description": "-"
+  },
+  "filename": {
+    "prefix": "analisis-caja-blanca-",
+    "fallback": "reporte"
+  },
+  "cover_title": "Análisis de Caja Blanca Sistema",
+  "headings": {
+    "introduction": "INTRODUCCIÓN",
+    "summary": "RESUMEN EJECUTIVO",
+    "system": "DETALLES DEL SISTEMA",
+    "version_control": "Control de versiones",
+    "findings": "HALLAZGOS DE VULNERABILIDADES",
+    "dependencies": "HALLAZGOS SOBRE PAQUETES Y DEPENDENCIAS",
+    "practices": "ERRORES Y PRÁCTICAS NO ADECUADAS EN EL CÓDIGO",
+    "commented_code": "Presencia de código comentado en el sistema",
+    "coverage": "COBERTURA DE HERRAMIENTAS",
+    "description": "Descripción General",
+    "impact": "Impacto",
+    "detection": "Detección",
+    "path": "Ruta",
+    "mitigation": "Mitigación",
+    "references": "Referencias"
+  },
+  "labels": {
+    "field": "Campo",
+    "value": "Valor",
+    "site_name": "Nombre del sitio Web",
+    "framework": "Framework",
+    "installed_at": "Fecha de instalación",
+    "database": "Base de datos",
+    "developer": "Desarrollador",
+    "version": "Versión",
+    "areas": "Áreas Modificadas",
+    "change": "Descripción del cambio",
+    "delivered_at": "Fecha de entrega",
+    "severity_level": "Nivel de severidad",
+    "owasp_code": "Código OWASP",
+    "tool": "Herramienta",
+    "category": "Categoría",
+    "status": "Estado",
+    "detail": "Detalle",
+    "found_below": "A continuación lo encontrado:",
+    "commented_files": "Existe código comentado en los siguientes archivos del sistema:",
+    "author_prefix": "Autor:"
+  },
+  "introduction": [
+    "Este informe detalla el análisis de caja blanca del código fuente del sistema {system_name}. El propósito de esta auditoría es identificar código potencialmente inseguro o mal escrito, dependencias con vulnerabilidades conocidas y secretos expuestos, mapear cada hallazgo al estándar OWASP y recomendar su mitigación.",
+    "La revisión se efectuó mediante análisis estático automatizado: análisis de seguridad del código (SAST), análisis de composición de software para las dependencias (SCA) y detección de secretos. Cada hallazgo conserva su ubicación exacta (archivo y línea) y el fragmento de código correspondiente. Las herramientas que no pudieron ejecutarse se registran como brechas de cobertura en la sección correspondiente."
+  ],
+  "findings_intro": "En este apartado se examinan las vulnerabilidades identificadas en la estructura y configuración del código, que podrían exponer el sistema a riesgos de seguridad. A continuación lo encontrado:",
+  "dependencies_intro": "En este apartado, se examinan y describen las vulnerabilidades identificadas en los paquetes y dependencias del código, que podrían exponer el sistema a diversos riesgos de seguridad. Cabe destacar que estas vulnerabilidades pueden o no aplicar directamente a la estructura o implementación del código analizado; sin embargo, deben ser informadas y documentadas como parte del proceso de gestión y transparencia de riesgos.",
+  "dependencies_clean": "Se realizó la revisión de las dependencias declaradas del proyecto contra bases de datos públicas de vulnerabilidades (OSV). No se identificaron dependencias con vulnerabilidades conocidas al momento del análisis. Se recomienda mantener este estado mediante una gestión y actualización periódica de las dependencias.",
+  "dependencies_not_run": "La revisión de dependencias contra la base de vulnerabilidades (OSV) no pudo ejecutarse en este análisis; queda registrada como brecha de cobertura en la sección Cobertura de herramientas.",
+  "commented_code": [
+    "Se detectaron múltiples líneas de código comentado dentro del sistema. Mantener código obsoleto o desactivado de esta forma afecta la legibilidad, dificulta las tareas de mantenimiento y puede inducir a errores durante futuras modificaciones. Además, podría exponer información sensible o lógica interna previamente utilizada, lo cual representa un riesgo de divulgación no intencionada.",
+    "Se recomienda eliminar el código comentado que no sea estrictamente necesario y, en caso de requerir su preservación por motivos históricos o de referencia, almacenarlo en el control de versiones (Git) mediante commits adecuados, evitando su permanencia en el código activo."
+  ],
+  "coverage_intro": "Estado de las herramientas de análisis. Una herramienta no instalada o con error es una brecha de cobertura registrada, no un fallo del análisis.",
+  "none_found": "ninguno",
+  "dependency_title": "Dependencia con Vulnerabilidad {severity}: {package} versión {version}",
+  "dependency_subtitle": "Vulnerabilidad conocida: {advisory_id}"
+}

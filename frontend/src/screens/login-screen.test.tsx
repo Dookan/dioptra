@@ -61,7 +61,8 @@ describe('login screen', () => {
 
     expect(await screen.findByText(es.home.greeting.replace('{{name}}', 'Moises Marin'))).toBeInTheDocument();
     expect(screen.getByText('mmarin')).toBeInTheDocument();
-    expect(screen.getByText(es.roles.analyst)).toBeInTheDocument();
+    // The role shows in the appbar and in the tabs bar context.
+    expect(screen.getAllByText(es.roles.analyst).length).toBeGreaterThan(0);
   });
 
   it('sends the credentials to the API exactly once', async () => {

@@ -1,0 +1,6 @@
+# Dioptra's OSV-Scanner configuration. Passed with --config on every scan so the
+# `osv-scanner.toml` an audited tree may ship next to its lockfiles (which can
+# list IgnoredVulns) is never honoured (docs/threat-model.md -> Analysis containers).
+#
+# Deliberately empty: no vulnerability is ignored at scan time. Exploitability
+# verdicts belong to the analyst's triage (VEX, P5), never to a config file.

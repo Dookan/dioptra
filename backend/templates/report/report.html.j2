@@ -1,0 +1,149 @@
+{# Institutional report — HTML source for the PDF and the browser export.
+   Autoescape is ON for every value; snippets go through the `pre` filter; the
+   stylesheet is our own static file, inlined (CSP style-src 'self'). Fixed
+   prose is the institution's template text (Spanish is report content). #}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Análisis de Caja Blanca — {{ system.name }}</title>
+<style>{{ stylesheet }}</style>
+</head>
+<body>
+
+<section class="cover">
+  <h1>Análisis de Caja Blanca Sistema<br>{{ system.name }}</h1>
+  <div class="period">{{ period }}</div>
+</section>
+
+<h2 class="break">INTRODUCCIÓN</h2>
+<p>Este informe detalla el análisis de caja blanca del código fuente del sistema {{ system.name }}. El propósito de esta auditoría es identificar código potencialmente inseguro o mal escrito, dependencias con vulnerabilidades conocidas y secretos expuestos, mapear cada hallazgo al estándar OWASP y recomendar su mitigación.</p>
+<p>La revisión se efectuó mediante análisis estático automatizado: análisis de seguridad del código (SAST), análisis de composición de software para las dependencias (SCA) y detección de secretos. Cada hallazgo conserva su ubicación exacta (archivo y línea) y el fragmento de código correspondiente. Las herramientas que no pudieron ejecutarse se registran como brechas de cobertura en la sección correspondiente.</p>
+
+<h2>RESUMEN EJECUTIVO</h2>
+<p>{{ summary.sentence }}</p>
+
+<h2>DETALLES DEL SISTEMA</h2>
+<table class="details">
+  <colgroup><col class="k"><col class="v"></colgroup>
+  <tbody>
+    <tr><td class="label-cell">Nombre del sitio Web</td><td>{{ system.name }}</td></tr>
+    <tr><td class="label-cell">Framework</td><td>{{ system.framework }}</td></tr>
+    <tr><td class="label-cell">Fecha de instalación</td><td>{{ system.installed_at }}</td></tr>
+    <tr><td class="label-cell">Base de datos</td><td>{{ system.database }}</td></tr>
+    <tr><td class="label-cell">Desarrollador</td><td>{{ system.developer }}</td></tr>
+  </tbody>
+</table>
+<p class="spacer"></p>
+<h4>Control de versiones</h4>
+<table class="four">
+  <colgroup><col class="a"><col class="b"><col class="c"><col class="d"></colgroup>
+  <thead>
+    <tr><th>Versión</th><th>Áreas Modificadas</th><th>Descripción del cambio</th><th>Fecha de entrega</th></tr>
+  </thead>
+  <tbody>
+  {% for row in version_control %}
+    <tr><td>{{ row.version }}</td><td>{{ row.areas }}</td><td>{{ row.description }}</td><td>{{ row.delivered_at }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+{% macro finding_block(f) %}
+<article class="finding">
+  <table class="finding-head">
+    <colgroup><col class="t"><col class="l"><col class="v"></colgroup>
+    <tbody>
+      <tr>
+        <td class="title">{{ f.title }}</td>
+        <td class="lbl">Nivel de severidad</td>
+        <td class="sev">{{ f.severity_label }}</td>
+      </tr>
+      <tr>
+        <td class="sub">{{ f.subtitle }}</td>
+        <td class="lbl">Código OWASP</td>
+        <td class="owasp">{{ f.owasp_label }}</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="spacer"></p>
+  <h4>Descripción General</h4>
+  <p>{{ f.description }}</p>
+  {% if f.message %}<p class="message">{{ f.message }}</p>{% endif %}
+  <h4>Impacto</h4>
+  <p>{{ f.impact }}</p>
+  <h4>Detección</h4>
+  <p class="strong">Ruta</p>
+  <p class="route">{{ f.location }}</p>
+  {% if f.snippet %}{{ f.snippet | pre }}{% endif %}
+  <h4>Mitigación</h4>
+  <ul>
+  {% for item in f.mitigation %}
+    <li>{{ item }}</li>
+  {% endfor %}
+  </ul>
+  {% if f.references %}
+  <h4>Referencias</h4>
+  <ul>
+  {% for item in f.references %}
+    <li>{{ item }}</li>
+  {% endfor %}
+  </ul>
+  {% endif %}
+</article>
+{% endmacro %}
+
+{% if security_findings %}
+<h2>HALLAZGOS DE VULNERABILIDADES</h2>
+<p>En este apartado se examinan las vulnerabilidades identificadas en la estructura y configuración del código, que podrían exponer el sistema a riesgos de seguridad. A continuación lo encontrado:</p>
+{% for f in security_findings %}
+{{ finding_block(f) }}
+{% endfor %}
+{% endif %}
+
+{% if dependency_findings or dependency_scan_ran %}
+<h2>HALLAZGOS SOBRE PAQUETES Y DEPENDENCIAS</h2>
+<p>En este apartado, se examinan y describen las vulnerabilidades identificadas en los paquetes y dependencias del código, que podrían exponer el sistema a diversos riesgos de seguridad. Cabe destacar que estas vulnerabilidades pueden o no aplicar directamente a la estructura o implementación del código analizado; sin embargo, deben ser informadas y documentadas como parte del proceso de gestión y transparencia de riesgos.</p>
+{% if dependency_findings %}
+<p>A continuación lo encontrado:</p>
+{% for f in dependency_findings %}
+{{ finding_block(f) }}
+{% endfor %}
+{% else %}
+<p>Se realizó la revisión de las dependencias declaradas del proyecto contra bases de datos públicas de vulnerabilidades (OSV). No se identificaron dependencias con vulnerabilidades conocidas al momento del análisis. Se recomienda mantener este estado mediante una gestión y actualización periódica de las dependencias.</p>
+{% endif %}
+{% else %}
+<h2>HALLAZGOS SOBRE PAQUETES Y DEPENDENCIAS</h2>
+<p>La revisión de dependencias contra la base de vulnerabilidades (OSV) no pudo ejecutarse en este análisis; queda registrada como brecha de cobertura en la sección Cobertura de herramientas.</p>
+{% endif %}
+
+{% if commented_code_files %}
+<h2>ERRORES Y PRÁCTICAS NO ADECUADAS EN EL CÓDIGO</h2>
+<h3 class="centered">Presencia de código comentado en el sistema</h3>
+<p>Se detectaron múltiples líneas de código comentado dentro del sistema. Mantener código obsoleto o desactivado de esta forma afecta la legibilidad, dificulta las tareas de mantenimiento y puede inducir a errores durante futuras modificaciones. Además, podría exponer información sensible o lógica interna previamente utilizada, lo cual representa un riesgo de divulgación no intencionada.</p>
+<p>Se recomienda eliminar el código comentado que no sea estrictamente necesario y, en caso de requerir su preservación por motivos históricos o de referencia, almacenarlo en el control de versiones (Git) mediante commits adecuados, evitando su permanencia en el código activo.</p>
+<p>Existe código comentado en los siguientes archivos del sistema:</p>
+<ul class="files">
+{% for path in commented_code_files %}
+  <li>{{ path }}</li>
+{% endfor %}
+</ul>
+{% endif %}
+
+{% if tool_runs %}
+<h2>COBERTURA DE HERRAMIENTAS</h2>
+<p>Estado de las herramientas de análisis. Una herramienta no instalada o con error es una brecha de cobertura registrada, no un fallo del análisis.</p>
+<table class="four">
+  <colgroup><col class="a"><col class="b"><col class="c"><col class="d"></colgroup>
+  <thead>
+    <tr><th>Herramienta</th><th>Categoría</th><th>Estado</th><th>Detalle</th></tr>
+  </thead>
+  <tbody>
+  {% for run in tool_runs %}
+    <tr><td>{{ run.tool }}</td><td>{{ run.category }}</td><td>{{ run.status_label }}</td><td>{{ run.detail }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+</body>
+</html>

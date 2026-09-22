@@ -8,6 +8,7 @@ guessable key (see tasks/phase0-survey.md, risk 2).
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, SecretStr, field_validator, model_validator
@@ -49,6 +50,44 @@ class Settings(BaseSettings):
     # The frontend is served from the same origin in production; this list only
     # exists for the split dev servers (Vite on 5173).
     cors_origins: tuple[str, ...] = ()
+
+    # --- Phase 1: ingest + analysis pipeline (tasks/phase1-survey.md) ---
+    #: Root of every per-analysis jail. Audited code is extracted under
+    #: ``<root>/<project_id>/<analysis_id>/src`` and never anywhere else.
+    workspace_root: Path = Path("/var/lib/dioptra/workspaces")
+    max_zip_bytes: int = Field(default=200 * 1024 * 1024, ge=1024)
+    max_unpacked_bytes: int = Field(default=1024 * 1024 * 1024, ge=1024)
+    max_zip_entries: int = Field(default=50_000, ge=1)
+    max_zip_ratio: int = Field(default=100, ge=2)
+    git_clone_timeout_seconds: int = Field(default=300, ge=10)
+
+    #: RQ broker. ``queue_inline`` runs every job synchronously in the calling
+    #: process — the test suite and single-process development need no broker.
+    redis_url: str = "redis://valkey:6379/0"
+    queue_inline: bool = False
+
+    #: ``docker`` runs each tool in an ephemeral container with no network;
+    #: ``local`` runs the same argv on the host (development, CI fixtures).
+    runner_mode: Literal["docker", "local"] = "docker"
+    analysis_image: str = "dioptra-analysis:latest"
+    runner_timeout_seconds: int = Field(default=600, ge=30)
+    runner_memory: str = "2g"
+    runner_cpus: str = "2"
+    runner_pids_limit: int = Field(default=512, ge=16)
+    #: Local OSV database directory (offline mode). Empty → OSV-Scanner is
+    #: recorded as a coverage gap, never queried live.
+    osv_db_dir: Path | None = None
+    #: Our own analysis policy: Semgrep rules (``semgrep/``), the vendored
+    #: gitleaks rule set (``gitleaks/``) and the OSV-Scanner config
+    #: (``osv-scanner/``). Every scanner is pointed at THIS tree so a config
+    #: file shipped inside the audited code is never honoured.
+    rules_dir: Path = Path("/srv/app/rules")
+    #: Findings persisted per analysis, worst first; the rest is a recorded
+    #: coverage gap. Bounds report rendering against a tree built to hit a
+    #: rule on every line.
+    max_findings_per_analysis: int = Field(default=2000, ge=100)
+    #: Caps on what is read back from a tool: hostile output must not fill the DB.
+    max_tool_output_bytes: int = Field(default=32 * 1024 * 1024, ge=1024)
 
     @model_validator(mode="after")
     def _prod_requires_a_secure_refresh_cookie(self) -> Settings:

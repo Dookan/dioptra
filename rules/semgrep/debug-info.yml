@@ -1,0 +1,26 @@
+rules:
+  - id: python-flask-debug-true
+    message: Flask debug mode exposes an interactive debugger that executes code; never enable it in a deployed app.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      cwe: "CWE-209"
+      owasp: "A05:2021"
+      category: security
+      confidence: HIGH
+    pattern: $APP.run(..., debug=True, ...)
+  - id: js-error-stack-in-response
+    message: Stack trace sent to the client; log it server-side and return a generic message.
+    severity: WARNING
+    languages: [javascript, typescript]
+    metadata:
+      cwe: "CWE-209"
+      owasp: "A05:2021"
+      category: security
+      confidence: HIGH
+    pattern-either:
+      - pattern: "$RES.send($ERR.stack)"
+      - pattern: "$RES.send(<... $ERR.stack ...>)"
+      - pattern: "$RES.json({ ..., stack: $ERR.stack, ... })"
+      - pattern: "$RES.status($CODE).send($ERR.stack)"
+      - pattern: "$RES.status($CODE).json({ ..., stack: $ERR.stack, ... })"

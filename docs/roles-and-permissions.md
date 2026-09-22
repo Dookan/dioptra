@@ -18,7 +18,7 @@ Usernames are initial + lastname, lowercase, no dots: `mmarin`, `cperez`,
 | Run verification, see mutants (E7) | — | view | ✓ |
 | Edit report sections (E8) | — | ✓ | — |
 | Sign/lock a report version | — | ✓ | — |
-| Export report (PDF/DOCX/Markdown) | ✓ | ✓ | view |
+| Export report (PDF/DOCX/Markdown) | ✓ | ✓ | ✓ (may download; "view" never meant a screen-only copy — the developer needs the findings to plan tests) |
 | Read audit log | ✓ | own projects | own actions |
 
 The software inventory (P5) has no rows yet: the work plan adds the module

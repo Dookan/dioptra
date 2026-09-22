@@ -1,0 +1,39 @@
+rules:
+  - id: js-mass-assignment-request-body
+    message: Whole request body assigned onto a model or object; copy only an explicit allowlist of fields and reject __proto__/constructor/prototype keys.
+    severity: WARNING
+    languages: [javascript, typescript]
+    metadata:
+      cwe: "CWE-915"
+      owasp: "A08:2021"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: Object.assign($TARGET, $REQ.body, ...)
+          - pattern: Object.assign($TARGET, ..., $REQ.body)
+          - pattern: $MODEL.create($REQ.body, ...)
+          - pattern: $MODEL.update($REQ.body, ...)
+          - pattern: $MODEL.findByIdAndUpdate($ID, $REQ.body, ...)
+          - pattern: $MODEL.findOneAndUpdate($Q, $REQ.body, ...)
+          - pattern: new $MODEL($REQ.body)
+          - pattern: |
+              { ...$REQ.body }
+      - metavariable-regex:
+          metavariable: $REQ
+          regex: ^(req|request|ctx\.request)$
+  - id: python-django-mass-assignment
+    message: Model built directly from request data (**request.POST / **request.data); use a form or serializer with explicit fields.
+    severity: WARNING
+    languages: [python]
+    metadata:
+      cwe: "CWE-915"
+      owasp: "A08:2021"
+      category: security
+      confidence: MEDIUM
+    pattern-either:
+      - pattern: $MODEL(**request.POST)
+      - pattern: $MODEL(**request.data)
+      - pattern: $MODEL.objects.create(**request.POST)
+      - pattern: $MODEL.objects.create(**request.data)
+      - pattern: $MODEL(**request.POST.dict())

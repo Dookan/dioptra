@@ -1,0 +1,134 @@
+{# Markdown export. Every hostile value goes through `md` (inline) or `fence`
+   (snippets); autoescape is still on underneath as a second net. #}
+# Análisis de Caja Blanca Sistema {{ system.name | md }}
+
+**{{ period }}**
+
+## INTRODUCCIÓN
+
+Este informe detalla el análisis de caja blanca del código fuente del sistema {{ system.name | md }}. El propósito de esta auditoría es identificar código potencialmente inseguro o mal escrito, dependencias con vulnerabilidades conocidas y secretos expuestos, mapear cada hallazgo al estándar OWASP y recomendar su mitigación.
+
+La revisión se efectuó mediante análisis estático automatizado: análisis de seguridad del código (SAST), análisis de composición de software para las dependencias (SCA) y detección de secretos. Cada hallazgo conserva su ubicación exacta (archivo y línea) y el fragmento de código correspondiente. Las herramientas que no pudieron ejecutarse se registran como brechas de cobertura en la sección correspondiente.
+
+## RESUMEN EJECUTIVO
+
+{{ summary.sentence }}
+
+## DETALLES DEL SISTEMA
+
+| Campo | Valor |
+|---|---|
+| Nombre del sitio Web | {{ system.name | md }} |
+| Framework | {{ system.framework | md }} |
+| Fecha de instalación | {{ system.installed_at | md }} |
+| Base de datos | {{ system.database | md }} |
+| Desarrollador | {{ system.developer | md }} |
+
+### Control de versiones
+
+| Versión | Áreas Modificadas | Descripción del cambio | Fecha de entrega |
+|---|---|---|---|
+{% for row in version_control %}
+| {{ row.version | md }} | {{ row.areas | md }} | {{ row.description | md }} | {{ row.delivered_at | md }} |
+{% endfor %}
+
+{% macro finding_block(f) %}
+### {{ f.title | md }}
+
+| {{ f.title | md }} | **Nivel de severidad** | **{{ f.severity_label }}** |
+|---|---|---|
+| {{ f.subtitle | md }} | **Código OWASP** | **{{ f.owasp_label | md }}** |
+
+**Descripción General**
+
+{{ f.description | md }}
+{% if f.message %}
+
+{{ f.message | md }}
+{% endif %}
+
+**Impacto**
+
+{{ f.impact | md }}
+
+**Detección**
+
+**Ruta**
+
+`{{ f.location | md }}`
+{% if f.snippet %}
+
+{{ f.snippet | fence }}
+{% endif %}
+
+**Mitigación**
+
+{% for item in f.mitigation %}
+- {{ item | md }}
+{% endfor %}
+{% if f.references %}
+
+**Referencias**
+
+{% for item in f.references %}
+- {{ item | md }}
+{% endfor %}
+{% endif %}
+
+{% endmacro %}
+{% if security_findings %}
+## HALLAZGOS DE VULNERABILIDADES
+
+En este apartado se examinan las vulnerabilidades identificadas en la estructura y configuración del código, que podrían exponer el sistema a riesgos de seguridad. A continuación lo encontrado:
+
+{% for f in security_findings %}
+{{ finding_block(f) }}
+{% endfor %}
+{% endif %}
+## HALLAZGOS SOBRE PAQUETES Y DEPENDENCIAS
+
+{% if dependency_findings or dependency_scan_ran %}
+En este apartado, se examinan y describen las vulnerabilidades identificadas en los paquetes y dependencias del código, que podrían exponer el sistema a diversos riesgos de seguridad. Cabe destacar que estas vulnerabilidades pueden o no aplicar directamente a la estructura o implementación del código analizado; sin embargo, deben ser informadas y documentadas como parte del proceso de gestión y transparencia de riesgos.
+
+{% if dependency_findings %}
+A continuación lo encontrado:
+
+{% for f in dependency_findings %}
+{{ finding_block(f) }}
+{% endfor %}
+{% else %}
+Se realizó la revisión de las dependencias declaradas del proyecto contra bases de datos públicas de vulnerabilidades (OSV). No se identificaron dependencias con vulnerabilidades conocidas al momento del análisis. Se recomienda mantener este estado mediante una gestión y actualización periódica de las dependencias.
+{% endif %}
+{% else %}
+La revisión de dependencias contra la base de vulnerabilidades (OSV) no pudo ejecutarse en este análisis; queda registrada como brecha de cobertura en la sección Cobertura de herramientas.
+{% endif %}
+
+{% if commented_code_files %}
+## ERRORES Y PRÁCTICAS NO ADECUADAS EN EL CÓDIGO
+
+### Presencia de código comentado en el sistema
+
+Se detectaron múltiples líneas de código comentado dentro del sistema. Mantener código obsoleto o desactivado de esta forma afecta la legibilidad, dificulta las tareas de mantenimiento y puede inducir a errores durante futuras modificaciones. Además, podría exponer información sensible o lógica interna previamente utilizada, lo cual representa un riesgo de divulgación no intencionada.
+
+Se recomienda eliminar el código comentado que no sea estrictamente necesario y, en caso de requerir su preservación por motivos históricos o de referencia, almacenarlo en el control de versiones (Git) mediante commits adecuados, evitando su permanencia en el código activo.
+
+Existe código comentado en los siguientes archivos del sistema:
+
+{% for path in commented_code_files %}
+- `{{ path | md }}`
+{% endfor %}
+
+{% endif %}
+## COBERTURA DE HERRAMIENTAS
+
+Estado de las herramientas de análisis. Una herramienta no instalada o con error es una brecha de cobertura registrada, no un fallo del análisis.
+
+| Herramienta | Categoría | Estado | Detalle |
+|---|---|---|---|
+{% for run in tool_runs %}
+| {{ run.tool | md }} | {{ run.category }} | {{ run.status_label }} | {{ run.detail | md }} |
+{% endfor %}
+
+---
+
+Autor: {{ author }}

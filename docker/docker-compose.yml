@@ -26,7 +26,7 @@ services:
     restart: unless-stopped
 
   # Valkey (BSD-3) instead of Redis, whose licence stopped being free.
-  # Idle until phase 1 puts the analysis jobs on it.
+  # Broker of the RQ queue the worker consumes.
   valkey:
     image: valkey/valkey:9-alpine
     command: ["valkey-server", "--save", "60", "1", "--appendonly", "no"]
@@ -51,6 +51,14 @@ services:
       DIOPTRA_SEED_PASSWORD_AMEDINA: ${DIOPTRA_SEED_PASSWORD_AMEDINA:-}
       DIOPTRA_SEED_PASSWORD_MMARIN: ${DIOPTRA_SEED_PASSWORD_MMARIN:-}
       DIOPTRA_SEED_PASSWORD_CPEREZ: ${DIOPTRA_SEED_PASSWORD_CPEREZ:-}
+      DIOPTRA_REDIS_URL: redis://valkey:6379/0
+      DIOPTRA_WORKSPACE_ROOT: /var/lib/dioptra/workspaces
+      # WeasyPrint's font cache must land on the tmpfs: the root is read-only.
+      XDG_CACHE_HOME: /tmp
+    volumes:
+      # The API extracts uploads into the jail; the worker reads them. The API
+      # NEVER gets the Docker socket — only the worker starts containers.
+      - ${DIOPTRA_DATA_DIR:-/var/lib/dioptra}/workspaces:/var/lib/dioptra/workspaces
     depends_on:
       postgres:
         condition: service_healthy
@@ -66,6 +74,68 @@ services:
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
+
+  # Runs the analysis pipeline: one ephemeral `dioptra-analysis` container per
+  # tool, each with --network none and hard CPU/RAM/pids limits (tasks/
+  # phase1-survey.md §3). It is the only service that can reach the Docker
+  # daemon, which is why it is a separate process from the API.
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    environment:
+      DIOPTRA_ENV: ${DIOPTRA_ENV:-prod}
+      DIOPTRA_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-dioptra}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-dioptra}
+      DIOPTRA_JWT_SECRET: ${DIOPTRA_JWT_SECRET:?DIOPTRA_JWT_SECRET is required (32+ characters)}
+      DIOPTRA_REDIS_URL: redis://valkey:6379/0
+      DIOPTRA_WORKSPACE_ROOT: /var/lib/dioptra/workspaces
+      DIOPTRA_RUNNER_MODE: docker
+      DIOPTRA_ANALYSIS_IMAGE: dioptra-analysis:latest
+      DIOPTRA_RULES_DIR: /srv/app/rules
+      DIOPTRA_OSV_DB_DIR: /var/lib/dioptra/osv
+      XDG_CACHE_HOME: /tmp
+    volumes:
+      # Bind mounts handed to `docker run` are resolved by the HOST daemon, so
+      # the jail, the rules copy and the OSV database must exist on the host at
+      # the SAME path the worker sees. DIOPTRA_DATA_DIR is that directory
+      # (owned by uid 10001); a named volume would be invisible to the sibling
+      # container. The default keeps host path == container path.
+      - ${DIOPTRA_DATA_DIR:-/var/lib/dioptra}/workspaces:/var/lib/dioptra/workspaces
+      - ${DIOPTRA_DATA_DIR:-/var/lib/dioptra}/osv:/var/lib/dioptra/osv:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      analysis-image:
+        condition: service_completed_successfully
+    # JSON payloads and a job class that refuses every callable but the
+    # pipeline: a write to Valkey must not become code execution in the one
+    # process that holds the Docker socket (threat model → Accepted residuals).
+    command:
+      [
+        "rq", "worker", "--url", "redis://valkey:6379/0",
+        "--serializer", "json", "--job-class", "app.core.queue.PipelineJob",
+        "analysis",
+      ]
+    # The worker runs as uid 10001; the socket belongs to the host's docker
+    # group. Its GID differs per host: `stat -c %g /var/run/docker.sock`.
+    group_add:
+      - "${DIOPTRA_DOCKER_GID:-999}"
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  # Build-only service: produces the `dioptra-analysis` image the worker spawns.
+  # It never runs; `docker compose build analysis-image` is enough on its own.
+  analysis-image:
+    build:
+      context: ..
+      dockerfile: docker/analysis.Dockerfile
+    image: dioptra-analysis:latest
+    command: ["true"]
+    restart: "no"
 
   frontend:
     build:

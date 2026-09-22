@@ -13,8 +13,27 @@ ENV PYTHONUNBUFFERED=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
     PATH="/opt/venv/bin:${PATH}"
 
+# WeasyPrint (report PDF) needs Pango/Cairo at runtime; git is used by the
+# worker for the shallow clone of a git URL ingest. Nothing else from apt.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libffi8 libjpeg62-turbo \
+        libopenjp2-7 fonts-dejavu-core fonts-liberation git curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 # uv is pinned: an unpinned installer would make the build non-reproducible.
 RUN pip install --no-cache-dir uv==0.11.1
+
+# Docker CLI for the worker (same image as the API; the API never gets the
+# socket, so the binary is inert there). Static build, pinned and verified.
+ARG DOCKER_CLI_VERSION=28.3.3
+ARG DOCKER_CLI_SHA256=40c16bcf324f354b382d07e845e6a79e3493fc0c09b252dff9e1a46125589bff
+RUN set -eux; \
+    curl -fsSLo /tmp/docker.tgz "https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_CLI_VERSION}.tgz"; \
+    echo "${DOCKER_CLI_SHA256}  /tmp/docker.tgz" | sha256sum -c -; \
+    tar -xzf /tmp/docker.tgz -C /tmp docker/docker; \
+    install -m 0755 /tmp/docker/docker /usr/local/bin/docker; \
+    rm -rf /tmp/docker /tmp/docker.tgz
 
 WORKDIR /srv/app
 
@@ -25,6 +44,10 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY backend/app ./app
 COPY backend/alembic ./alembic
 COPY backend/alembic.ini ./alembic.ini
+COPY backend/templates ./templates
+# Our own Semgrep rules travel with the worker image (mounted read-only into
+# every semgrep container).
+COPY rules ./rules
 
 # The service never runs as root; the sandbox work in P4 depends on that too.
 RUN useradd --system --uid 10001 --home /srv/app dioptra \

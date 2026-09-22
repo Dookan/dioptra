@@ -37,6 +37,19 @@ Added to `docs/mockups/index.html` on 2026-08-28, same tokens and principles:
   editable Mermaid text underneath; the brief is computed from the code, not
   from the edited diagram, and the screen says so.
 
+## Phase 1 deviations from the mockups (recorded 2026-09-21)
+
+- **"Proyectos" tab** (`frontend/src/components/app-shell.tsx`): the mockups
+  keep the project cards on *Inicio* and have no Proyectos tab. P1 ships a
+  separate list + E1 form because the home of screen 02 (cards with progress)
+  needs P2/P3 data. Decide at P2 whether the cards fold back into Inicio.
+- **Status bar** (avatar · `mmarin · Analista` · "Paso N de 8" · version in
+  mono) of screens 02–11 is not in the shell yet; it lands with the first
+  workflow screen of P3, which is where "Paso N de 8" gets a meaning.
+- **Drop zone** of screen 03 "2 · El código" (`.drop`, dashed accent) is a
+  native file input in P1; the buttons say what they do ("Subir y analizar" /
+  "Clonar y analizar"). The drag-and-drop affordance is deferred to P2.
+
 ## Tokens (frontend/src/theme/tokens.css — single source)
 
 Light: ground `#FAFAF7`, surface `#FFFFFF`/`#F1F4F1`/`#E7EDE8`, line

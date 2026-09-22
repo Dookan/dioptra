@@ -1,0 +1,33 @@
+rules:
+  - id: js-eval-injection
+    message: Dynamic code evaluation (eval / new Function / string timers) executes attacker-controllable text; replace with explicit logic or a safe parser.
+    severity: ERROR
+    languages: [javascript, typescript]
+    metadata:
+      cwe: "CWE-95"
+      owasp: "A03:2021"
+      category: security
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: eval($X)
+          - pattern: new Function(...)
+          - pattern: setTimeout("$CODE", ...)
+          - pattern: setInterval("$CODE", ...)
+          - pattern: setTimeout($X + $Y, ...)
+      - pattern-not: eval("...")
+  - id: python-eval-exec-injection
+    message: eval()/exec() on non-literal input executes arbitrary code; use ast.literal_eval or explicit dispatch.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      cwe: "CWE-94"
+      owasp: "A03:2021"
+      category: security
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern: eval($X)
+          - pattern: exec($X)
+      - pattern-not: eval("...")
+      - pattern-not: exec("...")

@@ -7,8 +7,23 @@ table is never silently missing from a migration.
 
 from __future__ import annotations
 
+from app.analysis.models import Analysis, CodeMetrics, Finding, RawToolOutput, Sbom, ToolRun
 from app.audit.models import AuditLogEntry
 from app.auth.models import RefreshToken, User
 from app.db.base import Base
+from app.projects.models import Project, System
 
-__all__ = ["AuditLogEntry", "Base", "RefreshToken", "User"]
+__all__ = [
+    "Analysis",
+    "AuditLogEntry",
+    "Base",
+    "CodeMetrics",
+    "Finding",
+    "Project",
+    "RawToolOutput",
+    "RefreshToken",
+    "Sbom",
+    "System",
+    "ToolRun",
+    "User",
+]

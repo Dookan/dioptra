@@ -1,6 +1,6 @@
 # Report format
 
-> **Status: DESIGN SURFACE — not yet implemented.** Anchor: the institution's
+> **Status: IN_PROGRESS — sections 1–6 plus "Hallazgos sobre paquetes", "Errores y prácticas" and "Cobertura de herramientas" built 2026-09-21 (`backend/app/reports/`, `backend/templates/report/`); PDF fidelity is a first structural pass, see the scope-change log.** Anchor: the institution's
 > manual white-box reports on the MINCYT form systems, in
 > `/home/user/Desktop/UTD/CAJA-BLANCA/*.pdf` (structure is authoritative; the
 > platform must reproduce it indistinguishably — the P1 success criterion,

@@ -1,0 +1,76 @@
+rules:
+  - id: js-express-reflected-xss
+    message: Request data written into the HTTP response without escaping; escape or use a templating engine with autoescape.
+    severity: WARNING
+    languages: [javascript, typescript]
+    metadata:
+      cwe: "CWE-79"
+      owasp: "A03:2021"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: $RES.send($BODY)
+          - pattern: $RES.write($BODY)
+          - pattern: $RES.end($BODY)
+      - metavariable-pattern:
+          metavariable: $BODY
+          patterns:
+            - pattern-either:
+                - pattern: $A + $REQ.$FIELD
+                - pattern: $A + $REQ.$FIELD.$SUB
+                - pattern: "`...${$REQ.$FIELD}...`"
+                - pattern: "`...${$REQ.$FIELD.$SUB}...`"
+            - metavariable-regex:
+                metavariable: $REQ
+                regex: ^(req|request)$
+  - id: js-dom-innerhtml-assignment
+    message: innerHTML/outerHTML assigned from a non-literal value; use textContent or sanitize the HTML first.
+    severity: WARNING
+    languages: [javascript, typescript]
+    metadata:
+      cwe: "CWE-79"
+      owasp: "A03:2021"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: $EL.innerHTML = $VALUE
+          - pattern: $EL.outerHTML = $VALUE
+          - pattern: $EL.insertAdjacentHTML($POS, $VALUE)
+      - pattern-not: $EL.innerHTML = "..."
+      - pattern-not: $EL.outerHTML = "..."
+      - pattern-not: $EL.insertAdjacentHTML($POS, "...")
+  - id: python-markup-non-literal
+    message: Markup()/mark_safe() on a non-literal marks untrusted text as safe HTML; escape it first.
+    severity: WARNING
+    languages: [python]
+    metadata:
+      cwe: "CWE-79"
+      owasp: "A03:2021"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: Markup($X)
+          - pattern: mark_safe($X)
+          - pattern: markupsafe.Markup($X)
+          - pattern: django.utils.safestring.mark_safe($X)
+      - pattern-not: Markup("...")
+      - pattern-not: mark_safe("...")
+      - pattern-not: markupsafe.Markup("...")
+      - pattern-not: django.utils.safestring.mark_safe("...")
+  - id: vue-v-html-binding
+    message: v-html renders raw HTML from a bound expression; use text interpolation or sanitize the value first.
+    severity: WARNING
+    languages: [generic]
+    paths:
+      include:
+        - "*.vue"
+    metadata:
+      cwe: "CWE-79"
+      owasp: "A03:2021"
+      category: security
+      confidence: MEDIUM
+    # regex rather than generic pattern: one finding per binding, line-exact.
+    pattern-regex: v-html="[^"]+"

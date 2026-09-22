@@ -17,6 +17,13 @@ dependencies = [
     "pydantic-settings", # MIT     — env-driven settings
     "argon2-cffi",      # MIT      — Argon2id password hashing (ASVS V2.4)
     "pyjwt",            # MIT      — JWT encode/decode
+    # --- Phase 1: audit pipeline (tasks/phase1-survey.md §3) ---
+    "python-multipart", # Apache-2.0 — multipart parsing for the ZIP upload endpoint
+    "rq",               # BSD-2    — job queue for the analysis pipeline (worker service)
+    "redis",            # MIT      — client library RQ uses to talk to Valkey
+    "jinja2",           # BSD-3    — report templates (HTML + Markdown), autoescape on
+    "weasyprint",       # BSD-3    — HTML → PDF for the institutional report
+    "python-docx",      # MIT      — basic DOCX export of the report
 ]
 
 [dependency-groups]

@@ -26,7 +26,8 @@
     "greeting": "Hola, {{name}}",
     "subtitle": "Aquí verás tus análisis en curso.",
     "nextStepTitle": "Siguiente paso",
-    "nextStepBody": "Todavía no hay análisis. La ingesta de código llega en la próxima fase.",
+    "nextStepBody": "Registra un sistema y sube su código para obtener el primer informe.",
+    "goToProjects": "Ir a proyectos",
     "signOut": "Cerrar sesión"
   },
   "roles": {
@@ -58,6 +59,149 @@
       "weakPassword": "La contraseña es muy corta. Usa al menos 12 caracteres.",
       "forbidden": "Tu rol no tiene permiso para esta acción.",
       "invalidUsername": "El nombre de usuario debe ser inicial + apellido, en minúsculas y sin puntos."
+    },
+    "ingest": {
+      "failed": "No se pudo procesar el código enviado.",
+      "zipSlip": "El archivo ZIP contiene rutas no permitidas.",
+      "zipTooLarge": "El archivo ZIP supera el tamaño máximo permitido.",
+      "tooManyEntries": "El archivo ZIP tiene demasiadas entradas.",
+      "zipBomb": "El archivo ZIP tiene una relación de compresión sospechosa.",
+      "invalidArchive": "El archivo no es un ZIP válido.",
+      "forbiddenHost": "La dirección del repositorio apunta a una red no permitida.",
+      "invalidUrl": "La dirección del repositorio no es válida (solo HTTPS).",
+      "repoUnreachable": "No se pudo acceder al repositorio."
+    },
+    "projects": {
+      "notFound": "El proyecto no existe."
+    },
+    "analysis": {
+      "notFound": "El análisis no existe.",
+      "notReady": "El análisis todavía no terminó.",
+      "sbomInvalid": "El inventario de componentes generado no es válido.",
+      "normalization": "La salida de una herramienta no se pudo interpretar.",
+      "noToolRan": "Ninguna herramienta de análisis pudo ejecutarse. Revisa la instalación."
+    },
+    "report": {
+      "renderFailed": "No se pudo generar el reporte."
+    }
+  },
+  "nav": {
+    "label": "Secciones",
+    "home": "Inicio",
+    "projects": "Proyectos"
+  },
+  "stepper": {
+    "label": "Etapas del proceso",
+    "register": "Registro",
+    "code": "Código",
+    "analysis": "Análisis",
+    "plan": "Plan",
+    "design": "Diseño",
+    "tests": "Tests",
+    "verification": "Verificación",
+    "report": "Reporte"
+  },
+  "severity": {
+    "critical": "Crítica",
+    "high": "Alta",
+    "medium": "Media",
+    "low": "Baja",
+    "info": "Informativa"
+  },
+  "analysis": {
+    "status": {
+      "queued": "En cola",
+      "running": "Analizando",
+      "done": "Terminado",
+      "failed": "Falló"
+    },
+    "tool": {
+      "ran": "ejecutada",
+      "failed": "error",
+      "missing": "no disponible",
+      "timeout": "tiempo agotado"
+    },
+    "coverage": "Cobertura de herramientas",
+    "detected": "Detectado",
+    "failedBody": "El análisis no pudo completarse. Código:",
+    "findingsCount": "{{count}} hallazgo(s)"
+  },
+  "projects": {
+    "title": "Proyectos",
+    "subtitle": "Cada sistema que audita la fábrica, con su último análisis.",
+    "nextStepTitle": "Siguiente paso",
+    "nextStepBody": "Registra el sistema que vas a analizar: nombre, tecnología y responsable.",
+    "nextStepBodyDeveloper": "Un analista registra los sistemas. Aquí verás los proyectos en los que tienes que escribir tests.",
+    "register": "Registrar sistema",
+    "empty": "Todavía no hay proyectos.",
+    "listLabel": "Proyectos",
+    "noAnalysis": "Sin análisis",
+    "createdAt": "Creado el {{date}}",
+    "form": {
+      "section": "1 · Datos del sistema",
+      "intro": "Estos datos van directo a la tabla \"Detalles del sistema\" del informe.",
+      "name": "Nombre del proyecto",
+      "systemName": "Nombre del sistema (sitio web)",
+      "framework": "Framework",
+      "database": "Base de datos",
+      "developer": "Desarrollador",
+      "installedAt": "Fecha de instalación",
+      "description": "Descripción",
+      "submit": "Guardar y continuar",
+      "submitting": "Guardando…",
+      "cancel": "Cancelar",
+      "hint": "Después podrás subir el código."
+    }
+  },
+  "project": {
+    "nextStep": {
+      "codeTitle": "Siguiente paso: sube el código",
+      "codeBody": "Sube un ZIP o pega la dirección HTTPS del repositorio. El análisis corre solo y te avisa cuando termina.",
+      "doneTitle": "Análisis terminado",
+      "doneBody": "Descarga el informe o vuelve a analizar una versión nueva. La revisión de hallazgos llega en la próxima etapa."
+    },
+    "ingest": {
+      "section": "2 · El código",
+      "intro": "El código se analiza en un entorno aislado, sin acceso a internet. No se ejecuta nada del sistema.",
+      "zipLabel": "Archivo ZIP con el código",
+      "uploadSubmit": "Subir y analizar",
+      "duration": "Suele tardar unos minutos.",
+      "gitLabel": "O la dirección HTTPS del repositorio",
+      "gitSubmit": "Clonar y analizar",
+      "privacy": "Todo queda en este servidor: ninguna herramienta consulta servicios externos."
+    },
+    "explain": {
+      "title": "¿Qué vamos a revisar?",
+      "securityLabel": "Código inseguro:",
+      "security": "patrones que permiten inyecciones, XSS, secretos expuestos.",
+      "depsLabel": "Dependencias:",
+      "deps": "librerías con vulnerabilidades conocidas, según la base local.",
+      "secretsLabel": "Secretos:",
+      "secrets": "contraseñas, claves y tokens olvidados en el código o su historial.",
+      "healthLabel": "Salud del código:",
+      "health": "complejidad por función, líneas por lenguaje, código comentado."
+    },
+    "analyses": {
+      "title": "Análisis",
+      "empty": "Todavía no se analizó ninguna versión."
+    },
+    "download": {
+      "pdf": "Descargar PDF",
+      "docx": "Descargar DOCX",
+      "md": "Descargar Markdown",
+      "sbom": "Descargar SBOM (CycloneDX)"
+    },
+    "findings": {
+      "show": "Ver hallazgos",
+      "hide": "Ocultar hallazgos",
+      "loading": "Cargando hallazgos…",
+      "empty": "No se encontraron hallazgos.",
+      "severity": "Severidad",
+      "title": "Hallazgo",
+      "classification": "CWE / OWASP",
+      "location": "Ubicación",
+      "unknownCwe": "CWE desconocido",
+      "unclassified": "Sin clasificar"
     }
   }
 }

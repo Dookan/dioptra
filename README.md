@@ -25,7 +25,12 @@ Project lead: **Moises Marin** (`mmarin`).
 ## Status
 
 Phase 0 (foundations) is done (2026-08-18): authentication, roles, audit
-trail, themes, i18n and the CI gates. The work plan (`docs/work-plan-reference.html`,
+trail, themes, i18n and the CI gates. Phase 1 (audit MVP) is in progress since
+2026-09-21: project registration (E1), ZIP / git ingest into a per-analysis
+jail (E2), the analysis pipeline in ephemeral containers (Semgrep with our own
+rules, Gitleaks, OSV-Scanner offline, Syft SBOM, Lizard, cloc), SARIF
+normalization with CWE → OWASP and CVSS 3.1, and the institutional report as
+PDF / DOCX / Markdown / HTML. The work plan (`docs/work-plan-reference.html`,
 distilled in `docs/development-phases.md`) runs 2026-08-24 → 2026-09-18 and
 ends with release v1.0.0: P1 audit pipeline + institutional PDF, P2 findings
 UI, P3 workflow E1–E5, P4 sandbox + mutation re-audit, P5 software inventory,
@@ -59,6 +64,22 @@ docker compose -f docker/docker-compose.yml exec api python -m app.seed
 | `cperez` | developer | test plan, case design, writes the tests |
 
 Usernames are initial + lastname, lowercase, no dots.
+
+### Analysis tools (phase 1)
+
+The `worker` service runs every tool inside the `dioptra-analysis` image with
+`--network none` and hard CPU / RAM / pids limits; the API never touches the
+Docker daemon. The image is built once by Compose. Two things are operator
+choices:
+
+- **One data directory, same path on host and containers.** `DIOPTRA_DATA_DIR`
+  (default `/var/lib/dioptra`, owned by uid 10001) holds the per-analysis jails
+  and the OSV database. `docker run` bind mounts are resolved by the host
+  daemon, which is why the path must be identical on both sides.
+- **Vulnerability data is local.** Run
+  `scripts/osv_db_download.sh /var/lib/dioptra/osv` on a connected host (or copy
+  that directory from one). Without it, OSV-Scanner is reported as a coverage
+  gap in every report — the platform never queries a vulnerability service live.
 
 ## Develop
 

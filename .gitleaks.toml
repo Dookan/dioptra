@@ -37,6 +37,10 @@ paths = [
   '''frontend/src/.*\.test\.tsx?''',
   '''frontend/src/test/.*''',
   '''scripts/test_.*\.py''',
+  # Our Semgrep rules' positive fixtures MUST contain fake credentials: they
+  # are what the hardcoded-secrets rule is proven against. Negatives too, so a
+  # future negative "looks like a key but is not" example does not trip this.
+  '''rules/semgrep/tests/.*''',
   '''\.env\.example''',
   '''docs/mockups/.*''',
 ]

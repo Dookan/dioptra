@@ -1,7 +1,8 @@
 # Task: Phase 1 — Audit MVP
 
-> **Status: DESIGN — deadline ◆ "P1 (PDF)" 2026-09-04 (plan days 6–10), on the
-> critical path. Starts now: P0 closed 2026-08-18.**
+> **Status: IN_PROGRESS — started 2026-09-21, seventeen days past the ◆ "P1 (PDF)"
+> deadline of 2026-09-04 (plan days 6–10, critical path). Survey:
+> `tasks/phase1-survey.md` (signed off "go" by `mmarin`, 2026-09-21).**
 
 ## Objective
 Replicate the current manual audit process end to end: a real repository goes
@@ -31,7 +32,9 @@ section. See docs/development-phases.md → Day table, days 6–10.
      directory seeded from the OSV dump file (no mirror table before P5).
    - SBOM CycloneDX 1.6 JSON per ingested version via Syft or cdxgen from
      lockfiles + dependency tree — metadata only, no package scripts, no
-     network; schema-validated before persistence.
+     network; structurally validated before persistence (own check of
+     bomFormat / specVersion 1.6 / component shape with caps — no JSON Schema
+     dependency, see `tasks/phase1-survey.md` §3).
    - Every runner container with `--network none` and tools in offline mode
      (Semgrep `--metrics=off`, OSV-Scanner offline, mounted local data).
    - Per-tool timeout and CPU/RAM limits; raw output persisted; a tool that
@@ -77,7 +80,7 @@ section. See docs/development-phases.md → Day table, days 6–10.
 - [ ] `tasks/phase1-survey.md` written and signed off before the ingest edits
 - [ ] The anchor backend report is reproduced from the real repository and the
       PDF is indistinguishable in structure, section by section (day 10)
-- [ ] The SBOM validates against the CycloneDX 1.6 schema
+- [ ] The SBOM passes the CycloneDX 1.6 structural validation (`app/analysis/sbom.py`)
 - [ ] CLAUDE.md phase status + docs/development-phases.md: Phase 1 → DONE with date and commit
 
 ## Non-goals (explicit)

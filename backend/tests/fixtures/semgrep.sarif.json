@@ -1,0 +1,101 @@
+{
+  "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Semgrep OSS",
+          "semanticVersion": "1.90.0",
+          "rules": [
+            {
+              "id": "dioptra.js.express.xss-res-send",
+              "name": "dioptra.js.express.xss-res-send",
+              "shortDescription": {"text": "User input reaches res.send without escaping"},
+              "fullDescription": {"text": "Reflected XSS through Express response."},
+              "helpUri": "https://owasp.org/Top10/A03_2021-Injection/",
+              "properties": {
+                "precision": "high",
+                "tags": ["CWE-79: Improper Neutralization of Input During Web Page Generation", "OWASP-A03:2021 - Injection", "security"],
+                "references": ["https://cwe.mitre.org/data/definitions/79.html"]
+              }
+            },
+            {
+              "id": "dioptra.js.no-cdn",
+              "name": "dioptra.js.no-cdn",
+              "shortDescription": {"text": "Script loaded from an external domain"},
+              "properties": {
+                "tags": ["security"],
+                "cwe": ["CWE-829: Inclusion of Functionality from Untrusted Control Sphere"],
+                "owasp": ["A08:2021 - Software and Data Integrity Failures"]
+              }
+            },
+            {
+              "id": "dioptra.js.mass-assignment",
+              "name": "dioptra.js.mass-assignment",
+              "shortDescription": {"text": "Object.assign from request body"},
+              "properties": {
+                "tags": ["CWE-915: Improperly Controlled Modification of Dynamically-Determined Object Attributes"]
+              }
+            },
+            {
+              "id": "dioptra.py.suspicious-pattern",
+              "name": "dioptra.py.suspicious-pattern",
+              "shortDescription": {"text": "Patrón sospechoso sin clasificar"},
+              "properties": {"tags": ["security"]}
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "dioptra.js.express.xss-res-send",
+          "level": "error",
+          "message": {"text": "User input flows into res.send"},
+          "locations": [{"physicalLocation": {
+            "artifactLocation": {"uri": "index.js", "uriBaseId": "%SRCROOT%"},
+            "region": {"startLine": 42, "startColumn": 3, "endLine": 42, "snippet": {"text": "res.send('<h1>' + req.query.name + '</h1>'); // <script>alert(1)</script>"}}
+          }}]
+        },
+        {
+          "ruleId": "dioptra.js.no-cdn",
+          "level": "warning",
+          "message": {"text": "External script"},
+          "locations": [{"physicalLocation": {
+            "artifactLocation": {"uri": "file:///var/lib/dioptra/workspaces/p/a/src/public/index.html"},
+            "region": {"startLine": 7, "snippet": {"text": "<script src=\"https://cdn.example.com/lib.js\"></script>"}}
+          }}]
+        },
+        {
+          "ruleId": "dioptra.js.mass-assignment",
+          "level": "warning",
+          "message": {"text": "Object.assign(user, req.body)"},
+          "locations": [{"physicalLocation": {
+            "artifactLocation": {"uri": "./index.js"},
+            "region": {"startLine": 279}
+          }}]
+        },
+        {
+          "ruleId": "dioptra.py.suspicious-pattern",
+          "level": "note",
+          "message": {"text": "no CWE on this rule"},
+          "locations": [{"physicalLocation": {
+            "artifactLocation": {"uri": "../../etc/passwd"},
+            "region": {"startLine": 1}
+          }}]
+        },
+        {
+          "ruleId": "dioptra.js.express.xss-res-send",
+          "level": "error",
+          "message": {"text": "result without any location"}
+        },
+        {
+          "ruleId": "rule-not-declared-in-driver",
+          "level": "bogus-level",
+          "message": {"text": 12345},
+          "locations": [{"physicalLocation": {"artifactLocation": {"uri": 77}, "region": {"startLine": "not-a-number"}}}]
+        }
+      ]
+    }
+  ]
+}

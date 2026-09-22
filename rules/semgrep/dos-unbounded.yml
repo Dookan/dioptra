@@ -1,0 +1,46 @@
+rules:
+  - id: js-regexp-from-input
+    message: Regular expression compiled from non-literal input can be catastrophic (ReDoS); escape the input or use a literal pattern.
+    severity: WARNING
+    languages: [javascript, typescript]
+    metadata:
+      cwe: "CWE-400"
+      owasp: "A05:2021"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern: new RegExp($SRC, ...)
+      - pattern-not: new RegExp("...", ...)
+      - metavariable-pattern:
+          metavariable: $SRC
+          pattern-either:
+            - pattern: $REQ.$FIELD
+            - pattern: $REQ.$FIELD.$SUB
+            - pattern: $A + $B
+            - pattern: "`...${...}...`"
+  - id: js-ajv-all-errors
+    message: Ajv configured with allErrors:true collects every error for a hostile payload; leave it off in production endpoints.
+    severity: INFO
+    languages: [javascript, typescript]
+    metadata:
+      cwe: "CWE-400"
+      owasp: "A05:2021"
+      category: security
+      confidence: HIGH
+    pattern: "new Ajv({ ..., allErrors: true, ... })"
+  - id: python-regex-from-input
+    message: Regular expression compiled from request data can be catastrophic (ReDoS); use re.escape() or a fixed pattern.
+    severity: WARNING
+    languages: [python]
+    metadata:
+      cwe: "CWE-400"
+      owasp: "A05:2021"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: re.compile($SRC, ...)
+          - pattern: re.$FUNC($SRC, $TEXT, ...)
+      - metavariable-regex:
+          metavariable: $SRC
+          regex: ^(request|req)\.

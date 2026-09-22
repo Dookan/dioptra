@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "gitleaks",
+          "semanticVersion": "v8.21.2",
+          "informationUri": "https://github.com/gitleaks/gitleaks",
+          "rules": [
+            {"id": "generic-api-key", "shortDescription": {"text": "Detected a Generic API Key, potentially exposing access to various services and sensitive operations."}},
+            {"id": "gitlab-pat", "name": "GitLab Personal Access Token", "shortDescription": {"text": "Identified a GitLab Personal Access Token."}}
+          ]
+        }
+      },
+      "results": [
+        {
+          "message": {"text": "generic-api-key has detected secret for file .gitlab-ci.yml at commit ."},
+          "ruleId": "generic-api-key",
+          "locations": [{"physicalLocation": {
+            "artifactLocation": {"uri": ".gitlab-ci.yml"},
+            "region": {"startLine": 73, "startColumn": 12, "endLine": 73, "endColumn": 52, "snippet": {"text": "AKIAIOSFODNN7EXAMPLE"}}
+          }}],
+          "partialFingerprints": {"commitSha": "", "email": "", "author": "", "date": "", "commitMessage": ""}
+        },
+        {
+          "message": {"text": "gitlab-pat has detected secret for file .gitlab-ci.yml at commit ."},
+          "ruleId": "gitlab-pat",
+          "locations": [{"physicalLocation": {
+            "artifactLocation": {"uri": ".gitlab-ci.yml"},
+            "region": {"startLine": 74, "snippet": {"text": "glpat-xxxxxxxxxxxxxxxxxxxx"}}
+          }}]
+        }
+      ]
+    }
+  ]
+}

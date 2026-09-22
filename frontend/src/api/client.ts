@@ -73,3 +73,61 @@ async function readErrorBody(response: Response): Promise<[string, string]> {
   }
   return ['internal_error', 'errors.internal'];
 }
+
+/**
+ * Multipart upload. The body is a FormData so the browser sets the boundary;
+ * everything else (auth, error contract) matches `apiFetch`.
+ */
+export async function apiUpload<T>(
+  path: string,
+  form: FormData,
+  accessToken: string | null,
+): Promise<T> {
+  const headers = new Headers();
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      headers,
+      body: form,
+      credentials: 'same-origin',
+    });
+  } catch (cause) {
+    throw new ApiError(0, 'network_unreachable', 'errors.network', { cause });
+  }
+  if (!response.ok) {
+    throw new ApiError(response.status, ...(await readErrorBody(response)));
+  }
+  return (await response.json()) as T;
+}
+
+export interface Download {
+  blob: Blob;
+  filename: string;
+}
+
+/**
+ * Authenticated file download. A plain link cannot carry the bearer token, so
+ * the file is fetched as a blob and handed to the browser by the caller.
+ */
+export async function apiDownload(
+  path: string,
+  accessToken: string | null,
+  fallbackName: string,
+): Promise<Download> {
+  const headers = new Headers();
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`);
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, { headers, credentials: 'same-origin' });
+  } catch (cause) {
+    throw new ApiError(0, 'network_unreachable', 'errors.network', { cause });
+  }
+  if (!response.ok) {
+    throw new ApiError(response.status, ...(await readErrorBody(response)));
+  }
+  const disposition = response.headers.get('Content-Disposition') ?? '';
+  const match = /filename="([^"]+)"/.exec(disposition);
+  return { blob: await response.blob(), filename: match?.[1] ?? fallbackName };
+}

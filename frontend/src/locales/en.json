@@ -24,9 +24,10 @@
   },
   "home": {
     "greeting": "Hello, {{name}}",
-    "subtitle": "Your ongoing analyses will show up here.",
+    "subtitle": "Your analyses in progress will show up here.",
     "nextStepTitle": "Next step",
-    "nextStepBody": "No analyses yet. Code ingest arrives in the next phase.",
+    "nextStepBody": "Register a system and upload its code to get the first report.",
+    "goToProjects": "Go to projects",
     "signOut": "Sign out"
   },
   "roles": {
@@ -58,6 +59,149 @@
       "weakPassword": "That password is too short. Use at least 12 characters.",
       "forbidden": "Your role is not allowed to do this.",
       "invalidUsername": "The username must be initial + lastname, lowercase, with no dots."
+    },
+    "ingest": {
+      "failed": "The submitted code could not be processed.",
+      "zipSlip": "The ZIP file contains forbidden paths.",
+      "zipTooLarge": "The ZIP file exceeds the maximum allowed size.",
+      "tooManyEntries": "The ZIP file has too many entries.",
+      "zipBomb": "The ZIP file has a suspicious compression ratio.",
+      "invalidArchive": "The file is not a valid ZIP.",
+      "forbiddenHost": "The repository address points to a forbidden network.",
+      "invalidUrl": "The repository address is not valid (HTTPS only).",
+      "repoUnreachable": "The repository could not be reached."
+    },
+    "projects": {
+      "notFound": "The project does not exist."
+    },
+    "analysis": {
+      "notFound": "The analysis does not exist.",
+      "notReady": "The analysis has not finished yet.",
+      "sbomInvalid": "The generated component inventory is not valid.",
+      "normalization": "A tool's output could not be interpreted.",
+      "noToolRan": "No analysis tool could run. Check the installation."
+    },
+    "report": {
+      "renderFailed": "The report could not be generated."
+    }
+  },
+  "nav": {
+    "label": "Sections",
+    "home": "Home",
+    "projects": "Projects"
+  },
+  "stepper": {
+    "label": "Process stages",
+    "register": "Register",
+    "code": "Code",
+    "analysis": "Analysis",
+    "plan": "Plan",
+    "design": "Design",
+    "tests": "Tests",
+    "verification": "Verification",
+    "report": "Report"
+  },
+  "severity": {
+    "critical": "Critical",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "info": "Informational"
+  },
+  "analysis": {
+    "status": {
+      "queued": "Queued",
+      "running": "Analyzing",
+      "done": "Finished",
+      "failed": "Failed"
+    },
+    "tool": {
+      "ran": "ran",
+      "failed": "error",
+      "missing": "not available",
+      "timeout": "timed out"
+    },
+    "coverage": "Tool coverage",
+    "detected": "Detected",
+    "failedBody": "The analysis could not finish. Code:",
+    "findingsCount": "{{count}} finding(s)"
+  },
+  "projects": {
+    "title": "Projects",
+    "subtitle": "Every system the factory audits, with its latest analysis.",
+    "nextStepTitle": "Next step",
+    "nextStepBody": "Register the system you are going to analyze: name, technology and owner.",
+    "nextStepBodyDeveloper": "An analyst registers the systems. Here you will see the projects where you have to write tests.",
+    "register": "Register system",
+    "empty": "No projects yet.",
+    "listLabel": "Projects",
+    "noAnalysis": "No analysis",
+    "createdAt": "Created on {{date}}",
+    "form": {
+      "section": "1 · System details",
+      "intro": "These details go straight into the report's \"System details\" table.",
+      "name": "Project name",
+      "systemName": "System name (web site)",
+      "framework": "Framework",
+      "database": "Database",
+      "developer": "Developer",
+      "installedAt": "Installation date",
+      "description": "Description",
+      "submit": "Save and continue",
+      "submitting": "Saving…",
+      "cancel": "Cancel",
+      "hint": "You will upload the code next."
+    }
+  },
+  "project": {
+    "nextStep": {
+      "codeTitle": "Next step: upload the code",
+      "codeBody": "Upload a ZIP or paste the repository's HTTPS address. The analysis runs on its own and tells you when it is done.",
+      "doneTitle": "Analysis finished",
+      "doneBody": "Download the report or analyze a new version. Reviewing findings comes in the next stage."
+    },
+    "ingest": {
+      "section": "2 · The code",
+      "intro": "The code is analyzed in an isolated environment with no internet access. Nothing from the system is executed.",
+      "zipLabel": "ZIP file with the code",
+      "uploadSubmit": "Upload and analyze",
+      "duration": "Usually takes a few minutes.",
+      "gitLabel": "Or the repository's HTTPS address",
+      "gitSubmit": "Clone and analyze",
+      "privacy": "Everything stays on this server: no tool queries external services."
+    },
+    "explain": {
+      "title": "What are we going to review?",
+      "securityLabel": "Insecure code:",
+      "security": "patterns that allow injections, XSS, exposed secrets.",
+      "depsLabel": "Dependencies:",
+      "deps": "libraries with known vulnerabilities, according to the local database.",
+      "secretsLabel": "Secrets:",
+      "secrets": "passwords, keys and tokens left in the code or its history.",
+      "healthLabel": "Code health:",
+      "health": "complexity per function, lines per language, commented-out code."
+    },
+    "analyses": {
+      "title": "Analyses",
+      "empty": "No version has been analyzed yet."
+    },
+    "download": {
+      "pdf": "Download PDF",
+      "docx": "Download DOCX",
+      "md": "Download Markdown",
+      "sbom": "Download SBOM (CycloneDX)"
+    },
+    "findings": {
+      "show": "Show findings",
+      "hide": "Hide findings",
+      "loading": "Loading findings…",
+      "empty": "No findings were found.",
+      "severity": "Severity",
+      "title": "Finding",
+      "classification": "CWE / OWASP",
+      "location": "Location",
+      "unknownCwe": "Unknown CWE",
+      "unclassified": "Unclassified"
     }
   }
 }

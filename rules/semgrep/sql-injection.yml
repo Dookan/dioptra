@@ -1,0 +1,42 @@
+rules:
+  - id: js-sql-string-concat
+    message: SQL query built by string concatenation or template literal; use parameterized queries.
+    severity: ERROR
+    languages: [javascript, typescript]
+    metadata:
+      cwe: "CWE-89"
+      owasp: "A03:2021"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: $DB.query($SQL, ...)
+          - pattern: $DB.execute($SQL, ...)
+          - pattern: $DB.raw($SQL, ...)
+          - pattern: $DB.$METHOD.query($SQL, ...)
+      - metavariable-pattern:
+          metavariable: $SQL
+          pattern-either:
+            - pattern: $A + $B
+            - pattern: "`...${...}...`"
+  - id: python-sql-string-format
+    message: SQL query built with f-string, % or .format(); pass parameters separately to execute().
+    severity: ERROR
+    languages: [python]
+    metadata:
+      cwe: "CWE-89"
+      owasp: "A03:2021"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: $CUR.execute($SQL, ...)
+          - pattern: $CUR.executemany($SQL, ...)
+          - pattern: $CUR.raw($SQL, ...)
+      - metavariable-pattern:
+          metavariable: $SQL
+          pattern-either:
+            - pattern: f"..."
+            - pattern: $A % $B
+            - pattern: $A.format(...)
+            - pattern: $A + $B

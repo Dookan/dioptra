@@ -8,7 +8,9 @@ enforces in production too.
 from __future__ import annotations
 
 import os
+import tempfile
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -17,6 +19,15 @@ os.environ.setdefault("DIOPTRA_ENV", "test")
 os.environ.setdefault("DIOPTRA_JWT_SECRET", "test-secret-please-do-not-use-in-production")
 os.environ.setdefault("DIOPTRA_DATABASE_URL", "sqlite+pysqlite:///:memory:")
 os.environ.setdefault("DIOPTRA_REFRESH_COOKIE_SECURE", "false")
+# Phase 1: jobs run inline, tools on the host (none installed → coverage gaps),
+# jails under a throwaway directory. No broker, no daemon, no network.
+os.environ.setdefault("DIOPTRA_QUEUE_INLINE", "true")
+os.environ.setdefault("DIOPTRA_RUNNER_MODE", "local")
+os.environ.setdefault("DIOPTRA_WORKSPACE_ROOT", tempfile.mkdtemp(prefix="dioptra-test-ws-"))
+# Our own rules live in the repository; an empty OSV directory makes the
+# runner "available" so its (fixture or absent) execution is exercised.
+os.environ.setdefault("DIOPTRA_RULES_DIR", str(Path(__file__).resolve().parents[2] / "rules"))
+os.environ.setdefault("DIOPTRA_OSV_DB_DIR", tempfile.mkdtemp(prefix="dioptra-test-osv-"))
 
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -71,8 +82,10 @@ def db(session_factory: sessionmaker[Session]) -> Iterator[Session]:
 
 
 @pytest.fixture
-def app(session_factory: sessionmaker[Session]) -> FastAPI:
+def app(session_factory: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch) -> FastAPI:
     application = create_app()
+    # The inline pipeline opens its own session, exactly like the worker does.
+    monkeypatch.setattr("app.analysis.pipeline.get_session_factory", lambda: session_factory)
 
     def override_get_db() -> Iterator[Session]:
         session = session_factory()

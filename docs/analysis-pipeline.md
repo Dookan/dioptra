@@ -1,6 +1,6 @@
 # Analysis pipeline
 
-> **Status: DESIGN SURFACE — not yet implemented.**
+> **Status: IN_PROGRESS — P1 slice built 2026-09-21: runners (`backend/app/analysis/runners/`), SARIF normalizer, CWE → OWASP map, CVSS 3.1, catalog, metrics; see `tasks/phase1-survey.md`.**
 
 Tool authority lives in CLAUDE.md → Analysis Tool Source Authority. This file
 covers behavior.

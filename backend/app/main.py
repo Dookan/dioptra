@@ -17,9 +17,11 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import Response
 
 from app import __version__
+from app.analysis.router import router as analysis_router
 from app.auth.router import router as auth_router
 from app.core.config import get_settings
 from app.core.errors import AppError
+from app.projects.router import router as projects_router
 
 logger = logging.getLogger("dioptra")
 
@@ -112,4 +114,6 @@ def create_app() -> FastAPI:
         return {"status": "ok", "version": __version__}
 
     app.include_router(auth_router)
+    app.include_router(projects_router)
+    app.include_router(analysis_router)
     return app

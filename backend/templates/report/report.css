@@ -1,0 +1,102 @@
+/* Institutional white-box report.
+   Layout aligned with the institution's ODT template that produced the anchor
+   PDFs: Letter page, Liberation Sans 12pt body at 103% leading, 12pt bold
+   uppercase section headings, serif bold sub-headings, dark-green label cells
+   (#294621) with white bold text, the "gerencial" finding table (red 13pt title,
+   gray #C0C0C0 label cells, red severity), 0.5pt black borders, 0.15cm padding.
+   The letterhead artwork of the anchor is the deploying institution's own and is
+   deliberately absent (docs: the institution stays unnamed); its top/bottom
+   margins are kept so the text block sits where the anchor's does.
+   No external font, no external asset of any kind (Hard Rule: no CDN). */
+
+@page {
+  size: Letter;
+  margin: 3.6cm 1.995cm 2.469cm 2cm;
+  @bottom-center { content: counter(page); font-family: "Liberation Sans", Arial, sans-serif; font-size: 12pt; color: #000; }
+  @bottom-right { content: "Moises Marin"; font-family: "Liberation Sans", Arial, sans-serif; font-size: 8pt; color: #666; }
+}
+@page cover {
+  margin: 1.27cm 2cm 1.27cm 2cm;
+  @bottom-center { content: none; }
+  @bottom-right { content: none; }
+}
+
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: "Liberation Sans", "Calibri", Arial, Helvetica, sans-serif;
+  font-size: 12pt;
+  line-height: 103%;
+  color: #000;
+}
+
+/* Cover: title 26pt bold centered about a third of the way down, date 14pt bold. */
+.cover { page: cover; text-align: center; padding-top: 8.4cm; page-break-after: always; }
+.cover h1 { font-size: 26pt; font-weight: 700; line-height: 1.35; margin: 0 0 0.6cm; word-break: break-word; }
+.cover .period { font-size: 14pt; font-weight: 700; }
+
+h2 {
+  font-size: 12pt;
+  font-weight: 700;
+  line-height: 150%;
+  margin: 0.423cm 0 0.212cm;
+  page-break-after: avoid;
+}
+h2.break { page-break-before: always; }
+h3, h4 {
+  font-family: "Liberation Serif", "Times New Roman", serif;
+  font-size: 12pt;
+  font-weight: 700;
+  margin: 0.282cm 0 0.282cm;
+  page-break-after: avoid;
+}
+h3.centered { font-family: "Liberation Sans", Arial, sans-serif; font-size: 15pt; text-align: center; }
+p { margin: 0 0 0.282cm; text-align: justify; }
+p.spacer { margin: 0; height: 0.45cm; }
+
+table { border-collapse: collapse; margin: 0 0 0.282cm; page-break-inside: auto; }
+th, td { border: 0.5pt solid #000; padding: 0.15cm; vertical-align: middle; text-align: left; font-size: 12pt; }
+thead { display: table-header-group; }
+tr { page-break-inside: avoid; }
+.label-cell, th { background: #294621; color: #fff; font-weight: 700; }
+th { text-align: center; }
+
+table.details { width: 17.5cm; }
+table.details col.k { width: 4.7cm; }
+table.details col.v { width: 12.8cm; }
+
+table.four { width: 17.5cm; }
+table.four col.a { width: 2.2cm; }
+table.four col.b { width: 3.1cm; }
+table.four col.c { width: 7.3cm; }
+table.four col.d { width: 4.9cm; }
+
+.finding { margin: 0 0 0.45cm; }
+table.finding-head { width: 17.5cm; page-break-inside: avoid; }
+table.finding-head col.t { width: 9.5cm; }
+table.finding-head col.l { width: 4.2cm; }
+table.finding-head col.v { width: 3.8cm; }
+table.finding-head td.title { color: #C00000; font-weight: 700; font-size: 13pt; }
+table.finding-head td.sub { font-weight: 700; }
+table.finding-head td.lbl { background: #C0C0C0; font-weight: 700; text-align: center; }
+table.finding-head td.sev { color: #C00000; font-weight: 700; text-align: center; }
+table.finding-head td.owasp { font-weight: 700; text-align: center; }
+.finding ul { margin: 0 0 0.282cm 0; padding-left: 1.6cm; list-style-type: disc; }
+.finding li { margin: 0 0 0.15cm; text-align: left; word-break: break-word; }
+.finding .strong { font-weight: 700; }
+.finding .route { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; font-size: 11pt; word-break: break-all; text-align: left; }
+.finding .message { text-align: left; }
+
+pre.snippet {
+  font-family: "DejaVu Sans Mono", "Liberation Mono", monospace;
+  font-size: 9pt;
+  line-height: 1.25;
+  background: #f4f4f4;
+  border: 0.5pt solid #bbb;
+  padding: 0.15cm 0.2cm;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0 0 0.282cm;
+}
+
+ul.files { margin: 0 0 0.282cm 0; padding-left: 1.6cm; }
+ul.files li { word-break: break-all; text-align: left; }

@@ -1,0 +1,55 @@
+rules:
+  - id: js-path-traversal
+    message: File path built from request data; resolve it and verify it stays inside the intended directory.
+    severity: ERROR
+    languages: [javascript, typescript]
+    metadata:
+      cwe: "CWE-22"
+      owasp: "A01:2021"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - patterns:
+              - pattern: $FS.$READ($PATH, ...)
+              - metavariable-regex:
+                  metavariable: $READ
+                  regex: ^(readFile|readFileSync|createReadStream|writeFile|writeFileSync|unlink|unlinkSync|readdir|readdirSync)$
+          - pattern: $RES.sendFile($PATH, ...)
+      - metavariable-pattern:
+          metavariable: $PATH
+          patterns:
+            - pattern-either:
+                - pattern: $REQ.$FIELD.$SUB
+                - pattern: $A + $REQ.$FIELD.$SUB
+                - pattern: path.join(..., $REQ.$FIELD.$SUB, ...)
+                - pattern: path.join(..., $REQ.$FIELD, ...)
+                - pattern: "`...${$REQ.$FIELD.$SUB}...`"
+            - metavariable-regex:
+                metavariable: $REQ
+                regex: ^(req|request)$
+  - id: python-path-traversal
+    message: File path built from request data; resolve it and verify it stays inside the intended directory.
+    severity: ERROR
+    languages: [python]
+    metadata:
+      cwe: "CWE-22"
+      owasp: "A01:2021"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: open($PATH, ...)
+          - pattern: send_file($PATH, ...)
+          - pattern: os.remove($PATH)
+          - pattern: Path($PATH).read_text(...)
+      - metavariable-pattern:
+          metavariable: $PATH
+          pattern-either:
+            - pattern: request.$SRC[$K]
+            - pattern: request.$SRC.get($K)
+            - pattern: $A + request.$SRC[$K]
+            - pattern: $A + request.$SRC.get($K)
+            - pattern: os.path.join(..., request.$SRC[$K], ...)
+            - pattern: os.path.join(..., request.$SRC.get($K), ...)
+            - pattern: f"..."

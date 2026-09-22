@@ -1,0 +1,59 @@
+rules:
+  - id: js-weak-hash-algorithm
+    message: MD5/SHA-1 are broken for security purposes; use SHA-256 or better, and a password hash (Argon2id/bcrypt) for credentials.
+    severity: WARNING
+    languages: [javascript, typescript]
+    metadata:
+      cwe: "CWE-328"
+      owasp: "A02:2021"
+      category: security
+      confidence: HIGH
+    patterns:
+      - pattern: $CRYPTO.createHash("$ALG", ...)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: (?i)^(md5|sha1|sha-1)$
+  - id: python-weak-hash-algorithm
+    message: MD5/SHA-1 are broken for security purposes; use hashlib.sha256 or a password hash (Argon2id).
+    severity: WARNING
+    languages: [python]
+    metadata:
+      cwe: "CWE-328"
+      owasp: "A02:2021"
+      category: security
+      confidence: HIGH
+    pattern-either:
+      - pattern: hashlib.md5(...)
+      - pattern: hashlib.sha1(...)
+      - pattern: hashlib.new("md5", ...)
+      - pattern: hashlib.new("sha1", ...)
+  - id: js-math-random-for-secret
+    message: Math.random() is not cryptographically secure; use crypto.randomBytes / crypto.randomUUID for tokens and secrets.
+    severity: WARNING
+    languages: [javascript, typescript]
+    metadata:
+      cwe: "CWE-330"
+      owasp: "A02:2021"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: $VAR = <... Math.random(...) ...>
+          - pattern: $OBJ.$VAR = <... Math.random(...) ...>
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: (?i).*(token|secret|nonce|otp|session|password|salt|key|code)
+  - id: python-random-for-secret
+    message: The random module is not cryptographically secure; use the secrets module for tokens and passwords.
+    severity: WARNING
+    languages: [python]
+    metadata:
+      cwe: "CWE-330"
+      owasp: "A02:2021"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern: $VAR = <... random.$FUNC(...) ...>
+      - metavariable-regex:
+          metavariable: $VAR
+          regex: (?i).*(token|secret|nonce|otp|session|password|salt|key|code)

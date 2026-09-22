@@ -1,0 +1,57 @@
+# Factory norm, level 2 of the No-CDN rule (CLAUDE.md → Hard Rules): audited
+# code that loads scripts, styles or fonts from an external domain gets an
+# automatic finding. Mitigation is always the same — bundle and serve locally.
+rules:
+  # HTML/CSS rules use regex mode: Semgrep's HTML grammar does not bind
+  # metavariables inside attribute values, and a URL prefix is what we need.
+  - id: no-cdn-script-tag
+    message: Script loaded from an external domain; bundle and serve it locally, version-pinned.
+    severity: WARNING
+    languages: [regex]
+    metadata:
+      cwe: "CWE-829"
+      owasp: "A08:2021"
+      category: security
+      confidence: HIGH
+    paths:
+      include: ["*.html", "*.htm", "*.ejs", "*.hbs", "*.jsx", "*.tsx", "*.vue", "*.blade.php", "*.jinja", "*.j2", "*.php"]
+    pattern-regex: '<script[^>]+src\s*=\s*["'']?(https?:)?//[^"''\s>]+'
+  - id: no-cdn-stylesheet-link
+    message: Stylesheet or font loaded from an external domain; bundle and serve it locally.
+    severity: WARNING
+    languages: [regex]
+    metadata:
+      cwe: "CWE-829"
+      owasp: "A08:2021"
+      category: security
+      confidence: HIGH
+    paths:
+      include: ["*.html", "*.htm", "*.ejs", "*.hbs", "*.jsx", "*.tsx", "*.vue", "*.blade.php", "*.jinja", "*.j2", "*.php"]
+    pattern-regex: '<link[^>]+href\s*=\s*["'']?(https?:)?//[^"''\s>]+'
+  - id: no-cdn-css-import
+    message: CSS @import from an external domain; bundle the stylesheet or font locally.
+    severity: WARNING
+    languages: [regex]
+    metadata:
+      cwe: "CWE-829"
+      owasp: "A08:2021"
+      category: security
+      confidence: HIGH
+    paths:
+      include: ["*.css", "*.scss", "*.less", "*.html", "*.vue"]
+    pattern-regex: '@import\s+(url\()?\s*["'']?https?://'
+  - id: no-cdn-js-remote-import
+    message: JavaScript module imported from a URL at runtime; install and bundle the dependency.
+    severity: WARNING
+    languages: [javascript, typescript]
+    metadata:
+      cwe: "CWE-829"
+      owasp: "A08:2021"
+      category: security
+      confidence: HIGH
+    pattern-either:
+      - pattern: import "=~/^https?:\/\//"
+      - pattern: import $X from "=~/^https?:\/\//"
+      - pattern: import { ... } from "=~/^https?:\/\//"
+      - pattern: import * as $X from "=~/^https?:\/\//"
+      - pattern: import("=~/^https?:\/\//")

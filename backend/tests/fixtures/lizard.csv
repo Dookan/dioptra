@@ -1,0 +1,4 @@
+12,3,80,2,14,"validar@10-23@./modulos/validacionFormulario.js","./modulos/validacionFormulario.js","validar","validar( datos , opciones )",10,23
+40,12,300,3,52,"handler@30-81@./index.js","./index.js","handler","handler( req , res , next )",30,81
+5,1,20,0,6,"ping@2-7@./index.js","./index.js","ping","ping()",2,7
+not,a,valid,row
