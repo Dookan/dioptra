@@ -1,6 +1,6 @@
 # Development phases
 
-> **Status: P0 DONE (2026-08-18); P1 IN_PROGRESS since 2026-09-21; P2 DONE (2026-09-22, `5f13ee1`); P3 DONE (2026-09-22, `80c0a3f`, closed in `37cd6cc`); P4 DONE (2026-09-22, `576993f` + phase close); P5 IN_PROGRESS since 2026-09-22.** Phase status summary
+> **Status: P0 DONE (2026-08-18); P1 IN_PROGRESS since 2026-09-21; P2 DONE (2026-09-22, `5f13ee1`); P3 DONE (2026-09-22, `80c0a3f`, closed in `37cd6cc`); P4 DONE (2026-09-22, `576993f`, `2b9680d`); P5 IN_PROGRESS since 2026-09-22.** Phase status summary
 > also lives in CLAUDE.md → Current phase status; keep both in sync.
 >
 > This file distills the work plan (`docs/work-plan-reference.html`, v1.0,

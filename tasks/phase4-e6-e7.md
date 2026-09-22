@@ -1,7 +1,7 @@
 # Task: Phase 4 — E6–E7
 
 > **Status: DONE — closed 2026-09-22; day 16 in commit `576993f` and day 17 in
-> the commit that carries this file. Deadline 2026-09-15 (plan days 16–17,
+> commit `2b9680d`. Deadline 2026-09-15 (plan days 16–17,
 > critical path), passed. Survey `tasks/phase4-survey.md` signed off by
 > `mmarin` 2026-09-22.** Both days on the critical path; day 16 opened with
 > the mandatory sandbox investigation gate.
@@ -169,7 +169,7 @@ demonstrably rejects the gate.
       (`test_sandbox_live.py::test_a_weak_suite_leaves_surviving_mutants`)
 - [x] Every sandbox escape test negative and recorded in docs/threat-model.md
       (nine probes, run 2026-09-22 with the shipped argv)
-- [ ] CLAUDE.md phase status + docs/development-phases.md: Phase 4 → DONE with date and commit
+- [x] CLAUDE.md phase status + docs/development-phases.md: Phase 4 → DONE with date and commit
 
 ## Non-goals (explicit)
 - PHPUnit/JUnit scaffolds, Infection, Pitest (P5)
