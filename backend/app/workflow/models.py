@@ -45,13 +45,20 @@ class TestPlan(Base):
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now, onupdate=utc_now)
 
 
-class CaseDesign(Base):
-    """E5 work on one planned function: the developer's diagram text (day 14).
+#: Cases per function; the schema and the service share the one number, and
+#: E4 refuses a function whose basis paths exceed it (it could never be approved).
+MAX_CASES = 200
 
-    Day 15 adds the pseudocode and its approval to the same row. The picture
-    the UI draws is always computed from the AST; ``diagram_text`` is the
-    developer's editable Mermaid — stored and shown as text, never rendered
-    as markup (docs/threat-model.md → Flow diagrams).
+
+class CaseDesign(Base):
+    """E5 work on one planned function: diagram text (day 14), cases and approval (day 15).
+
+    The picture the UI draws is always computed from the AST; ``diagram_text``
+    is the developer's editable Mermaid — stored and shown as text, never
+    rendered as markup (docs/threat-model.md → Flow diagrams). ``cases`` are
+    the developer's own words plus the brief items each one declares to
+    cover; ``brief`` is the snapshot taken at approval, which P4's scaffold
+    names its cases from.
     """
 
     __tablename__ = "case_designs"
@@ -64,6 +71,12 @@ class CaseDesign(Base):
     function: Mapped[str] = mapped_column(String(200))
     line: Mapped[int | None] = mapped_column(Integer, default=None)
     diagram_text: Mapped[str | None] = mapped_column(Text, default=None)
+    #: ``[{title, covers: [item id]}]`` — validated against the live brief on save.
+    cases: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    #: The brief as it was when the cases were approved (``brief_as_dict``).
+    brief: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
+    approved_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    approved_by_username: Mapped[str | None] = mapped_column(String(64), default=None)
     created_by_username: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now, onupdate=utc_now)

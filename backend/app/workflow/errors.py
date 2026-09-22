@@ -33,6 +33,7 @@ GATE_MESSAGE_KEYS: dict[str, str] = {
     "triage_pending": "errors.workflow.gate.triagePending",
     "test_plan_missing": "errors.workflow.gate.testPlanMissing",
     "gate_not_built": "errors.workflow.gate.notBuilt",
+    "cases_not_approved": "errors.workflow.gate.casesNotApproved",
 }
 
 
@@ -87,3 +88,59 @@ class TestPlanFunctionUnknown(WorkflowError):
 
     code = "test_plan_function_unknown"
     message_key = "errors.workflow.testPlanFunctionUnknown"
+
+
+class TestPlanFunctionRefused(WorkflowError):
+    """Base: a selected function cannot get a brief, so it cannot enter the plan.
+
+    Refused at E4, while the set is still editable — otherwise E5 could never
+    close (survey §8, addendum). ``context`` names the function for the UI.
+    """
+
+    def __init__(self, path: str, function: str, line: int | None, detail: str) -> None:
+        super().__init__(
+            repr(f"{path}:{line} {function} {detail}")[:200],
+            context={"path": path[:1024], "function": function[:200], "line": str(line or "")},
+        )
+
+
+class TestPlanFunctionUnbriefable(TestPlanFunctionRefused):
+    """The AST layer refused the function (language, size, syntax, nesting, not found)."""
+
+    code = "test_plan_function_unbriefable"
+    message_key = "errors.workflow.testPlanFunctionUnbriefable"
+
+
+class TestPlanFunctionTooComplex(TestPlanFunctionRefused):
+    """More basis paths than cases a design may hold (``MAX_CASES``)."""
+
+    code = "test_plan_function_too_complex"
+    message_key = "errors.workflow.testPlanFunctionTooComplex"
+
+
+class CaseItemUnknown(WorkflowError):
+    """A case declares a brief item id that the current brief does not contain."""
+
+    code = "case_item_unknown"
+    message_key = "errors.workflow.caseItemUnknown"
+
+
+class CasesInvalid(WorkflowError):
+    """A case title is empty, too short or too long, or there are too many cases."""
+
+    code = "cases_invalid"
+    message_key = "errors.workflow.casesInvalid"
+
+
+class BriefNotCovered(WorkflowError):
+    """Approval refused: at least one brief item is covered by no case."""
+
+    code = "brief_not_covered"
+    message_key = "errors.workflow.briefNotCovered"
+
+
+class CasesTooFew(WorkflowError):
+    """Approval refused: fewer cases than basis paths (+ malicious cases)."""
+
+    code = "cases_too_few"
+    message_key = "errors.workflow.casesTooFew"

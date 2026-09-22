@@ -1,6 +1,6 @@
 # UI model
 
-> **Status: IN_PROGRESS — tokens, both themes and i18n (P0), the projects screens (P1), the findings / report screens (P2) and the E4 plan screen with the status bar (P3, 2026-09-22) are built; the E5–E7 screens and Inventario are the target.** Visual anchor:
+> **Status: IN_PROGRESS — tokens, both themes and i18n (P0), the projects screens (P1), the findings / report screens (P2), the E4 plan screen with the status bar and the E5 design screen (P3, 2026-09-22) are built; the E6–E7 screens and Inventario are the target.** Visual anchor:
 > @docs/mockups/index.html (10 screens, approved 2026-08-17).
 
 ## Principles (from the approved mockups)
@@ -93,8 +93,23 @@ Added to `docs/mockups/index.html` on 2026-08-28, same tokens and principles:
   render (the CSP forbids Mermaid's inline styles — `tasks/phase3-survey.md`
   §7); the Mermaid text sits underneath, editable by the developer at E5 and
   always shown as text; the note "la consigna se calcula del código, no del
-  diagrama" is verbatim. The right column (cases) arrives with day 15. The
-  Workflow tab opens Plan until E4 closes, then Diseño. Recorded deviations
+  diagrama" is verbatim. The Workflow tab opens Plan until E4 closes, then
+  Diseño. Day 15 fills the screen: "La consigna te pide" under the diagram
+  (the minimum case count, then one line per brief item with its id chip —
+  branch with line and side, boundary with its values, error path, malicious
+  case naming the finding); the right panel "Tus casos, con tus palabras" is
+  a numbered list (`C1`, `C2`, …) of one-line cases, each with the brief
+  items as toggle chips ("Cubre:"), "Añadir un caso", "Guardar mis casos", a
+  plain-words line that says what is still uncovered or how many cases are
+  missing, then "Aprobar mis casos" (enabled only when saved, complete and
+  enough — the server re-checks) and the note "Al aprobar, el sistema te
+  prepara los archivos de test con estos N casos ya nombrados". The banner
+  counts "k de N funciones con casos aprobados" and holds the stage button
+  "Pasar a escribir los tests →" (`AdvanceStage`, enabled once every planned
+  function is approved). Deviation recorded: the mockup's one button "Aprobar
+  mis casos y pasar a escribir los tests →" is two actions — approval is per
+  function, the transition is per analysis and needs a written reason. The
+  analyst sees the brief and the cases read-only. Recorded deviations
   from screen 06: a `<select>` above the title chooses the planned function
   (the anchor shows one function with no navigation); "función N de M" sits
   in the panel's mono line, not in the status bar; the drawing has a small

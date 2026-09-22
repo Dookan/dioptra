@@ -39,7 +39,9 @@
 - **Self-audit**: the platform run through its own pipeline on the last day;
   must end with no high finding open without justification.
 - **Test brief** (Spanish UI: "consigna"): the per-function deterministic spec
-  the developer must satisfy. See docs/workflow-gates.md.
+  the developer must satisfy — items with stable ids (`R` branches, `F`
+  boundaries, `E` error paths, `M` malicious cases) and a minimum case count
+  (`backend/app/workflow/brief.py`). See docs/workflow-gates.md.
 - **Test debt**: gap between required and actual coverage; reported in E8.
 - **Triage**: human review of automatic findings — confirm, or discard as
   false positive with written justification.

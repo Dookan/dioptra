@@ -1,4 +1,8 @@
-/** Stage E5 day 14: the diagram is drawn from the server's layout; edited Mermaid stays text. */
+/**
+ * Stage E5: the diagram is drawn from the server's layout and edited Mermaid
+ * stays text (day 14); the brief renders from the payload and the cases
+ * declare what they cover (day 15).
+ */
 import es from '../locales/es.json';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -132,6 +136,51 @@ function fill(template: string, values: Record<string, string | number>): string
 }
 
 const DIAGRAM_URL = `/api/v1/analyses/${ANALYSIS_ID}/diagram?path=src%2Fvalidators.js&function=validateForm&line=10`;
+const BRIEF_URL = `/api/v1/analyses/${ANALYSIS_ID}/brief?path=src%2Fvalidators.js&function=validateForm&line=10`;
+const STATES_URL = `/api/v1/analyses/${ANALYSIS_ID}/case-designs`;
+const CASES_URL = `/api/v1/analyses/${ANALYSIS_ID}/cases`;
+const APPROVE_URL = `/api/v1/analyses/${ANALYSIS_ID}/cases/approve`;
+
+const BRIEF = {
+  function: 'validateForm',
+  path: 'src/validators.js',
+  line: 10,
+  language: 'javascript',
+  params: ['data'],
+  complexity: 2,
+  min_cases: 3,
+  items: [
+    { id: 'R1', kind: 'branch', line: 11, text: `if ${HOSTILE}`, detail: 'true', values: [], finding_id: null },
+    { id: 'R2', kind: 'branch', line: 11, text: `if ${HOSTILE}`, detail: 'false', values: [], finding_id: null },
+    { id: 'F1', kind: 'boundary', line: 11, text: 'age >= 18', detail: '>=', values: ['17', '18', '19'], finding_id: null },
+    { id: 'F2', kind: 'boundary', line: 12, text: 'role === "admin"', detail: '===', values: ['admin', ''], finding_id: null },
+    { id: 'F3', kind: 'boundary', line: 13, text: 'x < limit', detail: '<', values: [], finding_id: null },
+    { id: 'E1', kind: 'error', line: 11, text: 'return false;', detail: 'early_return', values: [], finding_id: null },
+    { id: 'M1', kind: 'malicious', line: 12, text: 'Registro sin sanear', detail: 'dioptra.log', values: ['CWE-117'], finding_id: 'f-1' },
+  ],
+};
+
+function briefState(cases: { title: string; covers: string[] }[], approvedBy: string | null = null) {
+  return {
+    brief: BRIEF,
+    cases,
+    approved_at: approvedBy === null ? null : '2026-09-22T12:00:00Z',
+    approved_by_username: approvedBy,
+  };
+}
+
+function states(first: string | null, second: string | null) {
+  return [
+    { ...PLAN.functions[0], cases: first === null ? 0 : 3, approved_at: first === null ? null : '2026-09-22T12:00:00Z', approved_by_username: first },
+    { ...PLAN.functions[1], cases: second === null ? 0 : 1, approved_at: second === null ? null : '2026-09-22T12:00:00Z', approved_by_username: second },
+  ];
+}
+
+const FULL_CASES = [
+  { title: `C1 · Sin datos → rechaza ${HOSTILE}`, covers: ['R1', 'E1'] },
+  { title: 'C2 · Con 17, 18 y 19 años', covers: ['R2', 'F1', 'F2', 'F3'] },
+  { title: 'C3 · Entrada maliciosa en el registro', covers: ['M1'] },
+];
 
 function renderDesign(role: 'analyst' | 'developer', stage: string, routes: Routes = {}) {
   globalThis.location.hash = `#/projects/${PROJECT_ID}/analyses/${ANALYSIS_ID}/design`;
@@ -142,6 +191,8 @@ function renderDesign(role: 'analyst' | 'developer', stage: string, routes: Rout
     [`/api/v1/analyses/${ANALYSIS_ID}`]: { status: 200, body: analysis(stage) },
     [`/api/v1/analyses/${ANALYSIS_ID}/test-plan`]: { status: 200, body: PLAN },
     [DIAGRAM_URL]: { status: 200, body: diagram(null) },
+    [BRIEF_URL]: { status: 200, body: briefState([]) },
+    [STATES_URL]: { status: 200, body: states(null, null) },
     ...routes,
   });
   render(
@@ -187,8 +238,10 @@ describe('case design screen', () => {
     // No inline style anywhere in the drawing (CSP style-src 'self').
     expect(svg.querySelectorAll('[style]')).toHaveLength(0);
     expect(svg.matches('[style]')).toBe(false);
-    // At the design stage itself: the diagrams banner, not "not yet".
-    expect(screen.getByText(fill(es.design.nextStep.diagramsTitle, { count: 2 }))).toBeInTheDocument();
+    // At the design stage itself: the progress banner, not "not yet".
+    expect(
+      screen.getByText(fill(es.design.nextStep.designTitle_other, { approved: 0, count: 2 })),
+    ).toBeInTheDocument();
     expect(screen.queryByText(es.design.nextStep.notYetTitle)).not.toBeInTheDocument();
     expect(screen.getByText(fill(es.design.complexity, { count: 2 }))).toBeInTheDocument();
     expect(screen.getByText(es.design.mermaid.note)).toBeInTheDocument();
@@ -258,6 +311,178 @@ describe('case design screen', () => {
     expect(screen.queryByRole('button', { name: es.design.mermaid.restore })).not.toBeInTheDocument();
   });
 
+  it('renders the brief from the payload, hostile text as text, and the empty value named', async () => {
+    renderDesign('developer', 'design');
+    await signIn('cperez');
+    const minimum = await screen.findByText(fill(es.design.brief.minCasesWithMalicious, { count: 3 }));
+    const list = minimum.closest('ul');
+    expect(list).not.toBeNull();
+    expect(list?.textContent).toContain(
+      fill(es.design.brief.branch, { line: 11, text: `if ${HOSTILE}`, side: es.design.edge.true }),
+    );
+    expect(list?.textContent).toContain(
+      fill(es.design.brief.boundary, { line: 11, text: 'age >= 18', values: '17, 18, 19' }),
+    );
+    expect(list?.textContent).toContain(
+      fill(es.design.brief.boundary, {
+        line: 12,
+        text: 'role === "admin"',
+        values: `admin, ${es.design.brief.emptyValue}`,
+      }),
+    );
+    expect(list?.textContent).toContain(
+      fill(es.design.brief.boundaryEmpty, { line: 13, text: 'x < limit' }),
+    );
+    expect(list?.textContent).toContain(
+      fill(es.design.brief.error.early_return, { line: 11, text: 'return false;' }),
+    );
+    expect(list?.textContent).toContain(
+      fill(es.design.brief.malicious, { line: 12, text: 'Registro sin sanear' }),
+    );
+    expect(list?.textContent).not.toContain('design.brief.');
+    expect(document.querySelector('img')).toBeNull();
+    expect(screen.getByText(es.design.cases.empty)).toBeInTheDocument();
+    // Nothing to approve yet, and the stage cannot be closed from here.
+    expect(screen.getByRole('button', { name: es.design.cases.approve })).toBeDisabled();
+    expect(screen.getByRole('button', { name: es.design.advance.label })).toBeDisabled();
+    expect(
+      screen.getByText(fill(es.design.advance.blocked_other, { approved: 0, count: 2 })),
+    ).toBeInTheDocument();
+  });
+
+  it('lets the developer write cases, tick what they cover, save and approve', async () => {
+    let saved = briefState([]);
+    const calls = renderDesign('developer', 'design', {
+      [CASES_URL]: () => ({ status: 200, body: saved }),
+      [APPROVE_URL]: { status: 200, body: briefState(FULL_CASES, 'cperez') },
+    });
+    const user = await signIn('cperez');
+    await screen.findByRole('button', { name: es.design.cases.add });
+    for (const draft of FULL_CASES) {
+      await user.click(screen.getByRole('button', { name: es.design.cases.add }));
+      const inputs = screen.getAllByPlaceholderText(es.design.cases.placeholder);
+      const input = inputs[inputs.length - 1];
+      if (input === undefined) throw new Error('no case input');
+      await user.click(input);
+      await user.paste(draft.title);
+      const row = input.closest('li');
+      if (row === null) throw new Error('no case row');
+      for (const id of draft.covers) {
+        const chip = Array.from(row.querySelectorAll('button')).find((b) => b.textContent === id);
+        if (chip === undefined) throw new Error(`no chip ${id}`);
+        await user.click(chip);
+        expect(chip).toHaveAttribute('aria-pressed', 'true');
+      }
+    }
+    // Every item ticked and three cases: only the unsaved state blocks approval.
+    expect(screen.getByText(es.design.cases.unsaved)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: es.design.cases.approve })).toBeDisabled();
+
+    saved = briefState(FULL_CASES);
+    await user.click(screen.getByRole('button', { name: es.design.cases.save }));
+    await waitFor(() => {
+      expect(bodyOf(calls, CASES_URL, 'PUT')).toEqual({
+        path: 'src/validators.js',
+        function: 'validateForm',
+        line: 10,
+        cases: FULL_CASES,
+      });
+    });
+    expect(await screen.findByText(es.design.cases.saved)).toBeInTheDocument();
+    expect(screen.getByText(es.design.cases.complete)).toBeInTheDocument();
+    const approve = screen.getByRole('button', { name: es.design.cases.approve });
+    expect(approve).toBeEnabled();
+    await user.click(approve);
+    await waitFor(() => {
+      expect(bodyOf(calls, APPROVE_URL, 'POST')).toEqual({
+        path: 'src/validators.js',
+        function: 'validateForm',
+        line: 10,
+      });
+    });
+    expect(await screen.findByText(fill(es.design.cases.approved, { user: 'cperez' }))).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: es.design.cases.approve })).toBeDisabled();
+    // One of two functions approved: the banner counts it, the stage stays closed.
+    expect(
+      screen.getByText(fill(es.design.nextStep.designTitle_other, { approved: 1, count: 2 })),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: es.design.advance.label })).toBeDisabled();
+    // The hostile case title is a text node, never markup.
+    expect(document.querySelector('img')).toBeNull();
+    expect(screen.getByRole('button', { name: fill(es.design.cases.removeCase, { n: 1 }) })).toBeInTheDocument();
+    expect(
+      screen.getByText(fill(es.design.cases.approveHint_other, { count: 3 })),
+    ).toBeInTheDocument();
+  });
+
+  it('shows what is still uncovered and the server refusal, and reopens after an edit', async () => {
+    const calls = renderDesign('developer', 'design', {
+      [BRIEF_URL]: { status: 200, body: briefState(FULL_CASES, 'cperez') },
+      [STATES_URL]: { status: 200, body: states('cperez', 'cperez') },
+      [CASES_URL]: {
+        status: 200,
+        body: briefState([...FULL_CASES.slice(0, 2), { title: 'C3 · Entrada maliciosa en el registro', covers: [] }]),
+      },
+      [APPROVE_URL]: {
+        status: 422,
+        body: { code: 'brief_not_covered', message_key: 'errors.workflow.briefNotCovered' },
+      },
+    });
+    const user = await signIn('cperez');
+    expect(await screen.findByText(fill(es.design.cases.approved, { user: 'cperez' }))).toBeInTheDocument();
+    // Every function approved: the way to the next stage is open.
+    expect(screen.getByRole('button', { name: es.design.advance.label })).toBeEnabled();
+
+    const rows = screen.getAllByPlaceholderText(es.design.cases.placeholder);
+    const third = rows[2]?.closest('li');
+    if (!third) throw new Error('no third row');
+    const m1 = Array.from(third.querySelectorAll('button')).find((b) => b.textContent === 'M1');
+    if (m1 === undefined) throw new Error('no chip');
+    await user.click(m1);
+    expect(screen.getByText(fill(es.design.cases.uncovered, { items: 'M1' }))).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: es.design.cases.save }));
+    expect(await screen.findByText(es.design.cases.reopened)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(bodyOf(calls, CASES_URL, 'PUT')).not.toBeUndefined();
+    });
+    expect(screen.queryByText(fill(es.design.cases.approved, { user: 'cperez' }))).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: es.design.cases.approve })).toBeDisabled();
+    expect(screen.getByRole('button', { name: es.design.advance.label })).toBeDisabled();
+  });
+
+  it('keeps approval disabled while the case count is below the minimum', async () => {
+    const calls = renderDesign('developer', 'design', {
+      [BRIEF_URL]: {
+        status: 200,
+        body: briefState([
+          { title: 'C1 · Todo lo que falla', covers: ['R1', 'E1', 'M1'] },
+          { title: 'C2 · Todo lo que pasa', covers: ['R2', 'F1', 'F2', 'F3'] },
+        ]),
+      },
+      [APPROVE_URL]: { status: 200, body: briefState(FULL_CASES, 'cperez') },
+    });
+    const user = await signIn('cperez');
+    expect(await screen.findByText(fill(es.design.cases.tooFew_one, { count: 1 }))).toBeInTheDocument();
+    const approve = screen.getByRole('button', { name: es.design.cases.approve });
+    expect(approve).toBeDisabled();
+    await user.click(approve);
+    expect(bodyOf(calls, APPROVE_URL, 'POST')).toBeUndefined();
+  });
+
+  it('shows the analyst the cases read-only', async () => {
+    renderDesign('analyst', 'design', {
+      [BRIEF_URL]: { status: 200, body: briefState(FULL_CASES, 'cperez') },
+    });
+    await signIn('mmarin');
+    expect(await screen.findByText(es.design.cases.readOnly)).toBeInTheDocument();
+    expect(await screen.findByText(`C1 · Sin datos → rechaza ${HOSTILE}`)).toBeInTheDocument();
+    expect(document.querySelector('img')).toBeNull();
+    expect(screen.queryByPlaceholderText(es.design.cases.placeholder)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: es.design.cases.approve })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: es.design.advance.label })).not.toBeInTheDocument();
+    expect(screen.getByText(fill(es.design.cases.approved, { user: 'cperez' }))).toBeInTheDocument();
+  });
+
   it('hides the edit button from the analyst at design and from the developer off design', async () => {
     renderDesign('analyst', 'design');
     await signIn('mmarin');
@@ -274,10 +499,15 @@ describe('case design screen', () => {
   });
 
   it('keeps the developer read-only once the stage has moved past design', async () => {
-    renderDesign('developer', 'tests');
+    renderDesign('developer', 'tests', {
+      [STATES_URL]: { status: 200, body: states('cperez', 'cperez') },
+    });
     await signIn('cperez');
     expect(await screen.findByText(es.design.mermaid.note)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: es.design.mermaid.edit })).not.toBeInTheDocument();
+    expect(screen.getByText(es.design.nextStep.doneTitle)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: es.design.cases.save })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: es.design.advance.label })).not.toBeInTheDocument();
   });
 
   it('is read-only for the analyst and shows the server refusal for a bad function', async () => {

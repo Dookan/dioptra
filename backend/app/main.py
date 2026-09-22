@@ -87,11 +87,10 @@ def create_app() -> FastAPI:
         logger.info(
             "domain error path=%s code=%s detail=%s", request.url.path, error.code, error.detail
         )
-        return JSONResponse(
-            status_code=error.status_code,
-            content={"code": error.code, "message_key": error.message_key},
-            headers=error.headers(),
-        )
+        content: dict[str, object] = {"code": error.code, "message_key": error.message_key}
+        if error.context:
+            content["context"] = error.context
+        return JSONResponse(status_code=error.status_code, content=content, headers=error.headers())
 
     @app.exception_handler(RequestValidationError)
     async def handle_validation_error(request: Request, _exc: Exception) -> JSONResponse:

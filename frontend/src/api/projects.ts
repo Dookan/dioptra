@@ -173,6 +173,50 @@ export interface Diagram {
   edited_at: string | null;
 }
 
+export interface BriefItem {
+  id: string;
+  kind: 'branch' | 'boundary' | 'error' | 'malicious';
+  line: number | null;
+  /** Source text or finding title — hostile, rendered as text. */
+  text: string;
+  /** branch: edge label; error: throw | handler | early_return; malicious: rule id. */
+  detail: string;
+  values: string[];
+  finding_id: string | null;
+}
+
+export interface Brief {
+  function: string;
+  path: string;
+  line: number;
+  language: string;
+  params: string[];
+  complexity: number;
+  min_cases: number;
+  items: BriefItem[];
+}
+
+export interface CaseDraft {
+  title: string;
+  covers: string[];
+}
+
+export interface BriefState {
+  brief: Brief;
+  cases: CaseDraft[];
+  approved_at: string | null;
+  approved_by_username: string | null;
+}
+
+export interface DesignState {
+  path: string;
+  function: string;
+  line: number | null;
+  cases: number;
+  approved_at: string | null;
+  approved_by_username: string | null;
+}
+
 export interface TestPlan {
   analysis_id: string;
   criterion: CoverageCriterion;
@@ -331,6 +375,50 @@ export function saveDiagramText(
     method: 'PUT',
     accessToken,
     body: { path: ref.path, function: ref.function, line: ref.line, text },
+  });
+}
+
+export function getBrief(
+  accessToken: string,
+  analysisId: string,
+  ref: PlannedFunction,
+): Promise<BriefState> {
+  const query = new URLSearchParams({ path: ref.path, function: ref.function });
+  if (ref.line !== null) query.set('line', String(ref.line));
+  return apiFetch<BriefState>(
+    `/analyses/${encodeURIComponent(analysisId)}/brief?${query.toString()}`,
+    { accessToken },
+  );
+}
+
+export function getDesignStates(accessToken: string, analysisId: string): Promise<DesignState[]> {
+  return apiFetch<DesignState[]>(`/analyses/${encodeURIComponent(analysisId)}/case-designs`, {
+    accessToken,
+  });
+}
+
+export function saveCases(
+  accessToken: string,
+  analysisId: string,
+  ref: PlannedFunction,
+  cases: CaseDraft[],
+): Promise<BriefState> {
+  return apiFetch<BriefState>(`/analyses/${encodeURIComponent(analysisId)}/cases`, {
+    method: 'PUT',
+    accessToken,
+    body: { path: ref.path, function: ref.function, line: ref.line, cases },
+  });
+}
+
+export function approveCases(
+  accessToken: string,
+  analysisId: string,
+  ref: PlannedFunction,
+): Promise<BriefState> {
+  return apiFetch<BriefState>(`/analyses/${encodeURIComponent(analysisId)}/cases/approve`, {
+    method: 'POST',
+    accessToken,
+    body: { path: ref.path, function: ref.function, line: ref.line },
   });
 }
 

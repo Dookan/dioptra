@@ -18,7 +18,7 @@ from typing import Any
 from tree_sitter import Language, Node, Parser
 
 from app.workflow.ast.errors import FunctionNotFound, ParseFailed, TooDeep
-from app.workflow.ast.graph import FlowEdge, FlowGraph, FlowNode, clip
+from app.workflow.ast.graph import Comparison, FlowEdge, FlowGraph, FlowNode, clip
 
 MAX_DEPTH = 40
 MAX_NODES = 400
@@ -49,6 +49,11 @@ class Profile:
     boolean_operator_tokens: frozenset[str]
     #: Node types that hold the boolean operators (JS: binary_expression).
     boolean_expression_types: frozenset[str]
+    #: Node types that hold a comparison (JS: binary_expression; Python: comparison_operator).
+    comparison_types: frozenset[str]
+    #: Literal node types whose text is a number.
+    number_types: frozenset[str]
+    string_types: frozenset[str]
 
 
 PYTHON = Profile(
@@ -71,6 +76,9 @@ PYTHON = Profile(
     expression_decision_types=frozenset({"conditional_expression"}),
     boolean_operator_tokens=frozenset({"and", "or"}),
     boolean_expression_types=frozenset({"boolean_operator"}),
+    comparison_types=frozenset({"comparison_operator"}),
+    number_types=frozenset({"integer", "float"}),
+    string_types=frozenset({"string"}),
 )
 
 JAVASCRIPT = Profile(
@@ -97,6 +105,9 @@ JAVASCRIPT = Profile(
     expression_decision_types=frozenset({"ternary_expression"}),
     boolean_operator_tokens=frozenset({"&&", "||", "??"}),
     boolean_expression_types=frozenset({"binary_expression"}),
+    comparison_types=frozenset({"binary_expression"}),
+    number_types=frozenset({"number"}),
+    string_types=frozenset({"string", "template_string"}),
 )
 
 PROFILES: dict[str, Profile] = {
@@ -326,8 +337,10 @@ class _Builder:
         self._connect(pending, loop)
         body = node.child_by_field_name("body")
         exits = self.block(_statements(body, profile), [(loop, "true")])
-        for source, _label in exits:
-            self.edges.append(FlowEdge(source=source, target=loop, label="loop"))
+        # A branch that ends the body keeps its own label (the brief lists
+        # that decision's false side); a plain statement's edge is "loop".
+        for source, label in exits:
+            self.edges.append(FlowEdge(source=source, target=loop, label=label or "loop"))
         return [(loop, "false")]
 
     def _switch(self, node: Node, pending: list[tuple[str, str]]) -> list[tuple[str, str]]:
@@ -428,6 +441,114 @@ def complexity(function: Node, profile: Profile) -> int:
     return count
 
 
+COMPARISON_OPERATORS = frozenset({"<", "<=", ">", ">=", "==", "!=", "===", "!=="})
+
+
+def _literal(node: Node, profile: Profile) -> int | float | str | None:
+    """The literal value of ``node`` when it is a number or a string; None otherwise."""
+    if node.type in ("parenthesized_expression",) and node.named_children:
+        return _literal(node.named_children[0], profile)
+    if node.type in profile.number_types:
+        return _number(_text(node))
+    if node.type == "unary_expression" and node.named_children:
+        # `-1` parses as unary minus over the literal.
+        operator = next((c for c in node.children if not c.is_named), None)
+        inner = _number(_text(node.named_children[0]))
+        if operator is not None and operator.type == "-" and inner is not None:
+            return -inner
+        return None
+    if node.type in profile.string_types:
+        if any(child.type in ("interpolation", "template_substitution") for child in node.children):
+            return None
+        return _string_body(_text(node))
+    return None
+
+
+#: Longer literals carry no boundary worth testing, and `int(text, 16)` is exempt
+#: from Python's 4300-digit conversion limit while `str(value)` is not.
+MAX_NUMBER_CHARS = 40
+
+
+def _number(text: str) -> int | float | None:
+    flat = text.replace("_", "").strip().lower()
+    if len(flat) > MAX_NUMBER_CHARS:
+        return None
+    for prefix, base in (("0x", 16), ("0o", 8), ("0b", 2)):
+        if flat.startswith(prefix):
+            try:
+                return int(flat[2:], base)
+            except ValueError:
+                return None
+    if flat.endswith("n"):  # JS BigInt
+        flat = flat[:-1]
+    if flat.endswith("j"):  # Python complex: no boundary makes sense
+        return None
+    try:
+        if "." in flat or "e" in flat:
+            value = float(flat)
+            return value if value == value and abs(value) != float("inf") else None
+        return int(flat)
+    except ValueError:
+        return None
+
+
+def _string_body(text: str) -> str:
+    stripped = text.strip()
+    for prefix in ("f", "r", "b", "u", "rb", "br", "fr", "rf"):
+        if stripped.lower().startswith(prefix) and len(stripped) > len(prefix):
+            candidate = stripped[len(prefix) :]
+            if candidate[:1] in "\"'`":
+                stripped = candidate
+                break
+    if len(stripped) >= 2 and stripped[0] == stripped[-1] and stripped[0] in "\"'`":
+        return stripped[1:-1]
+    return stripped
+
+
+def _comparisons_of(node: Node, profile: Profile) -> list[Comparison]:
+    """Comparisons inside one comparison node (Python chains: ``0 < x < 10`` gives two)."""
+    found: list[Comparison] = []
+    children = list(node.children)
+    for index, child in enumerate(children):
+        if child.is_named or child.type not in COMPARISON_OPERATORS:
+            continue
+        if index == 0 or index == len(children) - 1:
+            continue
+        left, right = children[index - 1], children[index + 1]
+        for operand in (right, left):
+            literal = _literal(operand, profile)
+            if literal is not None:
+                found.append(
+                    Comparison(
+                        line=node.start_point.row + 1,
+                        text=clip(f"{_text(left)} {child.type} {_text(right)}"),
+                        operator=child.type,
+                        literal=literal,
+                    )
+                )
+                break
+    return found
+
+
+def comparisons(function: Node, profile: Profile) -> list[Comparison]:
+    """Every comparison against a literal in the function body, in source order.
+
+    Nested functions are skipped like in ``complexity``: their branches are not
+    this function's paths. Compound expressions are entered operand by operand,
+    so ``a > 0 && b <= 10`` yields two comparisons.
+    """
+    found: list[Comparison] = []
+    stack = list(reversed(function.named_children))
+    while stack:
+        node = stack.pop()
+        if node.type in profile.function_types | profile.anonymous_function_types:
+            continue
+        if node.type in profile.comparison_types:
+            found.extend(_comparisons_of(node, profile))
+        stack.extend(reversed(node.named_children))
+    return found
+
+
 def build_graph(source: bytes, language: str, name: str, line: int | None) -> FlowGraph:
     """Parse ``source`` and build the flow graph of the function ``name`` near ``line``."""
     profile = PROFILES[language]
@@ -438,7 +559,8 @@ def build_graph(source: bytes, language: str, name: str, line: int | None) -> Fl
     builder = _Builder(profile, language)
     start = builder._add("start", _bare_name(name), function.start_point.row + 1)  # noqa: SLF001
     body = function.child_by_field_name("body")
-    exits = builder.block(_statements(body, profile), [(start, "")])
+    statements = _statements(body, profile)
+    exits = builder.block(statements, [(start, "")])
     end = builder._add("end", "", function.end_point.row + 1)  # noqa: SLF001
     builder._connect(exits, end)  # noqa: SLF001
     for terminal in builder.terminals:
@@ -451,6 +573,8 @@ def build_graph(source: bytes, language: str, name: str, line: int | None) -> Fl
         complexity=complexity(function, profile),
         nodes=builder.nodes,
         edges=builder.edges,
+        comparisons=comparisons(function, profile),
+        end_line=statements[-1].start_point.row + 1 if statements else function.start_point.row + 1,
     )
 
 
@@ -465,4 +589,9 @@ def graph_as_dict(graph: FlowGraph) -> dict[str, Any]:
             {"id": n.id, "kind": n.kind, "label": n.label, "line": n.line} for n in graph.nodes
         ],
         "edges": [{"source": e.source, "target": e.target, "label": e.label} for e in graph.edges],
+        "comparisons": [
+            {"line": c.line, "text": c.text, "operator": c.operator, "literal": c.literal}
+            for c in graph.comparisons
+        ],
+        "end_line": graph.end_line,
     }

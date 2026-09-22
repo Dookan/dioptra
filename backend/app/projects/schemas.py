@@ -18,7 +18,7 @@ from app.analysis.models import (
     ToolStatus,
     Verdict,
 )
-from app.workflow.models import CoverageCriterion
+from app.workflow.models import MAX_CASES, CoverageCriterion
 
 
 class SystemProfileIn(BaseModel):
@@ -193,6 +193,36 @@ class DiagramTextIn(BaseModel):
     function: str = Field(min_length=1, max_length=200)
     line: int | None = None
     text: str = Field(max_length=40_000)
+
+
+class CaseIn(BaseModel):
+    title: str = Field(max_length=2000)
+    #: Brief item ids this case declares to demonstrate (validated server-side).
+    covers: list[str] = Field(default_factory=list, max_length=200)
+
+
+class CasesIn(BaseModel):
+    path: str = Field(min_length=1, max_length=1024)
+    function: str = Field(min_length=1, max_length=200)
+    line: int | None = None
+    cases: list[CaseIn] = Field(max_length=MAX_CASES)
+
+
+class DesignStateOut(BaseModel):
+    path: str
+    function: str
+    line: int | None
+    cases: int
+    approved_at: datetime | None
+    approved_by_username: str | None
+
+
+class BriefOut(BaseModel):
+    #: ``app.workflow.brief.brief_as_dict``: signature, complexity, min_cases, items.
+    brief: dict[str, Any]
+    cases: list[dict[str, Any]]
+    approved_at: datetime | None
+    approved_by_username: str | None
 
 
 class DiagramOut(BaseModel):

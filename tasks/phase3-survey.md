@@ -279,3 +279,137 @@ nesting → 422, syntax error inside the function → 422, `../../etc/passwd` �
 404, `.rb` → 422; API: function outside the plan → 422, developer-only PUT,
 PUT refused off the design stage. Frontend: screen renders the SVG nodes,
 PUT body, read-only for the analyst.
+
+## §8 Day 15 — E5 test brief, pseudocode, gate (appended 2026-09-22, before any edit)
+
+### What exists (read-only)
+- `build_graph` (day 14) yields `FlowGraph{nodes, edges, complexity, params}`
+  with decision / loop / return / throw nodes carrying their source line;
+  `complexity()` is OUR McCabe count (decisions + loops + cases + handlers
+  + ternaries + boolean operators, nested functions excluded). The brief's
+  minimum case count is this number: cyclomatic complexity = number of
+  basis paths (docs/glossary.md).
+- Comparisons are NOT collected yet: the boundary values need a second walk
+  over the function node (same skip-nested-function rule as `complexity`).
+- `case_designs` has one row per planned function with `diagram_text`; the
+  service already refuses writes off the DESIGN stage (`StageNotReached` /
+  `StageLocked`) and functions outside the plan (`FunctionNotInPlan`).
+- `Finding.path` / `Finding.line` / `Finding.category` (`sast`, `sca`,
+  `secret`, `sbom`, `metrics`) and `Finding.in_report`: a SAST finding whose
+  line falls inside the function is "associated" to it. Verdicts are locked
+  once E3 is left, so the association is stable during E5.
+- `gates.GATES[Stage.DESIGN] = not_built`; gates are pure over the analysis
+  (no I/O), which rules out re-parsing the source inside the gate.
+- Mockup 06: "La consigna te pide" as a bullet list under the diagram
+  ("Al menos 5 casos (uno por camino)", boundary of `price ≤ 0` with 0, −1
+  and 0.01, "Un caso con entrada maliciosa (hay un hallazgo de validación)");
+  right panel "Tus casos, con tus palabras": numbered cases `C1 · …` and the
+  button "Aprobar mis casos y pasar a escribir los tests →".
+
+### Brief (`app/workflow/brief.py`) — deterministic, no AI
+```
+Brief(function, path, line, language, signature, params, complexity,
+      min_cases, items: list[BriefItem])
+BriefItem(id, kind, line, text, values)        kinds and ids:
+  branch   Rn  one per decision/loop node × {true,false} (switch: one per case label)
+  boundary Fn  one per comparison against a literal: values = (lit−1, lit, lit+1)
+               integers; (lit−step, lit, lit+step) floats with step = 10^-decimals;
+               string literal with == / != / === / !==: (literal, "")
+  error    En  every throw/raise node; every except/catch handler; every early
+               return (a return node whose line < the line of the function's
+               last top-level statement)
+  malicious Mn one per SAST finding in the report (not false positive) with
+               finding.path == path and function.line ≤ finding.line ≤ end line
+min_cases = complexity + number of malicious items   (the mockup's 5 = 4 paths + 1)
+```
+Ids are assigned in source order, so the same source and findings always
+give the same brief (tested: two runs, equal). The graph builder gains
+`comparisons` (line, text, operator, literal) and `end_line`; `graph_as_dict`
+stays additive. Compound expressions (`a > 0 && b <= 10`) give two boundary
+items — the walk descends into every operand.
+
+### Pseudocode ("Tus casos, con tus palabras")
+The developer writes cases as plain text and DECLARES which brief items each
+case demonstrates — the platform never interprets the prose:
+```
+case_designs += cases JSON [{title ≤ 500 chars, covers: [item ids]}] (≤ 50 cases)
+               + brief JSON (snapshot at approval) + approved_at, approved_by_username
+PUT  …/cases   (DeveloperUser, only AT design, function in plan)
+     titles: control chars stripped, whitespace collapsed, 3..500 chars; ids must
+     exist in the CURRENT brief (CaseItemUnknown 422); saving CLEARS any approval;
+     audit "design.cases.save"
+POST …/cases/approve (DeveloperUser, only AT design)
+     recomputes the brief now; every item id covered by ≥ 1 case AND
+     len(cases) ≥ min_cases, else BriefNotCovered 422 / CasesTooFew 422;
+     stores the brief snapshot + approved_at/by; audit "design.cases.approve"
+GET  …/brief?path&function&line (any role) → brief + cases + approval
+```
+Trade-off surfaced: coverage of the brief is a DECLARATION (a case ticks the
+items it covers) rather than a text match — the only deterministic option
+without AI; E7 measures the truth of the declaration by line coverage
+(docs/workflow-gates.md → E7). Approval carries no separate written
+justification: the cases ARE the developer's words and the stage transition
+that follows requires its reason; the audit row records actor and function.
+Editing after approval reopens it (approval cleared) rather than being
+refused — the developer may still be at E5; once E5 is left, `StageLocked`.
+
+### Gate E5 (`gates.leave_design`) — pure, replaces `not_built` for DESIGN
+```
+for every function in the plan: a case_designs row with approved_at IS NOT NULL
+else closed "cases_not_approved"  → errors.workflow.gate.casesNotApproved
+```
+Approval is where the brief is checked against the live source (the jail is
+immutable after ingest), so the gate needs no I/O and stays a pure predicate;
+the approval snapshot is what P4's scaffold names its cases from.
+`Analysis.case_designs` relationship added (string target like `test_plan`).
+Migration `0006_case_briefs`: four nullable columns, no data change.
+
+### Frontend (screen 06)
+Left panel gains "La consigna te pide" (bullets from the brief: min cases,
+each branch with its line, boundaries with values, error paths, malicious
+cases). Right panel: the cases editor — a numbered list (`C1`, `C2`, …), one
+text input per case and the brief items as toggle chips under it; "Añadir
+un caso", "Guardar mis casos", then "Aprobar mis casos" (enabled when every
+item is ticked and the count is met — the server re-checks). Deviation
+recorded: the mockup's one button "Aprobar mis casos y pasar a escribir los
+tests →" is two actions here — approval is per function, the transition is
+per analysis and needs a written reason (`AdvanceStage`, "Pasar a escribir
+los tests →", enabled when every planned function is approved). The analyst
+sees brief and cases read-only. i18n `design.brief.*`, `design.cases.*`.
+
+### Tests
+`tests/test_brief.py`: three real functions copied verbatim as fixtures
+(`tests/fixtures/ast/real_*.{py,ts}`, origin in a header comment) with
+basis paths counted by hand in the test; boundary extraction on `<, <=, >,
+>=, ==, !=, ===, !==`, negative and float literals, chained Python
+comparisons, compound expressions; error paths (throw, catch, early return —
+the final return is not one); malicious items only for SAST findings inside
+the function and never for a false positive; determinism; item ids stable
+across runs. `tests/test_cases_api.py`: developer-only, stage guards, unknown
+item id → 422, approval refused with an uncovered item / too few cases,
+approval clears on edit, `leave_design` closed until every planned function
+is approved and open afterwards (gate-skip proof extended: E5 rejected
+without approval through the API directly), hostile titles stored as text.
+Frontend: brief renders from the payload, chips toggle `covers`, PUT body,
+approve button state, read-only for the analyst.
+
+### Addendum (precommit panel, 2026-09-22) — no way out of E5
+The security auditor showed a terminal state this section had not
+considered: `leave_design` needs every planned function approved, approval
+needs a brief AND `min_cases ≤ len(cases) ≤ MAX_CASES`, the plan is locked
+once E4 is left and the stages are monotonic — so one planned function the
+AST layer refuses (non-wave-1 file Lizard measured, syntax error, > 400
+nodes, > 40 deep, > 512 KiB, a name tree-sitter does not find) or with more
+basis paths than `MAX_CASES` (was 50) strands the analysis at E5. And the
+risk matrix ranks the complex functions first. Decided by `mmarin` ("lo
+recomendado"): **fail early at E4** — `test_plan.save_test_plan` parses
+every chosen function (`check_briefable`: what `GET …/brief` costs, once,
+at the only moment the set is editable) and refuses with a typed 422
+naming the function (`test_plan_function_unbriefable`,
+`test_plan_function_too_complex`); `MAX_CASES` rises to 200 (a legacy
+function with 61 paths is real). Contract change, additive: an `AppError`
+MAY carry `context` (bounded strings the UI interpolates as text) — the
+error envelope gains an optional field. The threshold E4 checks is the one
+approval demands — `min_cases` (basis paths + one per SAST finding inside,
+frozen with E3), not the bare complexity. No class of the deadlock remains:
+the jail is immutable after ingest, so what parsed at E4 parses at E5.

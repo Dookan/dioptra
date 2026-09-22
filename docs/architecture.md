@@ -39,6 +39,8 @@
                  │           └─────────────────────────────────┘
 ```
 
+Error contract: every failure is `{code, message_key}` (a stable i18n key, never server-authored copy) and MAY add `context` — short strings the UI interpolates into the translated message as text (`backend/app/core/errors.py`).
+
 ## Repository layout (target)
 
 - `backend/app/` — `auth/`, `ingest/`, `analysis/`, `workflow/`, `reports/`, `sandbox/`, `audit/`, `inventory/` (P5: BOM store, vulnerability DB sync, correlation, statistics)

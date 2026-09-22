@@ -11,19 +11,28 @@ export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly messageKey: string;
+  /** Short strings to interpolate into the translated message (which function, which line). Data, never copy. */
+  readonly context: Record<string, string>;
 
-  constructor(status: number, code: string, messageKey: string, options?: ErrorOptions) {
+  constructor(
+    status: number,
+    code: string,
+    messageKey: string,
+    options?: ErrorOptions & { context?: Record<string, string> },
+  ) {
     super(`${String(status)} ${code}`, options);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.messageKey = messageKey;
+    this.context = options?.context ?? {};
   }
 }
 
 interface ErrorBody {
   code?: unknown;
   message_key?: unknown;
+  context?: unknown;
 }
 
 interface RequestOptions {
@@ -54,24 +63,34 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   }
 
   if (!response.ok) {
-    throw new ApiError(response.status, ...(await readErrorBody(response)));
+    const [code, messageKey, context] = await readErrorBody(response);
+    throw new ApiError(response.status, code, messageKey, { context });
   }
 
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
 
-async function readErrorBody(response: Response): Promise<[string, string]> {
+function stringMap(value: unknown): Record<string, string> {
+  if (typeof value !== 'object' || value === null) return {};
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).filter(
+      (entry): entry is [string, string] => typeof entry[1] === 'string',
+    ),
+  );
+}
+
+async function readErrorBody(response: Response): Promise<[string, string, Record<string, string>]> {
   try {
     const body = (await response.json()) as ErrorBody;
     if (typeof body.code === 'string' && typeof body.message_key === 'string') {
-      return [body.code, body.message_key];
+      return [body.code, body.message_key, stringMap(body.context)];
     }
   } catch {
     // A non-JSON body means something other than the API answered (a proxy,
     // a gateway). Fall through to the generic key rather than guessing.
   }
-  return ['internal_error', 'errors.internal'];
+  return ['internal_error', 'errors.internal', {}];
 }
 
 /**
@@ -97,7 +116,8 @@ export async function apiUpload<T>(
     throw new ApiError(0, 'network_unreachable', 'errors.network', { cause });
   }
   if (!response.ok) {
-    throw new ApiError(response.status, ...(await readErrorBody(response)));
+    const [code, messageKey, context] = await readErrorBody(response);
+    throw new ApiError(response.status, code, messageKey, { context });
   }
   return (await response.json()) as T;
 }
@@ -125,7 +145,8 @@ export async function apiDownload(
     throw new ApiError(0, 'network_unreachable', 'errors.network', { cause });
   }
   if (!response.ok) {
-    throw new ApiError(response.status, ...(await readErrorBody(response)));
+    const [code, messageKey, context] = await readErrorBody(response);
+    throw new ApiError(response.status, code, messageKey, { context });
   }
   const disposition = response.headers.get('Content-Disposition') ?? '';
   const match = /filename="([^"]+)"/.exec(disposition);

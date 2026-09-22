@@ -18,7 +18,11 @@ demonstrably rejects the gate.
      `## Verdict`, signed off BEFORE any sandbox edit. No exception.
    - Scaffolds derived ONLY from the AST + approved pseudocode: file name,
      imports, one named case per brief item (Jest/Vitest for JS/TS, pytest
-     for Python). Never an assertion, never data, never logic.
+     for Python). Never an assertion, never data, never logic. The approved
+     `case_designs.cases[].title` and the `brief` snapshot are the inputs
+     (P3 day 15): titles are one-line text but still hold quotes,
+     backslashes, `*/` and any Unicode — the generator slugs/escapes them at
+     ITS boundary before they become identifiers or strings in a test file.
    - Gate to leave E6: every planned case has a non-empty body written by the
      developer. Mockup anchor: "Escribir los tests (E6)".
 2. **Day 17 — E7 sandbox, coverage, mutation** — `backend/app/sandbox/`, `docker/sandbox-*.Dockerfile`, `backend/app/workflow/verify.py`, `frontend/src/screens/verification-screen.tsx`

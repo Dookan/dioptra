@@ -52,6 +52,8 @@ export function TestPlanScreen({ route, onNavigate }: Props): React.ReactNode {
   const [busy, setBusy] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [errorKey, setErrorKey] = useState<string | null>(null);
+  // The server names the refused function (path, function, line) as data.
+  const [errorContext, setErrorContext] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (accessToken === null) return;
@@ -122,6 +124,7 @@ export function TestPlanScreen({ route, onNavigate }: Props): React.ReactNode {
       return true;
     } catch (error) {
       setErrorKey(error instanceof ApiError ? error.messageKey : 'errors.internal');
+      setErrorContext(error instanceof ApiError ? error.context : {});
       return false;
     } finally {
       setBusy(false);
@@ -133,7 +136,7 @@ export function TestPlanScreen({ route, onNavigate }: Props): React.ReactNode {
       {analysis !== null && <Stepper current={stageIndex(analysis.stage)} />}
       {errorKey !== null && (
         <p className="alert" role="alert">
-          {t(errorKey)}
+          {t(errorKey, errorContext)}
         </p>
       )}
       {analysis !== null && rows !== null && (

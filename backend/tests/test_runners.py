@@ -216,6 +216,19 @@ def test_docker_command_is_isolated(settings: Settings, dirs: tuple[Path, Path])
     assert tuple(argv[image_index + 1 :]) == spec.argv
 
 
+def test_runner_user_is_configurable_but_never_root(
+    settings: Settings, dirs: tuple[Path, Path]
+) -> None:
+    workspace, out_dir = dirs
+    custom = Settings(**{**settings.model_dump(), "runner_user": "1000:1000"})
+    spec = SemgrepRunner().spec(custom, workspace=workspace, out_dir=out_dir)
+    joined = " ".join(DockerExecutor(custom).command(spec, workspace=workspace, out_dir=out_dir))
+    assert "--user 1000:1000" in joined and "10001" not in joined.split("--user")[1][:12]
+    for forbidden in ("0:0", "root", "0", "1000", "1000:0", "1000:1000:1"):
+        with pytest.raises(ValueError, match="runner_user"):
+            Settings(**{**settings.model_dump(), "runner_user": forbidden})
+
+
 def test_docker_executor_runs_the_built_command(
     settings: Settings, dirs: tuple[Path, Path]
 ) -> None:

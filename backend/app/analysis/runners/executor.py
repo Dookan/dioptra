@@ -24,8 +24,8 @@ from app.analysis.models import ToolStatus
 from app.analysis.runners.base import OUT_DIR, WORK_DIR, ExecutionResult, Executor, RunnerSpec
 from app.core.config import Settings
 
-#: Container user matching the analysis image (never root; see the Dockerfile).
-CONTAINER_UID = "10001:10001"
+# The container user is ``Settings.runner_user`` (10001:10001 as in the
+# analysis image; the settings pattern refuses root).
 STDERR_CAP = 64 * 1024
 DETAIL_TAIL = 200
 
@@ -177,7 +177,7 @@ class DockerExecutor:
             "--security-opt",
             "no-new-privileges",
             "--user",
-            CONTAINER_UID,
+            settings.runner_user,
             "-v",
             f"{workspace}:{WORK_DIR}:ro",
             "-v",

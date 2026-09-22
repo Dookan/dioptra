@@ -30,6 +30,18 @@ class FlowEdge:
     label: str = ""
 
 
+@dataclass(frozen=True)
+class Comparison:
+    """One comparison against a literal — the E5 brief derives boundary values from it."""
+
+    line: int
+    text: str
+    #: < <= > >= == != === !== (as written in the source)
+    operator: str
+    #: The literal as parsed: int, float or str.
+    literal: int | float | str
+
+
 @dataclass
 class FlowGraph:
     name: str
@@ -39,6 +51,10 @@ class FlowGraph:
     complexity: int
     nodes: list[FlowNode] = field(default_factory=list)
     edges: list[FlowEdge] = field(default_factory=list)
+    #: Day 15: comparisons in source order (nested functions excluded).
+    comparisons: list[Comparison] = field(default_factory=list)
+    #: Line of the function's last top-level statement: a return above it is an early return.
+    end_line: int = 0
 
 
 def clip(text: str) -> str:

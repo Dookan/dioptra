@@ -105,9 +105,16 @@
         "analysisNotDone": "The analysis has not finished yet.",
         "triagePending": "Findings are still pending review: each one needs a verdict.",
         "testPlanMissing": "The test plan is missing: at least one function, the coverage strictness and your rationale.",
-        "notBuilt": "This stage cannot be closed yet in this version of the platform."
+        "notBuilt": "This stage cannot be closed yet in this version of the platform.",
+        "casesNotApproved": "Some functions of the plan still lack approved cases."
       },
-      "stageNotReached": "That stage has not started yet: the previous ones close first."
+      "stageNotReached": "That stage has not started yet: the previous ones close first.",
+      "caseItemUnknown": "A case points at a brief item that no longer exists. Reload the page.",
+      "casesInvalid": "Each case needs between 3 and 500 characters, and 200 cases is the maximum.",
+      "briefNotCovered": "Some points of the brief are still covered by no case.",
+      "casesTooFew": "Fewer cases than paths: the brief asks for at least one per path.",
+      "testPlanFunctionUnbriefable": "{{function}} ({{path}}, line {{line}}) cannot be read for the brief (unsupported language, file too large, syntax error or a different name): leave it out of the plan.",
+      "testPlanFunctionTooComplex": "{{function}} ({{path}}, line {{line}}) has more paths than one function's design can hold: leave it out of the plan and ask for it to be split."
     },
     "ast": {
       "failed": "That function's code could not be analyzed.",
@@ -442,14 +449,59 @@
     "cases": {
       "title": "Your cases, in your words",
       "intro": "Describe what you will test and what you expect to happen. The code comes later.",
-      "pending": "The brief and the case editor arrive in the platform's next delivery. Meanwhile, review the diagrams."
+      "caseLabel": "Case {{n}}",
+      "placeholder": "What goes in, what you do and what you expect to happen",
+      "covers": "Covers:",
+      "add": "Add a case",
+      "remove": "Remove",
+      "save": "Save my cases",
+      "saved": "Cases saved.",
+      "approve": "Approve my cases",
+      "approved": "Cases approved by {{user}}.",
+      "reopened": "You changed the cases: they need approving again.",
+      "uncovered": "Still uncovered: {{items}}.",
+      "tooFew_one": "{{count}} more case is needed to reach the brief's minimum.",
+      "tooFew_other": "{{count}} more cases are needed to reach the brief's minimum.",
+      "complete": "Every point of the brief is covered.",
+      "unsaved": "Save the cases before approving them.",
+      "empty": "No cases for this function yet.",
+      "readOnly": "The developer writes the cases; they are shown here as the developer left them.",
+      "removeCase": "Remove case {{n}}",
+      "approveHint_one": "On approval, the platform prepares the test file with this case already named.",
+      "approveHint_other": "On approval, the platform prepares the test files with these {{count}} cases already named."
     },
     "nextStep": {
       "notYetTitle": "Not time to design yet",
       "notYetBody": "The test plan closes first. You can look at the diagrams meanwhile.",
       "noPlanTitle": "No functions in the plan",
-      "diagramsTitle": "{{count}} function(s) to design",
-      "diagramsBody": "Review each function's diagram. When the brief arrives, you will write your cases right here."
+      "designBody": "For each function: look at the diagram, read the brief and write your cases. Once all are approved, you move on to writing the tests.",
+      "doneTitle": "Design closed",
+      "doneBody": "The cases of every function were approved as shown here.",
+      "designTitle_one": "{{approved}} of {{count}} function with approved cases",
+      "designTitle_other": "{{approved}} of {{count}} functions with approved cases"
+    },
+    "brief": {
+      "title": "The brief asks you for",
+      "loading": "Computing the brief from the code…",
+      "minCases_one": "At least {{count}} case (one per path).",
+      "minCases_other": "At least {{count}} cases (one per path).",
+      "minCasesWithMalicious": "At least {{count}} cases: one per path and one per security finding.",
+      "branch": "Branch at line {{line}} · {{text}} → {{side}}.",
+      "boundary": "Test the boundary of {{text}} (line {{line}}): with {{values}}.",
+      "boundaryEmpty": "Test the boundary of {{text}} (line {{line}}).",
+      "error": {
+        "throw": "Error path (line {{line}}): {{text}} — throws an error.",
+        "handler": "Error path (line {{line}}): {{text}} — catches an error.",
+        "early_return": "Error path (line {{line}}): {{text}} — returns before the end."
+      },
+      "malicious": "One case with malicious input: there is a finding at line {{line}} ({{text}}).",
+      "none": "No branches or boundaries: the brief asks for one happy-path case.",
+      "emptyValue": "empty"
+    },
+    "advance": {
+      "label": "Move on to writing the tests →",
+      "blocked_one": "Approve the cases of the plan's one function ({{approved}} of {{count}}).",
+      "blocked_other": "Approve the cases of every function in the plan ({{approved}} of {{count}})."
     }
   }
 }

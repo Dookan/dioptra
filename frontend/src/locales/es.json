@@ -105,9 +105,16 @@
         "analysisNotDone": "El análisis todavía no terminó.",
         "triagePending": "Faltan hallazgos por revisar: cada uno necesita un veredicto.",
         "testPlanMissing": "Falta el plan de pruebas: al menos una función, la exigencia de cobertura y tu justificación.",
-        "notBuilt": "Esta etapa todavía no se puede cerrar en esta versión de la plataforma."
+        "notBuilt": "Esta etapa todavía no se puede cerrar en esta versión de la plataforma.",
+        "casesNotApproved": "Faltan funciones del plan con sus casos aprobados."
       },
-      "stageNotReached": "Esa etapa todavía no empezó: primero se cierran las anteriores."
+      "stageNotReached": "Esa etapa todavía no empezó: primero se cierran las anteriores.",
+      "caseItemUnknown": "Un caso apunta a un punto de la consigna que ya no existe. Recarga la página.",
+      "casesInvalid": "Cada caso necesita entre 3 y 500 caracteres, y son 200 casos como máximo.",
+      "briefNotCovered": "Todavía hay puntos de la consigna que ningún caso cubre.",
+      "casesTooFew": "Hay menos casos que caminos: la consigna pide al menos uno por camino.",
+      "testPlanFunctionUnbriefable": "{{function}} ({{path}}, línea {{line}}) no se puede leer para la consigna (lenguaje no soportado, archivo demasiado grande, error de sintaxis o nombre distinto): déjala fuera del plan.",
+      "testPlanFunctionTooComplex": "{{function}} ({{path}}, línea {{line}}) tiene más caminos de los que cabe diseñar en una sola función: déjala fuera del plan y pide que se divida."
     },
     "ast": {
       "failed": "No se pudo analizar el código de esa función.",
@@ -442,14 +449,59 @@
     "cases": {
       "title": "Tus casos, con tus palabras",
       "intro": "Describe qué vas a probar y qué esperas que pase. El código viene después.",
-      "pending": "La consigna y el editor de casos llegan en la siguiente entrega de la plataforma. Mientras tanto, revisa los diagramas."
+      "caseLabel": "Caso {{n}}",
+      "placeholder": "Qué entra, qué haces y qué esperas que pase",
+      "covers": "Cubre:",
+      "add": "Añadir un caso",
+      "remove": "Quitar",
+      "save": "Guardar mis casos",
+      "saved": "Casos guardados.",
+      "approve": "Aprobar mis casos",
+      "approved": "Casos aprobados por {{user}}.",
+      "reopened": "Cambiaste los casos: hay que aprobarlos otra vez.",
+      "uncovered": "Faltan por cubrir: {{items}}.",
+      "tooFew_one": "Falta {{count}} caso para llegar al mínimo de la consigna.",
+      "tooFew_other": "Faltan {{count}} casos para llegar al mínimo de la consigna.",
+      "complete": "Todos los puntos de la consigna están cubiertos.",
+      "unsaved": "Guarda los casos antes de aprobarlos.",
+      "empty": "Todavía no hay casos para esta función.",
+      "readOnly": "El programador escribe los casos; aquí se ven tal como los dejó.",
+      "removeCase": "Quitar el caso {{n}}",
+      "approveHint_one": "Al aprobar, el sistema te prepara el archivo de test con este caso ya nombrado.",
+      "approveHint_other": "Al aprobar, el sistema te prepara los archivos de test con estos {{count}} casos ya nombrados."
     },
     "nextStep": {
       "notYetTitle": "Todavía no toca diseñar",
       "notYetBody": "Primero se cierra el plan de pruebas. Puedes mirar los diagramas mientras tanto.",
       "noPlanTitle": "No hay funciones en el plan",
-      "diagramsTitle": "{{count}} función(es) para diseñar",
-      "diagramsBody": "Revisa el diagrama de cada función. Cuando llegue la consigna, escribirás tus casos aquí mismo."
+      "designBody": "Para cada función: mira el diagrama, lee la consigna y escribe tus casos. Cuando las apruebes todas, pasas a escribir los tests.",
+      "doneTitle": "Diseño cerrado",
+      "doneBody": "Los casos de cada función quedaron aprobados tal como se ven aquí.",
+      "designTitle_one": "{{approved}} de {{count}} función con casos aprobados",
+      "designTitle_other": "{{approved}} de {{count}} funciones con casos aprobados"
+    },
+    "brief": {
+      "title": "La consigna te pide",
+      "loading": "Calculando la consigna desde el código…",
+      "minCases_one": "Al menos {{count}} caso (uno por camino).",
+      "minCases_other": "Al menos {{count}} casos (uno por camino).",
+      "minCasesWithMalicious": "Al menos {{count}} casos: uno por camino y uno por cada hallazgo de seguridad.",
+      "branch": "Rama de la línea {{line}} · {{text}} → {{side}}.",
+      "boundary": "Probar la frontera de {{text}} (línea {{line}}): con {{values}}.",
+      "boundaryEmpty": "Probar la frontera de {{text}} (línea {{line}}).",
+      "error": {
+        "throw": "Camino de error (línea {{line}}): {{text}} — lanza un error.",
+        "handler": "Camino de error (línea {{line}}): {{text}} — captura un error.",
+        "early_return": "Camino de error (línea {{line}}): {{text}} — sale antes de terminar."
+      },
+      "malicious": "Un caso con entrada maliciosa: hay un hallazgo en la línea {{line}} ({{text}}).",
+      "none": "Sin ramas ni fronteras: la consigna pide un caso del camino normal.",
+      "emptyValue": "vacío"
+    },
+    "advance": {
+      "label": "Pasar a escribir los tests →",
+      "blocked_one": "Aprueba los casos de la función del plan ({{approved}} de {{count}}).",
+      "blocked_other": "Aprueba los casos de cada función del plan ({{approved}} de {{count}})."
     }
   }
 }

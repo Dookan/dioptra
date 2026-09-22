@@ -74,6 +74,11 @@ class Settings(BaseSettings):
     runner_memory: str = "2g"
     runner_cpus: str = "2"
     runner_pids_limit: int = Field(default=512, ge=16)
+    #: uid:gid the analysis containers run as. Never root. It must own the
+    #: jails the API/worker create (mode 0700), i.e. match the process that
+    #: writes DIOPTRA_DATA_DIR — 10001 in the shipped images; a developer
+    #: running the API on the host sets their own uid here.
+    runner_user: str = Field(default="10001:10001", pattern=r"^[1-9][0-9]{0,9}:[1-9][0-9]{0,9}$")
     #: Local OSV database directory (offline mode). Empty → OSV-Scanner is
     #: recorded as a coverage gap, never queried live.
     osv_db_dir: Path | None = None

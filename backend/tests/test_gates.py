@@ -8,6 +8,7 @@ are unreachable — the machine fails closed.
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 from typing import Any
 
 from fastapi.testclient import TestClient
@@ -107,10 +108,10 @@ def test_plan_cannot_be_left_without_a_test_plan(
     assert _stage(db, analysis) is Stage.PLAN
 
 
-def test_full_walk_to_design_and_the_unbuilt_gate_fails_closed(
-    client: TestClient, analyst: User, developer: User, db: Session
+def test_full_walk_to_design_and_the_e5_gate_refuses_without_approval(
+    client: TestClient, analyst: User, developer: User, db: Session, tmp_path: Path
 ) -> None:
-    analysis = seed_done_analysis(db, [make_finding(0)])
+    analysis = seed_done_analysis(db, [make_finding(0)], jail=tmp_path)
     analyst_headers = login(client, analyst.username)
     developer_headers = login(client, developer.username)
 
@@ -123,10 +124,11 @@ def test_full_walk_to_design_and_the_unbuilt_gate_fails_closed(
     assert saved.status_code == 200, saved.text
     assert _advance(client, developer_headers, analysis.id).json()["stage"] == "design"
 
-    # E5's gate lands on day 15; until then nobody leaves design through the API.
+    # E5's gate: no planned function has approved cases yet (tests/test_cases_api.py
+    # walks the approval and the transition to tests).
     blocked = _advance(client, developer_headers, analysis.id)
     assert blocked.status_code == 409
-    assert blocked.json()["message_key"] == "errors.workflow.gate.notBuilt"
+    assert blocked.json()["message_key"] == "errors.workflow.gate.casesNotApproved"
     assert _stage(db, analysis) is Stage.DESIGN
 
     rows = list(
@@ -163,9 +165,11 @@ def test_leave_plan_checks_every_clause_of_the_plan(db: Session) -> None:
 
 def test_every_unbuilt_gate_is_closed() -> None:
     analysis = Analysis()
-    for stage in (Stage.DESIGN, Stage.TESTS, Stage.VERIFICATION):
+    for stage in (Stage.TESTS, Stage.VERIFICATION):
         result = gates.check(stage, analysis)
         assert result.open is False and result.reason == "gate_not_built", stage
+    # DESIGN is built (day 15): closed for its own reason, never open by default.
+    assert gates.check(Stage.DESIGN, analysis).open is False
     # REGISTER is the project's (always open); REPORT has no gate entry and
     # the default for a missing entry is CLOSED, never open.
     assert gates.check(Stage.REGISTER, analysis).open is True
@@ -174,9 +178,9 @@ def test_every_unbuilt_gate_is_closed() -> None:
 
 
 def test_wrong_role_cannot_leave_a_stage(
-    client: TestClient, analyst: User, developer: User, admin: User, db: Session
+    client: TestClient, analyst: User, developer: User, admin: User, db: Session, tmp_path: Path
 ) -> None:
-    analysis = seed_done_analysis(db, [make_finding(0)])
+    analysis = seed_done_analysis(db, [make_finding(0)], jail=tmp_path)
     developer_headers = login(client, developer.username)
     # code: analyst or admin only
     assert _advance(client, developer_headers, analysis.id).status_code == 403

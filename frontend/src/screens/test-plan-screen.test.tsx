@@ -230,6 +230,40 @@ describe('test plan screen', () => {
     expect(screen.getByRole('listitem', { current: 'step' })).toHaveTextContent(es.stepper.plan);
   });
 
+  it('names the function the server refused, from the error context, as text', async () => {
+    const hostile = 'src/<img src=x onerror=alert(1)>.js';
+    const calls = renderPlan('developer', 'plan', {
+      [`/api/v1/analyses/${ANALYSIS_ID}/test-plan`]: () =>
+        calls.mock.calls.some(
+          ([url, init]: unknown[]) =>
+            String(url).endsWith('/test-plan') && (init as RequestInit | undefined)?.method === 'PUT',
+        )
+          ? {
+              status: 422,
+              body: {
+                code: 'test_plan_function_too_complex',
+                message_key: 'errors.workflow.testPlanFunctionTooComplex',
+                context: { path: hostile, function: 'validateForm', line: 7, extra: '10' },
+              },
+            }
+          : NO_PLAN,
+    });
+    const user = await signIn('cperez');
+    const ranking = await screen.findByRole('list', { name: es.plan.rankingLabel });
+    const [first] = within(ranking).getAllByRole('listitem');
+    await user.click(within(first!).getByRole('button', { name: es.plan.include }));
+    await user.type(screen.getByLabelText(es.plan.rationaleLabel), 'Una razón suficiente para el plan.');
+    await user.click(screen.getByRole('button', { name: es.plan.saveAndDesign }));
+    await user.type(screen.getByLabelText(es.workflow.advance.reasonLabel), 'Plan acordado con el analista.');
+    await user.click(screen.getByRole('button', { name: es.plan.saveAndDesign }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain(`validateForm (${hostile}`);
+    expect(document.querySelector('img')).toBeNull();
+    // A non-string context value is dropped: the number 7 never reaches the message.
+    expect(alert.textContent).not.toContain('7');
+  });
+
   it('is read-only for the analyst even at the plan stage', async () => {
     renderPlan('analyst', 'plan');
     await signIn('mmarin');

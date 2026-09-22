@@ -7,6 +7,7 @@ Rows are written straight to the database: the pipeline is exercised in
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -67,14 +68,40 @@ FUNCTIONS: list[dict[str, object]] = [
 ]
 
 
+def write_stub_sources(jail: Path, functions: list[dict[str, object]]) -> None:
+    """One trivial function per Lizard row, at its line, so E4 can parse what it plans."""
+    by_path: dict[str, list[dict[str, object]]] = {}
+    for row in functions:
+        by_path.setdefault(str(row["path"]), []).append(row)
+    for path, rows in by_path.items():
+        lines: list[str] = []
+        for row in sorted(rows, key=lambda r: int(str(r.get("line") or 1))):
+            name = str(row["function"]).rsplit("::", 1)[-1]
+            start = int(str(row.get("line") or 1))
+            while len(lines) < start - 1:
+                lines.append("")
+            if path.endswith(".py"):
+                lines += [f"def {name}(x):", "    return x", ""]
+            else:
+                lines += [f"function {name}(x) {{", "  return x;", "}", ""]
+        target = jail / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("\n".join(lines))
+
+
 def seed_done_analysis(
     db: Session,
     findings: list[Finding],
     *,
     status: AnalysisStatus = AnalysisStatus.DONE,
     functions: list[dict[str, object]] | None = None,
+    jail: Path | None = None,
 ) -> Analysis:
-    """A project with one analysis carrying ``findings``, three RAN tools and Lizard rows."""
+    """A project with one analysis carrying ``findings``, three RAN tools and Lizard rows.
+
+    With ``jail``, stub sources for every Lizard row are written there and the
+    analysis points at it, so a test plan can be saved (E4 parses its functions).
+    """
     project = Project(name=f"proyecto-{uuid.uuid4().hex[:8]}")
     project.system = System(name="Sistema de prueba", framework="Express")
     db.add(project)
@@ -94,9 +121,11 @@ def seed_done_analysis(
         ToolRun(tool="gitleaks", category=ToolCategory.SECRET, status=ToolStatus.RAN),
         ToolRun(tool="osv-scanner", category=ToolCategory.SCA, status=ToolStatus.RAN),
     ]
-    analysis.metrics = CodeMetrics(
-        functions=FUNCTIONS if functions is None else functions, lines={}, commented_code_files=[]
-    )
+    rows = FUNCTIONS if functions is None else functions
+    analysis.metrics = CodeMetrics(functions=rows, lines={}, commented_code_files=[])
+    if jail is not None:
+        write_stub_sources(jail, rows)
+        analysis.workspace_path = str(jail)
     db.add(analysis)
     db.commit()
     return analysis

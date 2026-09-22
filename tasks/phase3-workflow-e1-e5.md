@@ -1,8 +1,8 @@
 # Task: Phase 3 — Workflow E1–E5
 
-> **Status: IN_PROGRESS — days 13 and 14 built 2026-09-22 (◆ deadline "P2+P3"
-> 2026-09-11, passed); survey `tasks/phase3-survey.md` §1–§7 ("go" by `mmarin`).**
-> Day 15 is on the critical path.
+> **Status: IN_PROGRESS — days 13, 14 and 15 built 2026-09-22 (◆ deadline "P2+P3"
+> 2026-09-11, passed); survey `tasks/phase3-survey.md` §1–§8 ("go" by `mmarin`).**
+> Phase close (mutation pass, task DONE with commit) remains.
 
 ## Objective
 Bring the reconstruction workflow up to case design: the developer plans what
@@ -33,7 +33,7 @@ gates enforced by the API.
      (the Mermaid library cannot render under the CSP — survey §7);
      editable by the developer, but the brief is computed from the AST,
      never from the edited text.
-3. **Day 15 — E5 brief + pseudocode** — `backend/app/workflow/brief.py`, `frontend/src/screens/case-design-screen.tsx`
+3. **Day 15 — E5 brief + pseudocode** — `backend/app/workflow/brief.py`, `frontend/src/screens/case-design-screen.tsx` — BUILT 2026-09-22 (survey §8: coverage of the brief is the developer's declaration per case; approval per function, separate from the stage transition)
    - Brief per function: signature and parameters; basis paths (McCabe) →
      minimum case count; every branch/condition with its line (true AND
      false); boundary values from literal comparisons (`age >= 18` → 17, 18,
@@ -63,9 +63,13 @@ gates enforced by the API.
 - [ ] No secrets in diff (Gitleaks clean); locale parity check green
 - [ ] `/precommit` returned `READY TO COMMIT` (including mockup fidelity)
 - [x] `tasks/phase3-survey.md` written and signed off before the gate edits (day 13; days 14–15 append their sections first)
-- [ ] Briefs produced for at least THREE real functions of the P1 project
-      whose basis paths, counted by hand, match the platform's count (plan day 15)
-- [ ] The gate-skip suite proves every E1–E5 transition is rejected without its gate (E2–E4 proven in `backend/tests/test_gates.py`; E5's gate is day 15)
+- [x] Briefs produced for at least THREE real functions whose basis paths,
+      counted by hand, match the platform's count (plan day 15) — three
+      functions of this repository, verbatim fixtures, `backend/tests/test_brief.py`;
+      also checked by hand, outside the repo, on five functions of the MINCYT
+      frontend (`obtenerEdad` 4, `request` 10, `formatearMoneda` 5,
+      `aplicarMascara` 9, `validarUrl` 2 — all matching)
+- [x] The gate-skip suite proves every E1–E5 transition is rejected without its gate (`backend/tests/test_gates.py`, `test_cases_api.py`)
 - [ ] CLAUDE.md phase status + docs/development-phases.md: Phase 3 → DONE with date and commit
 
 ## Non-goals (explicit)

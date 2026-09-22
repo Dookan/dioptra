@@ -17,6 +17,7 @@ REASON_ANALYSIS_NOT_DONE = "analysis_not_done"
 REASON_TRIAGE_PENDING = "triage_pending"
 REASON_TEST_PLAN_MISSING = "test_plan_missing"
 REASON_NOT_BUILT = "gate_not_built"
+REASON_CASES_NOT_APPROVED = "cases_not_approved"
 
 
 @dataclass(frozen=True)
@@ -55,20 +56,41 @@ def leave_plan(analysis: Analysis) -> GateResult:
     return OPEN
 
 
+def leave_design(analysis: Analysis) -> GateResult:
+    """E5 → E6: every planned function has its cases approved.
+
+    Approval (``design.approve_cases``) is where the cases are checked against
+    the brief computed from the live source; the gate only needs the record,
+    so it stays a pure predicate. Saving cases again clears the approval.
+    """
+    plan = analysis.test_plan
+    if plan is None or not plan.functions:
+        return _closed(REASON_TEST_PLAN_MISSING)
+    approved = {
+        (design.path, design.function, design.line)
+        for design in analysis.case_designs
+        if design.approved_at is not None
+    }
+    for row in plan.functions:
+        key = (str(row.get("path")), str(row.get("function")), row.get("line"))
+        if key not in approved:
+            return _closed(REASON_CASES_NOT_APPROVED)
+    return OPEN
+
+
 def not_built(_analysis: Analysis) -> GateResult:
     """Placeholder for a gate whose phase has not landed: always closed."""
     return _closed(REASON_NOT_BUILT)
 
 
-# TODO(phase3): day 15 replaces DESIGN with "pseudocode covers every brief item
-# AND approval recorded". TODO(phase4): TESTS ("all planned cases have non-empty
-# bodies") and VERIFICATION ("coverage meets the criterion, zero surviving
-# mutants, no assertion-less test").
+# TODO(phase4): TESTS ("all planned cases have non-empty bodies") and
+# VERIFICATION ("coverage meets the criterion, zero surviving mutants, no
+# assertion-less test").
 GATES: dict[Stage, object] = {
     Stage.CODE: leave_code,
     Stage.ANALYSIS: leave_analysis,
     Stage.PLAN: leave_plan,
-    Stage.DESIGN: not_built,
+    Stage.DESIGN: leave_design,
     Stage.TESTS: not_built,
     Stage.VERIFICATION: not_built,
 }

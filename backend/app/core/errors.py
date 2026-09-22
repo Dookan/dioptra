@@ -3,7 +3,9 @@
 Raw exceptions MUST NOT reach an HTTP response (CLAUDE.md → Code Conventions).
 Every module raises its own subclass of :class:`AppError`; a single handler in
 ``app.main`` renders ``{"code": ..., "message_key": ...}`` — a stable i18n key,
-never a server-authored Spanish/English sentence and never a stack trace.
+never a server-authored Spanish/English sentence and never a stack trace. An
+error MAY carry ``context``: short strings the UI interpolates into the
+translated message (which function, which line); they are data, never copy.
 """
 
 from __future__ import annotations
@@ -17,10 +19,13 @@ class AppError(Exception):
     #: i18n key the frontend resolves; the backend never ships display copy.
     message_key: str = "errors.internal"
 
-    def __init__(self, detail: str | None = None) -> None:
+    def __init__(self, detail: str | None = None, *, context: dict[str, str] | None = None) -> None:
         # ``detail`` is for the server log only. It is never serialized.
         super().__init__(detail or self.code)
         self.detail = detail
+        #: Serialized as ``context`` when present; values are bounded strings
+        #: the client renders as text (they may come from the audited tree).
+        self.context = context
 
     def headers(self) -> dict[str, str]:
         """Extra response headers (e.g. ``Retry-After``). Empty by default."""

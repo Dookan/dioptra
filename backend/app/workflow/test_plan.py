@@ -7,14 +7,20 @@ from sqlalchemy.orm import Session
 from app.analysis.models import Analysis, Stage
 from app.audit import service as audit
 from app.auth.models import User
+from app.workflow.ast.errors import AstError
+from app.workflow.ast.extract import build_graph
+from app.workflow.ast.source import language_for, load_source
+from app.workflow.brief import build_brief
 from app.workflow.errors import (
     StageLocked,
     StageNotReached,
     TestPlanEmpty,
+    TestPlanFunctionTooComplex,
+    TestPlanFunctionUnbriefable,
     TestPlanFunctionUnknown,
     TestPlanNotFound,
 )
-from app.workflow.models import CoverageCriterion, TestPlan
+from app.workflow.models import MAX_CASES, CoverageCriterion, TestPlan
 from app.workflow.stages import is_past
 from app.workflow.triage import clean_justification
 
@@ -43,6 +49,27 @@ def _measured(analysis: Analysis) -> dict[FunctionKey, dict[str, object]]:
     metrics = analysis.metrics
     rows = metrics.functions if metrics is not None else []
     return {_key(row): row for row in rows}
+
+
+def check_briefable(analysis: Analysis, key: FunctionKey) -> None:
+    """Refuse, at E4, a function E5 could never approve.
+
+    Parsing here costs what ``GET …/brief`` costs, once per chosen function,
+    at the only moment the set is still editable; without it a function the
+    AST layer refuses, or one with more basis paths than ``MAX_CASES``, would
+    leave the analysis stuck at E5 with no way back (the plan is locked and
+    the stages are monotonic).
+    """
+    path, function, line = key
+    try:
+        graph = build_graph(load_source(analysis, path), language_for(path), function, line)
+    except AstError as error:
+        raise TestPlanFunctionUnbriefable(path, function, line, error.code) from error
+    # The number approval will demand — basis paths plus one case per SAST
+    # finding inside the function (frozen with E3) — not the bare complexity.
+    minimum = build_brief(analysis, path, graph).min_cases
+    if minimum > MAX_CASES:
+        raise TestPlanFunctionTooComplex(path, function, line, f"min_cases {minimum}")
 
 
 def save_test_plan(
@@ -79,6 +106,7 @@ def save_test_plan(
         if key in seen:
             continue
         seen.add(key)
+        check_briefable(analysis, key)
         selected.append(
             {"path": key[0], "function": key[1], "line": key[2], "ccn": row.get("ccn", 1)}
         )

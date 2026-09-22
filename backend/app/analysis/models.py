@@ -20,7 +20,7 @@ from app.db.base import Base
 from app.db.types import UtcDateTime
 
 if TYPE_CHECKING:
-    from app.workflow.models import TestPlan
+    from app.workflow.models import CaseDesign, TestPlan
 
 
 class SourceKind(StrEnum):
@@ -146,6 +146,9 @@ class Analysis(Base):
     # registry maps both before the first query configures the mappers.
     test_plan: Mapped[TestPlan | None] = relationship(
         "TestPlan", uselist=False, cascade="all, delete-orphan"
+    )
+    case_designs: Mapped[list[CaseDesign]] = relationship(
+        "CaseDesign", cascade="all, delete-orphan", order_by="CaseDesign.created_at"
     )
 
 
