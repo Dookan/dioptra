@@ -58,10 +58,11 @@ def boundary_values(literal: int | float | str, operator: str) -> list[str]:
     """The three values around a literal comparison (``age >= 18`` → 17, 18, 19).
 
     Floats step by their last decimal (``0.5`` → 0.4, 0.5, 0.6); a string
-    literal under an equality gives the literal and the empty string.
+    literal under an equality gives the literal and the empty string. The
+    extractor never yields a ``bool`` (it parses numbers and strings only), so
+    ``True`` would be treated as the integer 1 — give it a branch here if a
+    language profile ever maps boolean literals.
     """
-    if isinstance(literal, bool):
-        return [str(literal).lower()]
     if isinstance(literal, int):
         return [str(literal - 1), str(literal), str(literal + 1)]
     if isinstance(literal, float):
@@ -82,7 +83,7 @@ def _fmt(value: Decimal) -> str:
     text = format(value, "f")
     if "." in text:
         text = text.rstrip("0").rstrip(".")
-    return text or "0"
+    return text
 
 
 def _branch_items(graph: FlowGraph) -> list[BriefItem]:
@@ -219,4 +220,4 @@ def build_brief(analysis: Analysis, path: str, graph: FlowGraph) -> Brief:
 
 
 def brief_as_dict(brief: Brief) -> dict[str, Any]:
-    return {**asdict(brief), "items": [asdict(item) for item in brief.items]}
+    return asdict(brief)  # recurses into the items

@@ -32,7 +32,7 @@ from app.analysis.models import (
 )
 from app.analysis.normalizer import NormalizationError, ToolReport, normalize, parse_sarif
 from app.analysis.runners import default_runners
-from app.analysis.runners.base import ExecutionResult, Runner, RunnerSpec
+from app.analysis.runners.base import WORK_DIR, ExecutionResult, Runner, RunnerSpec
 from app.analysis.runners.executor import build_executor
 from app.analysis.sbom import SbomInvalid, component_count, validate_cyclonedx
 from app.core.clock import utc_now
@@ -58,7 +58,9 @@ class NoToolRan(AppError):
 class _Collected:
     """What the tool loop hands to the normalization step."""
 
-    def __init__(self) -> None:
+    def __init__(self, roots: tuple[str, ...] = (WORK_DIR,)) -> None:
+        #: Prefixes under which the tools saw the tree: /work (docker) or the jail (local).
+        self.roots = roots
         self.reports: list[ToolReport] = []
         self.sbom: dict[str, Any] | None = None
         self.sbom_generator: str | None = None
@@ -113,7 +115,8 @@ def _execute(db: Session, analysis: Analysis, settings: Settings) -> None:
     out_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     settings = _stage_rules(settings, workspace.parent)
     executor = build_executor(settings)
-    collected = _Collected()
+    # Both spellings of the jail: a tool may print the path as given or resolved.
+    collected = _Collected((WORK_DIR, str(workspace), str(workspace.resolve())))
 
     for runner in default_runners():
         reason = runner.unavailable_reason(settings)
@@ -152,7 +155,7 @@ def _execute(db: Session, analysis: Analysis, settings: Settings) -> None:
     if not ran_security:
         raise NoToolRan("no SAST/SCA/secret tool produced a report")
 
-    findings = normalize(collected.reports)
+    findings = normalize(collected.reports, collected.roots)
     if len(findings) > settings.max_findings_per_analysis:
         # Worst first is already the normalizer's order; what falls off the end
         # is a recorded coverage gap, never a silent drop.
@@ -307,7 +310,7 @@ def _collect(runner: Runner, spec: RunnerSpec, output: bytes, collected: _Collec
     elif runner.category is ToolCategory.METRICS:
         text = output.decode("utf-8", errors="replace")
         if spec.output_file.endswith(".csv"):
-            collected.lizard = parse_lizard_csv(text)
+            collected.lizard = parse_lizard_csv(text, collected.roots)
         else:
             try:
                 json.loads(text)

@@ -87,3 +87,18 @@ def test_commented_code_scan_respects_caps(tmp_path: Path) -> None:
     # Only the first bytes are read: the offending lines sit past the cap.
     _write(tmp_path / "big.js", "x = 1;\n" * 100 + "// a;\n// b;\n// c;\n")
     assert "big.js" not in scan_commented_code(tmp_path, max_bytes_per_file=50)
+
+
+def test_lizard_paths_lose_only_the_tree_root() -> None:
+    # In the container Lizard reports /work/…; the audited tree's own `src/`
+    # (the MINCYT frontend has one) must survive so E4/E5 can find the file.
+    header = "NLOC,CCN,token,PARAM,length,location,file,function,long_name,start,end\n"
+    row = (
+        '4,2,20,1,6,"edad@3-17@/work/src/helpers/edad.js","/work/src/helpers/edad.js",'
+        '"obtenerEdad","obtenerEdad( n )",3,17\n'
+    )
+    jail = "/var/lib/dioptra/workspaces/p/a/src"
+    local = row.replace("/work/", f"{jail}/")
+    assert parse_lizard_csv(header + row)[0]["path"] == "src/helpers/edad.js"
+    assert parse_lizard_csv(header + local, ("/work", jail))[0]["path"] == "src/helpers/edad.js"
+    assert parse_lizard_csv(header + local)[0]["path"] == f"{jail.lstrip('/')}/src/helpers/edad.js"

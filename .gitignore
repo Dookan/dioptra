@@ -20,6 +20,11 @@ dist/
 build/
 *.egg-info/
 
+# Mutation testing scratch (mutmut copies app/ + tests/ into mutants/)
+mutants/
+.mutmut-cache
+mutmut-stats.json
+
 # Node
 node_modules/
 frontend/dist/

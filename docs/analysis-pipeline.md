@@ -65,6 +65,14 @@ Languages (analysis runners and, since P3 day 14, the tree-sitter AST layer of E
   OWASP bucket of "unclassified"; it still reaches triage and the report.
 - Findings are deduplicated across tools on (path, line, rule-or-CWE) before
   persistence; the surviving finding keeps every source tool in `references`.
+- **Paths are relative to the TREE ROOT, and only an exact root is stripped.**
+  The pipeline passes the roots the tools could have seen (`/work` inside the
+  container, the jail path in `local` runner mode) to the normalizer and to
+  the Lizard parser. Guessing a prefix is a bug: a generic "strip everything
+  up to `src/`" rule ate the audited tree's own `src/` directory on the
+  MINCYT frontend (2026-09-22), so findings said `helpers/x.js` while the
+  metrics said `work/src/helpers/x.js` — the E4 risk matrix then correlated
+  nothing and E5 could not read the file.
 - Snippets are stored raw and ESCAPED AT EVERY RENDER (UI and report) — the
   audited code is hostile input.
 - A tool that fails to run is recorded as a coverage gap in the report, never

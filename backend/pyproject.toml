@@ -44,6 +44,7 @@ dev = [
     "httpx2",           # BSD-3 — ASGI transport required by starlette's TestClient
     "ruff",             # MIT
     "mypy",             # MIT
+    "mutmut",           # BSD-3 — phase-close mutation pass on gate / brief / triage modules (CLAUDE.md → Tests); the same discipline the product applies at E7
 ]
 
 [build-system]
@@ -98,3 +99,24 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
 filterwarnings = ["error"]
+
+[tool.mutmut]
+# Phase-close targets only (CLAUDE.md → Code Conventions → Tests): the gate,
+# brief, triage and test-plan modules, run against their own test files. Run
+# `uv run mutmut run` then `uv run mutmut results`; a survivor is either
+# killed by a new test or recorded as equivalent in the phase's task file.
+source_paths = ["app"]
+also_copy = ["templates", "alembic", "alembic.ini", "rules"]
+only_mutate = [
+    "app/workflow/gates.py",
+    "app/workflow/brief.py",
+    "app/workflow/triage.py",
+    "app/workflow/test_plan.py",
+]
+pytest_add_cli_args_test_selection = [
+    "tests/test_gates.py",
+    "tests/test_brief.py",
+    "tests/test_cases_api.py",
+    "tests/test_triage.py",
+    "tests/test_test_plan.py",
+]

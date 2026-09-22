@@ -81,11 +81,17 @@ def test_snippet_is_stored_raw_never_escaped_here(semgrep: ToolReport) -> None:
 
 
 def test_semgrep_cwe_from_properties_and_jail_prefix_stripped(semgrep: ToolReport) -> None:
-    cdn = next(f for f in normalize([semgrep]) if f.rule_id == "dioptra.js.no-cdn")
+    # Local runner mode: the pipeline passes the jail as a root; the fixture's
+    # URI is the jail's absolute path (which ends in `src`).
+    jail = "/var/lib/dioptra/workspaces/p/a/src"
+    cdn = next(f for f in normalize([semgrep], ("/work", jail)) if f.rule_id == "dioptra.js.no-cdn")
     assert cdn.cwe == 829
     assert cdn.owasp == "A08:2021"
     assert cdn.title.startswith("Inclusión de recursos desde un origen no confiable")
     assert cdn.path == "public/index.html"
+    # Without that root nothing is guessed: the path stays as the tool wrote it.
+    unrooted = next(f for f in normalize([semgrep]) if f.rule_id == "dioptra.js.no-cdn")
+    assert unrooted.path == "var/lib/dioptra/workspaces/p/a/src/public/index.html"
 
 
 def test_unknown_cwe_is_a_valid_state(semgrep: ToolReport) -> None:
@@ -296,9 +302,13 @@ def test_run_that_is_not_a_dict_is_ignored() -> None:
     ("raw", "expected"),
     [
         ("./index.js", "index.js"),
-        ("/abs/path/to/src/lib/a.js", "lib/a.js"),
-        ("file:///var/lib/dioptra/workspaces/p/a/src/x.py", "x.py"),
+        # Only an exact root is stripped: the tree's own `src/` survives.
+        ("/work/src/lib/a.js", "src/lib/a.js"),
+        ("work/src/lib/a.js", "src/lib/a.js"),
+        ("/abs/path/to/src/lib/a.js", "abs/path/to/src/lib/a.js"),
+        ("file:///work/x.py", "x.py"),
         ("../../etc/passwd", "etc/passwd"),
+        ("/workspace/a.js", "workspace/a.js"),
         ("C:\\repo\\src\\a.js", "C:/repo/src/a.js"),
         ("", ""),
         (None, ""),
@@ -309,6 +319,25 @@ def test_run_that_is_not_a_dict_is_ignored() -> None:
 )
 def test_normalize_path(raw: object, expected: str) -> None:
     assert normalize_path(raw) == expected
+
+
+def test_normalize_path_strips_the_jail_root_it_is_given() -> None:
+    # Local runner mode: tools report the jail's absolute path, which ends in
+    # `src` — the audited tree's own `src/` below it must survive.
+    jail = "/var/lib/dioptra/workspaces/p/a/src"
+    roots = ("/work", jail)
+    assert normalize_path(f"{jail}/src/helpers/edad.js", roots) == "src/helpers/edad.js"
+    assert normalize_path(f"file://{jail}/x.py", roots) == "x.py"
+    assert normalize_path("/work/src/x.py", roots) == "src/x.py"
+    # A sibling directory that merely shares the prefix string is not the root.
+    assert normalize_path(f"{jail}2/x.py", roots) == "var/lib/dioptra/workspaces/p/a/src2/x.py"
+    assert normalize_path("/x.py", ("/",)) == "x.py"
+    # The root is stripped where it LEADS, never where it merely appears…
+    assert normalize_path("packages/work/x.js") == "packages/work/x.js"
+    assert normalize_path("/srv/work/x.js") == "srv/work/x.js"
+    # …and only once: the tree may hold a directory named like the root.
+    assert normalize_path("/work/work/x.js") == "work/x.js"
+    assert normalize_path("/work/src/work/x.js", ("/work", jail)) == "src/work/x.js"
 
 
 # --- catalog and mapping ---------------------------------------------------------

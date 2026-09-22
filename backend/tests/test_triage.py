@@ -58,6 +58,8 @@ def test_analyst_verdict_is_stored_and_audited(
     assert entry.justification == REASON
     assert entry.target == f"finding:{first.id}"
     assert entry.actor_username == "mmarin" and entry.outcome is AuditOutcome.OK
+    assert entry.actor_id == analyst.id and entry.actor_role == "analyst"
+    assert entry.source_ip == "testclient"
 
 
 def test_triage_status_follows_every_verdict(

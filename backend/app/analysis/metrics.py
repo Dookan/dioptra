@@ -12,8 +12,11 @@ import io
 import json
 import os
 import re
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
+
+from app.analysis.normalizer import DEFAULT_ROOTS, normalize_path
 
 MAX_LIZARD_ROWS = 5000
 _SKIPPED_DIRS = frozenset(
@@ -35,7 +38,7 @@ def _to_int(value: str) -> int | None:
         return None
 
 
-def parse_lizard_csv(text: str) -> list[dict[str, Any]]:
+def parse_lizard_csv(text: str, roots: Sequence[str] = DEFAULT_ROOTS) -> list[dict[str, Any]]:
     """``lizard --csv`` → per-function rows, most complex first.
 
     Columns: nloc, ccn, token, param, length, location, file, function,
@@ -51,7 +54,7 @@ def parse_lizard_csv(text: str) -> list[dict[str, Any]]:
             continue  # the header row, or garbage
         rows.append(
             {
-                "path": _relative_posix(record[6])[:1024],
+                "path": normalize_path(record[6], roots)[:1024],
                 "function": record[7].strip()[:200],
                 "line": start,
                 "end_line": end,
@@ -88,13 +91,6 @@ def parse_cloc_json(text: str) -> dict[str, dict[str, int]]:
 
 def _as_int(value: object) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) else 0
-
-
-def _relative_posix(path: str) -> str:
-    text = path.strip().replace("\\", "/")
-    if text.startswith("./"):
-        text = text[2:]
-    return text.lstrip("/")
 
 
 def _looks_like_code(body: str) -> bool:

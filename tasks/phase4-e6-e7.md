@@ -1,8 +1,10 @@
 # Task: Phase 4 — E6–E7
 
-> **Status: DESIGN — deadline 2026-09-15 (plan days 16–17); starts the moment
-> P3 closes.** Both days on the critical path; day 16 opens with the mandatory
-> sandbox investigation gate.
+> **Status: IN_PROGRESS — started 2026-09-22 (deadline 2026-09-15, plan days
+> 16–17, passed); survey `tasks/phase4-survey.md` SIGNED OFF by `mmarin`
+> 2026-09-22 (§5 answered: build without pruning, dependency-less tests as a
+> v1.0.0 non-goal, Stryker + mutmut confirmed).** Both days on the critical
+> path; day 16 opened with the mandatory sandbox investigation gate.
 
 ## Objective
 Close the cycle where the workflow stops being theoretical: the developer
@@ -53,7 +55,8 @@ demonstrably rejects the gate.
   limit to make a test pass.
 
 ## Definition of Done
-- [ ] `tasks/phase4-survey.md` written and signed off before the sandbox edits
+- [x] `tasks/phase4-survey.md` written and signed off before the sandbox edits
+      (written and signed off 2026-09-22, `mmarin`)
 - [ ] All deliverables implemented; ruff + mypy + oxlint + tsc clean
 - [ ] All specified tests passing (pytest / Vitest)
 - [ ] Mutation pass on `verify.py` and the gate module (phase-close) — we apply

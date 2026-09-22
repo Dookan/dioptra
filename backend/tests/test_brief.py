@@ -106,6 +106,7 @@ def test_boundary_values_by_literal_kind() -> None:
     assert boundary_values(0, "<=") == ["-1", "0", "1"]
     assert boundary_values(-1, "!=") == ["-2", "-1", "0"]
     assert boundary_values(0.5, "<") == ["0.4", "0.5", "0.6"]
+    assert boundary_values(0.9, "<") == ["0.8", "0.9", "1"]  # never "1.0"
     assert boundary_values(0.25, "===") == ["0.24", "0.25", "0.26"]
     assert boundary_values(100.0, ">") == ["99", "100", "101"]
     assert boundary_values(1e3, ">") == ["999", "1000", "1001"]
@@ -202,6 +203,18 @@ function w(items) {
     assert all(i.detail != "loop" for i in brief.items)
 
 
+def test_a_repeated_comparison_is_one_item_and_the_next_one_still_counts() -> None:
+    source = b"""
+function d(a, b) {
+  if (a > 1 && a > 1 || b < 2) { return 1; }
+  return 0;
+}
+"""
+    brief = build_brief(Analysis(), "d.js", build_graph(source, "javascript", "d", None))
+    boundaries = [(i.id, i.line, i.text) for i in brief.items if i.kind == "boundary"]
+    assert boundaries == [("F1", 3, "a > 1"), ("F2", 3, "b < 2")]
+
+
 def test_python_chained_comparison_and_prefixed_strings() -> None:
     source = b"""
 def f(x, s):
@@ -231,8 +244,13 @@ function g(x) {
 }
 """
     brief = build_brief(Analysis(), "g.js", build_graph(source, "javascript", "g", None))
-    errors = [(i.line, i.detail) for i in brief.items if i.kind == "error"]
-    assert errors == [(3, "throw"), (4, "handler"), (4, "early_return"), (5, "early_return")]
+    errors = [(i.line, i.detail, i.text) for i in brief.items if i.kind == "error"]
+    assert errors == [
+        (3, "throw", 'throw new Error("no");'),
+        (4, "handler", "catch (e)"),
+        (4, "early_return", "return null;"),
+        (5, "early_return", "return 1;"),
+    ]
 
 
 def test_malicious_case_per_sast_finding_inside_the_function() -> None:
@@ -244,11 +262,12 @@ def test_malicious_case_per_sast_finding_inside_the_function() -> None:
     discarded = make_finding(3, path="src/sample.js", line=5, verdict=Verdict.FALSE_POSITIVE)
     sca = make_finding(4, path="src/sample.js", line=6, category=ToolCategory.SCA)
     no_line = make_finding(5, path="src/sample.js", line=None)
-    analysis.findings = [inside, outside, other_file, discarded, sca, no_line]
+    # The excluded ones come first: skipping must not end the scan.
+    analysis.findings = [outside, other_file, discarded, sca, no_line, inside]
     brief = build_brief(analysis, "src/sample.js", graph)
     malicious = [i for i in brief.items if i.kind == "malicious"]
-    assert [(i.id, i.line, i.text, i.values, i.finding_id) for i in malicious] == [
-        ("M1", 4, "Registro sin sanear", ["CWE-79"], str(inside.id))
+    assert [(i.id, i.line, i.text, i.detail, i.values, i.finding_id) for i in malicious] == [
+        ("M1", 4, "Registro sin sanear", "dioptra.rule-0", ["CWE-79"], str(inside.id))
     ]
     assert brief.min_cases == brief.complexity + 1
     # Both ends of the function are inside (lines 2..9 for validateForm); the neighbours are not.
@@ -286,3 +305,10 @@ def test_brief_is_deterministic_and_serialisable() -> None:
         "finding_id": None,
     }
     assert payload["min_cases"] == 7 and payload["function"] == "mermaid_escape"
+    assert (payload["path"], payload["line"], payload["language"], payload["complexity"]) == (
+        "real_mermaid_escape.py",
+        7,
+        "python",
+        7,
+    )
+    assert payload["params"] == ["text: str"]

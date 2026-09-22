@@ -1,9 +1,10 @@
 # Task: Phase 2 — Findings UI
 
-> **Status: IN_PROGRESS — started 2026-09-22 (deadline 2026-09-08, plan days
-> 11–12, passed) on P1's data per the contingency "PDF fidelity slips → P2
-> starts anyway". Survey: `tasks/phase2-survey.md` ("go" by `mmarin`).**
-> Closes together with P3 at the ◆ "P2+P3" milestone, 2026-09-11.
+> **Status: DONE — closed 2026-09-22; deliverables in commit `5f13ee1`, the
+> phase-close evidence (mutation pass, the E3 walk on the real system) in the
+> commit that carries this file. Deadline 2026-09-08, plan days 11–12, passed.
+> Survey: `tasks/phase2-survey.md` ("go" by `mmarin`).** Closed together with P3 at
+> the ◆ "P2+P3" milestone (2026-09-11, passed).
 
 ## Objective
 Let the analyst work inside the platform: review every finding with a verdict
@@ -47,15 +48,22 @@ control. E3's gate becomes usable start to finish in the UI.
 - Forbidden: UI-only enforcement of the E3 gate; any AI suggestion in triage.
 
 ## Definition of Done
-- [ ] All deliverables implemented; ruff + mypy + oxlint + tsc clean
-- [ ] All specified tests passing (pytest / Vitest)
-- [ ] Mutation pass on the triage gate module (phase-close)
-- [ ] No secrets in diff (Gitleaks clean); locale parity check green
-- [ ] `/precommit` returned `READY TO COMMIT` (including mockup fidelity)
+- [x] All deliverables implemented; ruff + mypy + oxlint + tsc clean
+- [x] All specified tests passing (pytest / Vitest)
+- [x] Mutation pass on the triage gate module (phase-close): `uv run mutmut run`
+      over `app/workflow/triage.py` (with `gates`, `brief`, `test_plan`),
+      2026-09-22 — 503/543 killed; every survivor inspected and classified in
+      `tasks/phase3-workflow-e1-e5.md`; the meaningful ones became tests
+      (audit row fields: actor id, role, ip, target)
+- [x] No secrets in diff (Gitleaks clean); locale parity check green
+- [x] `/precommit` returned `READY TO COMMIT` (including mockup fidelity)
 - [x] `tasks/phase2-survey.md` written and signed off before the report-versioning edits
-- [ ] E3 walked start to finish in the UI on the P1 project: every finding
-      has a verdict, the gate opens, the report version exports
-- [ ] CLAUDE.md phase status + docs/development-phases.md: Phase 2 → DONE with date and commit
+- [x] E3 walked start to finish on the real MINCYT frontend (2026-09-22, dev
+      instance): fifteen findings, eleven confirmed and four discarded with
+      justification, the gate opened, sections edited, version 2 signed by
+      `mmarin` and exported as PDF / Markdown / DOCX / HTML with the version
+      table filled and the false positives absent from every format
+- [x] CLAUDE.md phase status + docs/development-phases.md: Phase 2 → DONE with date and commit
 
 ## Non-goals (explicit)
 - Risk matrix, briefs, pseudocode (P3); test writing and sandbox (P4)

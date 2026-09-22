@@ -44,9 +44,13 @@ _CVSS_PATTERN = re.compile(r"CVSS:3\.[01]/[A-Z]{1,3}:[A-Z](?:/[A-Z]{1,3}:[A-Z])+
 _PACKAGE_AT_VERSION = re.compile(r"'(@?[^'@\s]+)@([^'\s@]+)'")
 _FIXED_PATTERN = re.compile(r"[Ff]ixed(?: in| version)?[^0-9A-Za-z|]*([0-9][^\s|,;)]*)")
 _ECOSYSTEM_PATTERN = re.compile(r"\b(npm|PyPI|Maven|Packagist|Go|crates\.io|RubyGems|NuGet)\b")
-# The jail on disk is ``.../src/``; inside the analysis container the tree is
-# ``/work`` and tools report it with or without the leading slash.
-_JAIL_PREFIX = re.compile(r"^(?:/.*?/src/|/?work/)")
+#: Inside the analysis container the tree is mounted at ``/work`` and tools
+#: report it with or without the leading slash; in ``local`` runner mode they
+#: report the jail's own absolute path, which the pipeline passes as a root.
+#: Only an EXACT root is stripped: a generic ``/src/`` rule ate the audited
+#: tree's own ``src/`` directory (proven on the MINCYT frontend, 2026-09-22),
+#: leaving paths that matched neither the report nor the jail.
+DEFAULT_ROOTS: tuple[str, ...] = ("/work", "work")
 
 
 class NormalizationError(AppError):
@@ -160,15 +164,27 @@ def _first_vector(*sources: object) -> str | None:
     return None
 
 
-def normalize_path(raw: object) -> str:
-    """Relative POSIX path, or empty when unknown. Absolute and jail paths lose their prefix."""
+def normalize_path(raw: object, roots: Sequence[str] = DEFAULT_ROOTS) -> str:
+    """Relative POSIX path from the tree root, or empty when unknown.
+
+    ``roots`` are the prefixes under which a tool may have seen the tree
+    (the container mount, the jail on disk); the first exact match is
+    stripped, nothing else is guessed. ``..`` segments are dropped.
+    """
     text = _text(raw, MAX_PATH * 2)
     if text is None:
         return UNKNOWN_PATH
     text = text.replace("\\", "/")
     if text.lower().startswith("file://"):
         text = text[len("file://") :]
-    text = _JAIL_PREFIX.sub("", text, count=1)
+    for root in roots:
+        prefix = root.replace("\\", "/").rstrip("/") + "/"
+        # LEADING only, and only once: a root that merely appears inside the
+        # path (``packages/work/x.js``) is part of the audited tree, and a
+        # second pass would eat a real directory of the same name.
+        if prefix != "/" and text.startswith(prefix):
+            text = text[len(prefix) :]
+            break
     parts = [part for part in text.split("/") if part not in ("", ".", "..")]
     cleaned = "/".join(parts)[:MAX_PATH]
     return cleaned or UNKNOWN_PATH
@@ -193,14 +209,14 @@ def _rules_by_id(run: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return rules
 
 
-def _location(result: dict[str, Any]) -> tuple[str, int | None, str | None]:
+def _location(result: dict[str, Any], roots: Sequence[str]) -> tuple[str, int | None, str | None]:
     for location in _list(result.get("locations")):
         physical = _dict(_dict(location).get("physicalLocation"))
         if not physical:
             continue
         artifact = _dict(physical.get("artifactLocation"))
         region = _dict(physical.get("region"))
-        path = normalize_path(artifact.get("uri"))
+        path = normalize_path(artifact.get("uri"), roots)
         line = _int(region.get("startLine"))
         snippet = _text(_dict(region.get("snippet")).get("text"), MAX_SNIPPET)
         return path, line, snippet
@@ -266,7 +282,11 @@ def _title_case_rule(rule_id: str) -> str:
 
 
 def _semgrep_finding(
-    tool: str, category: ToolCategory, rule: dict[str, Any], result: dict[str, Any]
+    tool: str,
+    category: ToolCategory,
+    rule: dict[str, Any],
+    result: dict[str, Any],
+    roots: Sequence[str],
 ) -> NormalizedFinding:
     rule_id = _text(result.get("ruleId"), MAX_RULE_ID) or _text(rule.get("id"), MAX_RULE_ID) or "?"
     rule_props = _dict(rule.get("properties"))
@@ -287,7 +307,7 @@ def _semgrep_finding(
         rule_props.get("cvss_vector"),
     )
     score, severity = _score_and_severity(vector, _security_severity(rule, result), result)
-    path, line, snippet = _location(result)
+    path, line, snippet = _location(result, roots)
     fallback = _rule_text(rule, "shortDescription") or _rule_name(rule) or rule_id
     title = describe(cwe, fallback_title=fallback).title[:MAX_TITLE]
     return NormalizedFinding(
@@ -325,9 +345,11 @@ def _score_and_severity(
     return None, severity_for_level(_text(result.get("level"), 16))
 
 
-def _gitleaks_finding(tool: str, rule: dict[str, Any], result: dict[str, Any]) -> NormalizedFinding:
+def _gitleaks_finding(
+    tool: str, rule: dict[str, Any], result: dict[str, Any], roots: Sequence[str]
+) -> NormalizedFinding:
     rule_id = _text(result.get("ruleId"), MAX_RULE_ID) or "secret"
-    path, line, snippet = _location(result)
+    path, line, snippet = _location(result, roots)
     name = _rule_name(rule) or _title_case_rule(rule_id)
     title = f"Secreto expuesto ({name})"[:MAX_TITLE]
     return NormalizedFinding(
@@ -350,7 +372,9 @@ def _gitleaks_finding(tool: str, rule: dict[str, Any], result: dict[str, Any]) -
     )
 
 
-def _osv_finding(tool: str, rule: dict[str, Any], result: dict[str, Any]) -> NormalizedFinding:
+def _osv_finding(
+    tool: str, rule: dict[str, Any], result: dict[str, Any], roots: Sequence[str]
+) -> NormalizedFinding:
     rule_id = _text(result.get("ruleId"), MAX_RULE_ID) or "advisory"
     rule_props = _dict(rule.get("properties"))
     result_props = _dict(result.get("properties"))
@@ -392,7 +416,7 @@ def _osv_finding(tool: str, rule: dict[str, Any], result: dict[str, Any]) -> Nor
         eco_match = _ECOSYSTEM_PATTERN.search(help_text) or _ECOSYSTEM_PATTERN.search(message)
         ecosystem = eco_match.group(1) if eco_match else None
 
-    path, line, snippet = _location(result)
+    path, line, snippet = _location(result, roots)
     subject = f"{package}@{version}" if package and version else package or "dependencia"
     title = f"Dependencia vulnerable: {subject} ({rule_id})"[:MAX_TITLE]
     return NormalizedFinding(
@@ -421,7 +445,9 @@ def _osv_finding(tool: str, rule: dict[str, Any], result: dict[str, Any]) -> Nor
     )
 
 
-def _findings_for_run(report: ToolReport, run: dict[str, Any]) -> list[NormalizedFinding]:
+def _findings_for_run(
+    report: ToolReport, run: dict[str, Any], roots: Sequence[str]
+) -> list[NormalizedFinding]:
     rules = _rules_by_id(run)
     tool = report.tool.strip().lower()[:40] or "unknown"
     findings: list[NormalizedFinding] = []
@@ -430,11 +456,11 @@ def _findings_for_run(report: ToolReport, run: dict[str, Any]) -> list[Normalize
             continue
         rule = rules.get(_text(result.get("ruleId"), MAX_RULE_ID) or "", {})
         if tool == "gitleaks" or report.category is ToolCategory.SECRET:
-            findings.append(_gitleaks_finding(tool, rule, result))
+            findings.append(_gitleaks_finding(tool, rule, result, roots))
         elif tool == "osv-scanner" or report.category is ToolCategory.SCA:
-            findings.append(_osv_finding(tool, rule, result))
+            findings.append(_osv_finding(tool, rule, result, roots))
         else:
-            findings.append(_semgrep_finding(tool, report.category, rule, result))
+            findings.append(_semgrep_finding(tool, report.category, rule, result, roots))
     return findings
 
 
@@ -458,14 +484,19 @@ def _merge(kept: NormalizedFinding, other: NormalizedFinding) -> NormalizedFindi
     )
 
 
-def normalize(reports: Sequence[ToolReport]) -> list[NormalizedFinding]:
-    """Every result of every run, deduplicated across tools and sorted for the report."""
+def normalize(
+    reports: Sequence[ToolReport], roots: Sequence[str] = DEFAULT_ROOTS
+) -> list[NormalizedFinding]:
+    """Every result of every run, deduplicated across tools and sorted for the report.
+
+    ``roots``: the prefixes under which the tools saw the tree (see ``normalize_path``).
+    """
     merged: dict[str, NormalizedFinding] = {}
     for report in reports:
         for run in _list(report.sarif.get("runs")):
             if not isinstance(run, dict):
                 continue
-            for finding in _findings_for_run(report, run):
+            for finding in _findings_for_run(report, run, roots):
                 existing = merged.get(finding.fingerprint)
                 merged[finding.fingerprint] = (
                     finding if existing is None else _merge(existing, finding)

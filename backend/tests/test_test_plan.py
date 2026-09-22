@@ -71,6 +71,49 @@ def test_developer_saves_and_replaces_the_plan(
     assert fetched.status_code == 200 and fetched.json()["criterion"] == "paths"
     rows = list(db.scalars(select(AuditLogEntry).where(AuditLogEntry.action == "testplan.save")))
     assert len(rows) == 2 and all(row.justification == RATIONALE for row in rows)
+    assert all(row.target == f"analysis:{analysis.id}" for row in rows)
+    assert all(row.actor_id == developer.id and row.actor_role == "developer" for row in rows)
+    assert all(row.source_ip == "testclient" for row in rows)
+
+
+def test_duplicates_are_folded_and_a_missing_ccn_defaults_to_one(
+    client: TestClient, developer: User, db: Session, tmp_path: Path
+) -> None:
+    rows: list[dict[str, object]] = [
+        {"path": "src/a.js", "function": "alpha", "line": 1, "nloc": 3},  # Lizard row without ccn
+        {"path": "src/b.js", "function": "beta", "line": 1, "nloc": 3, "ccn": 4},
+    ]
+    analysis = seed_done_analysis(db, [], functions=rows, jail=tmp_path)
+    _at_plan(db, analysis)
+    headers = login(client, developer.username)
+    alpha = {"path": "src/a.js", "function": "alpha", "line": 1}
+    beta = {"path": "src/b.js", "function": "beta", "line": 1}
+    saved = _put(client, headers, analysis.id, functions=[alpha, alpha, beta])
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["functions"] == [{**alpha, "ccn": 1}, {**beta, "ccn": 4}]
+
+
+def test_the_planned_line_picks_the_function_when_names_repeat(
+    client: TestClient, developer: User, db: Session, tmp_path: Path
+) -> None:
+    # Two `dup` functions in one file: the first parses, the one the plan
+    # names (line 5) is broken — the refusal must be about THAT one.
+    rows: list[dict[str, object]] = [
+        {"path": "src/dup.py", "function": "dup", "line": 1, "nloc": 2, "ccn": 1},
+        {"path": "src/dup.py", "function": "dup", "line": 5, "nloc": 2, "ccn": 1},
+    ]
+    analysis = seed_done_analysis(db, [], functions=rows, jail=tmp_path)
+    (tmp_path / "src" / "dup.py").write_text(
+        "def dup(x):\n    return x\n\n\ndef dup(x):\n    if x\n        return 1\n"
+    )
+    _at_plan(db, analysis)
+    headers = login(client, developer.username)
+    first = {"path": "src/dup.py", "function": "dup", "line": 1}
+    second = {"path": "src/dup.py", "function": "dup", "line": 5}
+    assert _put(client, headers, analysis.id, functions=[first]).status_code == 200
+    refused = _put(client, headers, analysis.id, functions=[second])
+    assert refused.status_code == 422 and refused.json()["code"] == "test_plan_function_unbriefable"
+    assert refused.json()["context"]["line"] == "5"
 
 
 def test_plan_validation(client: TestClient, developer: User, db: Session, tmp_path: Path) -> None:
@@ -237,6 +280,40 @@ def test_a_function_e5_could_never_approve_is_refused_at_e4(
     locked = _put(client, headers, analysis.id, functions=[ONE[0], rows[2]])
     assert locked.status_code == 409 and locked.json()["code"] == "stage_locked"
     assert "context" not in locked.json()
+
+
+def test_save_attaches_the_plan_to_the_analysis_in_the_same_session(
+    developer: User, db: Session, tmp_path: Path
+) -> None:
+    analysis = seed_done_analysis(db, [], jail=tmp_path)
+    _at_plan(db, analysis)
+    plan = save_test_plan(
+        db,
+        analysis=analysis,
+        actor=developer,
+        criterion=CoverageCriterion.DECISIONS,
+        rationale=RATIONALE,
+        functions=ONE,
+        source_ip=None,
+    )
+    # The gate that follows in the same request reads analysis.test_plan.
+    assert analysis.test_plan is plan and plan.analysis_id == analysis.id
+
+
+def test_an_analysis_without_metrics_knows_no_function(developer: User, db: Session) -> None:
+    analysis = seed_done_analysis(db, [])
+    analysis.metrics = None
+    _at_plan(db, analysis)
+    with pytest.raises(workflow_errors.TestPlanFunctionUnknown):
+        save_test_plan(
+            db,
+            analysis=analysis,
+            actor=developer,
+            criterion=CoverageCriterion.DECISIONS,
+            rationale=RATIONALE,
+            functions=ONE,
+            source_ip=None,
+        )
 
 
 def test_unknown_function_never_reaches_the_parser(developer: User, db: Session) -> None:

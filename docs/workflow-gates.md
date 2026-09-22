@@ -62,6 +62,11 @@ stable ids in source order:
 - `M<n>` — one mandatory malicious-input case per SAST finding in the report
   (false positives excluded) whose line falls inside the function.
 
+The success edge of a `try` carries no label, so a function whose whole body
+is a `try/catch` yields one item (the handler) and `min_cases` 2: the happy
+path is required by the count, not named as an item. Observed on the MINCYT
+frontend's `validarUrl`; revisit if E7 coverage shows the distinction matters.
+
 The developer's cases ("Tus casos, con tus palabras") are plain text, one
 title per case, and each case DECLARES the item ids it demonstrates. The
 platform never interprets the prose: approval checks that the union of the

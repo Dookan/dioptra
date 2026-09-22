@@ -163,8 +163,12 @@ def read_python_packages(site_packages: Path) -> list[Package]:
         name = version = ""
         declared: list[str] = []
         for line in metadata_file.read_text(encoding="utf-8", errors="replace").splitlines():
-            if not line.strip():
-                break  # headers end at the first blank line; the body is the README
+            if line == "":
+                # Headers end at the first EMPTY line; the body is the README. A
+                # whitespace-only line is a folded continuation of a multi-line
+                # header (libcst's prose `License:` has blank paragraphs), and
+                # stopping there would hide the `Classifier: License ::` below.
+                break
             if line.startswith("Name: "):
                 name = line.removeprefix("Name: ").strip()
             elif line.startswith("Version: "):

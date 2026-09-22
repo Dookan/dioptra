@@ -83,6 +83,7 @@ def _ingest(client: TestClient, headers: dict[str, str]) -> str:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
         archive.writestr("index.js", "// const a = 1;\n// return b;\n// if (x) {\n")
+        archive.writestr("src/a.js", "function f(x) {\n  if (x) { return 1; }\n  return 0;\n}\n")
         archive.writestr("package.json", "{}")
         # A scanned tree's own ignore file must never reach the scanner.
         archive.writestr(".gitleaksignore", "/work/index.js:generic-api-key:1\n")
@@ -159,7 +160,7 @@ def test_raw_outputs_are_durable_before_normalization(
     del fixture_executor
     from app.analysis.pipeline import run_pipeline
 
-    def explode(_reports: object) -> None:
+    def explode(_reports: object, _roots: object) -> None:
         raise KeyboardInterrupt
 
     monkeypatch.setattr("app.analysis.pipeline.normalize", explode)
@@ -230,7 +231,7 @@ def test_findings_are_capped_worst_first_and_recorded(
     from app.analysis.normalizer import NormalizedFinding
     from app.core.config import get_settings
 
-    def flood(_reports: object) -> list[NormalizedFinding]:
+    def flood(_reports: object, _roots: object) -> list[NormalizedFinding]:
         levels = [Severity.HIGH] * 120 + [Severity.LOW] * 30
         return [
             NormalizedFinding(
@@ -278,3 +279,81 @@ def test_tree_level_scanner_override_files_are_removed_before_scanning(
     assert analysis is not None and analysis.workspace_path is not None
     assert not (Path(analysis.workspace_path) / ".gitleaksignore").exists()
     assert (Path(analysis.workspace_path) / "index.js").exists()
+
+
+def test_tool_paths_are_relative_to_the_tree_root_end_to_end(
+    client: TestClient, analyst: User, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Findings and Lizard rows must agree on the path, or E4 correlates nothing.
+
+    The container reports ``/work/src/…`` and the local executor the jail's own
+    path; both must come out as ``src/…`` — the audited tree's own ``src/``
+    survives (`docs/analysis-pipeline.md` → Normalizer invariants).
+    """
+
+    class RootedExecutor:
+        def __init__(self) -> None:
+            self.jail: Path | None = None
+
+        def run(self, spec: RunnerSpec, *, workspace: Path, out_dir: Path) -> ExecutionResult:
+            del out_dir
+            self.jail = workspace
+            if spec.output_file == "semgrep.sarif":
+                sarif = {
+                    "version": "2.1.0",
+                    "runs": [
+                        {
+                            "tool": {"driver": {"name": "semgrep", "rules": []}},
+                            "results": [
+                                {
+                                    "ruleId": "dioptra.js.eval",
+                                    "level": "error",
+                                    "message": {"text": "eval"},
+                                    "locations": [
+                                        {
+                                            "physicalLocation": {
+                                                "artifactLocation": {"uri": f"{root}/src/a.js"},
+                                                "region": {"startLine": 2},
+                                            }
+                                        }
+                                        for root in ("/work", str(workspace))
+                                    ],
+                                }
+                            ],
+                        }
+                    ],
+                }
+                return ExecutionResult(
+                    ToolStatus.RAN, 0, "", json.dumps(sarif).encode(), False, 1, None
+                )
+            if spec.output_file == "lizard.csv":
+                header = "NLOC,CCN,token,PARAM,length,location,file,function,long_name,start,end\n"
+                rows = "".join(
+                    f'4,2,20,1,6,"f@2-5@{root}/src/a.js","{root}/src/a.js","f","f( x )",2,5\n'
+                    for root in ("/work", str(workspace))
+                )
+                return ExecutionResult(
+                    ToolStatus.RAN, 0, "", (header + rows).encode(), False, 1, None
+                )
+            if spec.output_file == "sbom.cdx.json":
+                return ExecutionResult(
+                    ToolStatus.RAN, 0, "", json.dumps(SBOM).encode(), False, 1, None
+                )
+            return ExecutionResult(ToolStatus.FAILED, 2, "boom", None, False, 1, "exit 2")
+
+    executor = RootedExecutor()
+    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _settings: executor)
+    headers = login(client, analyst.username)
+    analysis_id = _ingest(client, headers)
+
+    db.expire_all()
+    analysis = db.get(Analysis, uuid.UUID(analysis_id))
+    assert analysis is not None
+    assert [finding.path for finding in analysis.findings] == ["src/a.js"]
+    assert analysis.metrics is not None
+    assert {row["path"] for row in analysis.metrics.functions} == {"src/a.js"}
+    # The same file seen through both roots is ONE finding, not two.
+    assert len(analysis.findings) == 1
+    # And the path is the one E5 reads from the jail.
+    assert executor.jail is not None
+    assert (executor.jail / analysis.findings[0].path).parent.name == "src"

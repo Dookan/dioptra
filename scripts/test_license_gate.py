@@ -164,3 +164,26 @@ def test_a_package_declaring_no_license_is_rejected_not_ignored(tmp_path: Path) 
     violations = evaluate(read_node_packages(node_modules))
 
     assert [violation.package.name for violation in violations] == ["mystery-lib"]
+
+
+def test_a_folded_prose_license_header_does_not_hide_the_classifier(tmp_path: Path) -> None:
+    # libcst 1.9.0: `License:` is a multi-paragraph prose block folded with
+    # 8-space continuation lines, blank paragraphs included; the MIT classifier
+    # sits after it. The header parse must not stop at the folded blank line.
+    site_packages = tmp_path / "site-packages"
+    dist_info = site_packages / "libcst-1.9.0.dist-info"
+    dist_info.mkdir(parents=True)
+    dist_info.joinpath("METADATA").write_text(
+        "Metadata-Version: 2.4\n"
+        "Name: libcst\n"
+        "Version: 1.9.0\n"
+        "License: All contributions towards LibCST are MIT licensed.\n"
+        "        \n"
+        "        Some Python files have been derived from the standard library.\n"
+        "Classifier: License :: OSI Approved :: MIT License\n"
+        "\n"
+        "README body: Proprietary is a word that appears here and must be ignored.\n"
+    )
+    packages = read_python_packages(site_packages)
+    assert [(p.name, p.license) for p in packages] == [("libcst", "MIT License")]
+    assert evaluate(packages) == []
