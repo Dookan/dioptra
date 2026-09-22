@@ -24,6 +24,17 @@ dependencies = [
     "jinja2",           # BSD-3    — report templates (HTML + Markdown), autoescape on
     "weasyprint",       # BSD-3    — HTML → PDF for the institutional report
     "python-docx",      # MIT      — basic DOCX export of the report
+    # --- Phase 3: E5 flow diagrams and test briefs from the AST (tasks/phase3-survey.md §7) ---
+    # MIT — incremental parser bindings; one engine for every language wave.
+    # <0.26: the 0.26.0 binding corrupts the heap (SIGSEGV) on ordinary
+    # ~150-statement functions (proven 2026-09-22, precommit panel); the API
+    # parses hostile source, so a crash is a one-request DoS. Re-probe
+    # (tests/test_ast_python.py::test_large_functions_do_not_crash_the_process)
+    # before lifting the pin.
+    "tree-sitter<0.26",
+    "tree-sitter-javascript", # MIT — JS grammar (wave 1)
+    "tree-sitter-typescript", # MIT — TS/TSX grammars (wave 1)
+    "tree-sitter-python",     # MIT — Python grammar (wave 1)
 ]
 
 [dependency-groups]
@@ -46,6 +57,8 @@ packages = ["app"]
 line-length = 100
 target-version = "py313"
 src = ["."]
+# Audited-code fixtures are parsed, never imported: their style is the point.
+extend-exclude = ["tests/fixtures"]
 
 [tool.ruff.lint]
 select = [
@@ -74,7 +87,8 @@ strict = true
 warn_unreachable = true
 disallow_any_generics = true
 plugins = []
-exclude = ["alembic/versions/"]
+# tests/fixtures holds audited-code samples: parsed by tree-sitter, never imported.
+exclude = ["alembic/versions/", "tests/fixtures/"]
 
 [[tool.mypy.overrides]]
 module = ["alembic.*"]

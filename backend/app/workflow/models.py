@@ -1,4 +1,4 @@
-"""Workflow tables. Phase 3: the E4 test plan."""
+"""Workflow tables. Phase 3: the E4 test plan and the E5 case designs."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, Enum, ForeignKey, String, Text
+from sqlalchemy import JSON, Enum, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.clock import utc_now
@@ -43,3 +43,40 @@ class TestPlan(Base):
     created_by_username: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now, onupdate=utc_now)
+
+
+class CaseDesign(Base):
+    """E5 work on one planned function: the developer's diagram text (day 14).
+
+    Day 15 adds the pseudocode and its approval to the same row. The picture
+    the UI draws is always computed from the AST; ``diagram_text`` is the
+    developer's editable Mermaid — stored and shown as text, never rendered
+    as markup (docs/threat-model.md → Flow diagrams).
+    """
+
+    __tablename__ = "case_designs"
+
+    id: Mapped[uuid.UUID] = mapped_column(default=uuid.uuid4, primary_key=True)
+    analysis_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("analyses.id", ondelete="CASCADE"), index=True
+    )
+    path: Mapped[str] = mapped_column(String(1024))
+    function: Mapped[str] = mapped_column(String(200))
+    line: Mapped[int | None] = mapped_column(Integer, default=None)
+    diagram_text: Mapped[str | None] = mapped_column(Text, default=None)
+    created_by_username: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now, onupdate=utc_now)
+
+    __table_args__ = (
+        # NULLS NOT DISTINCT: a function without a line (malformed Lizard row)
+        # still gets one row on PostgreSQL; SQLite relies on the service upsert.
+        UniqueConstraint(
+            "analysis_id",
+            "path",
+            "function",
+            "line",
+            name="uq_case_design_function",
+            postgresql_nulls_not_distinct=True,
+        ),
+    )

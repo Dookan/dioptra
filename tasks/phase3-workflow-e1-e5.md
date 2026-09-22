@@ -1,7 +1,7 @@
 # Task: Phase 3 — Workflow E1–E5
 
-> **Status: IN_PROGRESS — day 13 built 2026-09-22 (◆ deadline "P2+P3"
-> 2026-09-11, passed); survey `tasks/phase3-survey.md` ("go" by `mmarin`).**
+> **Status: IN_PROGRESS — days 13 and 14 built 2026-09-22 (◆ deadline "P2+P3"
+> 2026-09-11, passed); survey `tasks/phase3-survey.md` §1–§7 ("go" by `mmarin`).**
 > Day 15 is on the critical path.
 
 ## Objective
@@ -25,12 +25,14 @@ gates enforced by the API.
      directly (no UI) and is rejected each time.
    - Mockup anchor: "Plan de pruebas (E4)"; stepper uses stage NAMES, never
      E-codes; "siguiente paso" banner.
-2. **Day 14 — E5 AST → Mermaid** — `backend/app/workflow/ast/{js_ts,python}.py`, `backend/app/workflow/diagrams.py`
-   - AST parsing of the prioritized functions (JS/TS and Python in wave 1);
+2. **Day 14 — E5 AST → Mermaid** — `backend/app/workflow/ast/{extract,graph,source}.py`, `backend/app/workflow/diagrams.py` — BUILT 2026-09-22
+   - AST parsing of the prioritized functions (JS/TS and Python in wave 1,
+     tree-sitter — MIT, license + rationale in `pyproject.toml`);
      deterministic Mermaid flowchart text (same input → byte-identical
-     output); rendered in the UI by the bundled Mermaid library (MIT —
-     license + rationale in `package.json`); editable by the developer, but
-     the brief is computed from the AST, never from the edited text.
+     output) plus a deterministic layout drawn as class-only SVG in the UI
+     (the Mermaid library cannot render under the CSP — survey §7);
+     editable by the developer, but the brief is computed from the AST,
+     never from the edited text.
 3. **Day 15 — E5 brief + pseudocode** — `backend/app/workflow/brief.py`, `frontend/src/screens/case-design-screen.tsx`
    - Brief per function: signature and parameters; basis paths (McCabe) →
      minimum case count; every branch/condition with its line (true AND

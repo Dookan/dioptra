@@ -16,6 +16,7 @@ import { PasswordChangeScreen } from './screens/password-change-screen';
 import { ProjectScreen } from './screens/project-screen';
 import { ProjectsScreen } from './screens/projects-screen';
 import { ReportScreen } from './screens/report-screen';
+import { CaseDesignScreen } from './screens/case-design-screen';
 import { TestPlanScreen } from './screens/test-plan-screen';
 
 function Authenticated(): React.ReactNode {
@@ -29,6 +30,8 @@ function Authenticated(): React.ReactNode {
       return <FindingsScreen route={route} onNavigate={navigate} />;
     case 'plan':
       return <TestPlanScreen route={route} onNavigate={navigate} />;
+    case 'design':
+      return <CaseDesignScreen route={route} onNavigate={navigate} />;
     case 'report':
       return <ReportScreen route={route} onNavigate={navigate} />;
     case 'home':

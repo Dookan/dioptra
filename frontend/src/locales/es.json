@@ -108,6 +108,15 @@
         "notBuilt": "Esta etapa todavía no se puede cerrar en esta versión de la plataforma."
       },
       "stageNotReached": "Esa etapa todavía no empezó: primero se cierran las anteriores."
+    },
+    "ast": {
+      "failed": "No se pudo analizar el código de esa función.",
+      "unsupportedLanguage": "Ese archivo no está en un lenguaje que la plataforma analice (JS/TS y Python en esta versión).",
+      "sourceTooLarge": "El archivo es demasiado grande para dibujarlo.",
+      "functionNotFound": "No encontramos esa función en el código.",
+      "parseFailed": "La función tiene errores de sintaxis; corrígelos en el código antes de diseñar.",
+      "tooDeep": "La función está anidada más allá del límite; simplifícala antes de diseñar.",
+      "functionNotInPlan": "Esa función no está en el plan de pruebas."
     }
   },
   "nav": {
@@ -397,5 +406,50 @@
       "lockedBody": "La etapa de plan ya se cerró: el diseño de casos trabaja sobre este plan y no se puede cambiar."
     },
     "incomplete": "Incluye al menos una función y escribe tu justificación ({{min}} caracteres o más)."
+  },
+  "design": {
+    "title": "Diseño de casos",
+    "subtitle": "Cada función del plan, dibujada desde su código. Diseña tus casos mirando el diagrama y la consigna.",
+    "functionLabel": "Función del plan",
+    "position": "función {{position}} de {{total}}",
+    "complexity": "{{count}} caminos posibles",
+    "diagram": {
+      "loading": "Dibujando el diagrama desde el código…",
+      "alt": "Diagrama de flujo de {{name}}: {{count}} caminos posibles",
+      "legend": "Rombos: decisiones y bucles · borde rojo: error o excepción · flecha punteada: vuelve a empezar el bucle."
+    },
+    "node": {
+      "start": "inicio · {{name}}",
+      "end": "fin"
+    },
+    "edge": {
+      "true": "sí",
+      "false": "no",
+      "loop": "repite",
+      "except": "error",
+      "default": "otro"
+    },
+    "mermaid": {
+      "title": "Diagrama (Mermaid) · editable",
+      "textLabel": "Texto Mermaid del diagrama",
+      "edit": "✎ Editar el diagrama",
+      "restore": "Restaurar el generado",
+      "save": "Guardar mi versión",
+      "cancel": "Cancelar",
+      "editedBy": "Texto editado por {{user}}. El dibujo de arriba sigue siendo el del código.",
+      "note": "Puedes ordenar el diagrama a tu gusto; la consigna se calcula del código, no del diagrama."
+    },
+    "cases": {
+      "title": "Tus casos, con tus palabras",
+      "intro": "Describe qué vas a probar y qué esperas que pase. El código viene después.",
+      "pending": "La consigna y el editor de casos llegan en la siguiente entrega de la plataforma. Mientras tanto, revisa los diagramas."
+    },
+    "nextStep": {
+      "notYetTitle": "Todavía no toca diseñar",
+      "notYetBody": "Primero se cierra el plan de pruebas. Puedes mirar los diagramas mientras tanto.",
+      "noPlanTitle": "No hay funciones en el plan",
+      "diagramsTitle": "{{count}} función(es) para diseñar",
+      "diagramsBody": "Revisa el diagrama de cada función. Cuando llegue la consigna, escribirás tus casos aquí mismo."
+    }
   }
 }

@@ -35,7 +35,9 @@ Added to `docs/mockups/index.html` on 2026-08-28, same tokens and principles:
   SBOM/CBOM)" in the section list.
 - **Diseño de casos (E5)**: the flow diagram is rendered Mermaid, with its
   editable Mermaid text underneath; the brief is computed from the code, not
-  from the edited diagram, and the screen says so.
+  from the edited diagram, and the screen says so. (Rendering deviation
+  recorded under "Phase 3 screens" below: the picture is our own SVG, the
+  Mermaid text stays as text.)
 
 ## Phase 1 deviations from the mockups (recorded 2026-09-21)
 
@@ -86,6 +88,22 @@ Added to `docs/mockups/index.html` on 2026-08-28, same tokens and principles:
   shown in plain words. Buttons: "Empezar la revisión de hallazgos" (project
   card, E2 → E3), "Pasar al plan de pruebas" (findings banner, E3 → E4),
   "Guardar plan y diseñar los casos →" (plan screen, saves then E4 → E5).
+- **Diseño de casos (E5)**, route `#/…/design` (screen 06): the diagram is
+  our own class-only SVG drawn from the server's layout, not a Mermaid
+  render (the CSP forbids Mermaid's inline styles — `tasks/phase3-survey.md`
+  §7); the Mermaid text sits underneath, editable by the developer at E5 and
+  always shown as text; the note "la consigna se calcula del código, no del
+  diagrama" is verbatim. The right column (cases) arrives with day 15. The
+  Workflow tab opens Plan until E4 closes, then Diseño. Recorded deviations
+  from screen 06: a `<select>` above the title chooses the planned function
+  (the anchor shows one function with no navigation); "función N de M" sits
+  in the panel's mono line, not in the status bar; the drawing has a small
+  colour semantics the anchor lacks (diamonds for decisions and loops, red
+  border on throw/raise, dashed back edges) explained by a one-line legend
+  under the frame; the start pill reads "inicio · <name>". The Mermaid text
+  under the drawing is the server's interchange text (English tokens
+  `true`/`false`/`Start`) while the drawing is translated — `mmarin`'s call
+  whether the anchor's Spanish Mermaid sample should be matched.
 - The findings screen hides the verdict form once the analysis has left
   E3 (the server refuses with `stage_locked`; the UI mirrors it).
 - The status bar uses the mockups' long-form stage names (`statusbar.stage.*`:

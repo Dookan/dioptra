@@ -188,3 +188,94 @@ body, advance POST), stepper driven by `analysis.stage`, status bar text.
 ## Verdict: Proceed
 
 Day 13 only. Days 14–15 append §7+ here before their edits.
+
+## §7 Day 14 — AST → flow diagrams (appended 2026-09-22, before any edit)
+
+### What exists
+- The plan (`test_plans.functions`) names each function by `(path, function,
+  line)` as Lizard reported it; Lizard's `function` is the bare name (methods
+  arrive as `Class::method` / `Class.method` — match on the last segment).
+- The jail (`analysis.workspace_path`) is shared by API and worker
+  (`DIOPTRA_DATA_DIR`), so the API can read the source file itself.
+- CSP is `style-src 'self'` in both nginx and the API (P0), no
+  `unsafe-inline`.
+
+### Parser
+tree-sitter (MIT) + the JS, TS/TSX and Python grammars (MIT), added to
+`pyproject.toml` with license + rationale; the license gate re-verified
+(215 packages, OK). One engine for wave 1 and for PHP/Java in P5. Language by
+extension: `.js .mjs .cjs .jsx` → javascript, `.ts .mts .cts` → typescript,
+`.tsx` → tsx, `.py` → python; anything else → `UnsupportedLanguage` (422).
+
+### Extraction (`app/workflow/ast/`)
+```
+load_source(analysis, path) -> bytes
+    resolved = (jail / path).resolve(); must be relative_to(jail) else FunctionNotFound
+    size > MAX_SOURCE_BYTES (512 KiB) → SourceTooLarge (422)
+find_function(tree, name, line) -> node
+    candidates: function_definition / function_declaration / method_definition /
+    arrow_function or function expression bound by a variable_declarator, whose
+    name's last segment == name; prefer start line == line, else nearest;
+    none → FunctionNotFound (404). A tree with ERROR nodes inside the function → ParseFailed (422).
+build_graph(node, language) -> FlowGraph(name, params, nodes[], edges[], complexity)
+    nodes: start, end, process (consecutive simple statements collapsed, label =
+    "line a–b"), decision (if / elif / while / for / switch-case / try),
+    return, throw/raise; edges labelled true / false / loop / except.
+    depth capped (MAX_DEPTH 40 → TooDeep 422); nested functions are opaque process nodes.
+    complexity = 1 + if/elif/else-if + loops + case + except/catch + ternary
+                 + boolean operators (&&, ||, ??, and, or) — Lizard's counting.
+```
+Determinism: node ids are assigned in source order; the same bytes give the
+same graph, the same Mermaid text and the same layout (tested: two runs,
+byte-identical).
+
+### Rendering — trade-off surfaced
+The plan says "rendered by the bundled Mermaid library". Mermaid renders an
+SVG that carries its own `<style>` element and `style=` attributes; under
+our CSP (`style-src 'self'`, no `unsafe-inline`) the browser drops both and
+the diagram comes out black-on-black. Two ways out: (a) add
+`'unsafe-inline'` to `style-src` for the whole app, or (b) render the
+diagram ourselves from the same graph with a deterministic layered layout and
+CSS classes only — no inline style, no new frontend dependency, and the SAME
+layout function produces the SVG the P5 report annex embeds server-side
+(docs/threat-model.md → Flow diagrams already requires that). Chosen: (b).
+The Mermaid TEXT stays the interchange and editing format (shown and
+editable under the diagram, exportable, escaped as text everywhere); the
+rendered picture is always the AST's, so "the brief is computed from the
+AST, never from the edited diagram" holds by construction. Recorded in
+docs/ui-model.md and docs/workflow-gates.md; `mmarin` may revert to (a).
+
+### Storage and API
+```
+case_designs: id, analysis_id FK, path, function, line,
+              diagram_text NULL (developer's edited Mermaid, ≤ 20 000 chars),
+              created_by_username, updated_at; UNIQUE (analysis_id, path, function, line)
+              -- day 15 adds pseudocode + approval columns to the same row
+GET /api/v1/analyses/{id}/diagram?path=&function=&line=   (any role)
+    → {language, mermaid, complexity, graph, layout, edited_text}
+PUT /api/v1/analyses/{id}/diagram   (DeveloperUser, only AT design; body {path, function, line, text})
+    → saves diagram_text (text only), audit "design.diagram.edit"
+```
+The function must belong to the saved plan (`FunctionNotInPlan` 422) —
+diagrams exist for what E4 chose.
+
+### Frontend
+Route `#/…/design` → `case-design-screen.tsx` (mockup 06): function
+selector from the plan; `FlowDiagram` draws `<svg>` from the layout JSON
+with `<rect>/<text>/<path>` and class names; the Mermaid text below in a
+textarea (developer, at design) with "Guardar diagrama"; the note "La
+consigna se calcula del código, no del diagrama". The right column (brief +
+pseudocode) is day 15 — a banner says so. The Workflow tab points at plan
+or design by stage.
+
+### Tests
+`tests/test_ast_js_ts.py`, `test_ast_python.py`: fixtures with hand-counted
+nodes/edges/complexity (if/else, elif chain, loops, try/except, switch,
+ternary, boolean operators, nested function opaque, arrow function bound to
+const, method); `test_diagrams.py`: determinism, Mermaid escaping of hostile
+names (`"`, `<`, newlines), layout invariants (every node placed, no NaN,
+edges reference existing nodes); hostile source: 600 KiB file → 422, 60-deep
+nesting → 422, syntax error inside the function → 422, `../../etc/passwd` →
+404, `.rb` → 422; API: function outside the plan → 422, developer-only PUT,
+PUT refused off the design stage. Frontend: screen renders the SVG nodes,
+PUT body, read-only for the analyst.

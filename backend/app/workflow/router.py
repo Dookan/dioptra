@@ -20,6 +20,8 @@ from app.ingest import service
 from app.projects.router import analysis_out
 from app.projects.schemas import (
     AnalysisOut,
+    DiagramOut,
+    DiagramTextIn,
     FindingOut,
     JustificationIn,
     RiskRowOut,
@@ -28,7 +30,7 @@ from app.projects.schemas import (
     VerdictIn,
     finding_out,
 )
-from app.workflow import stages, test_plan, triage
+from app.workflow import design, stages, test_plan, triage
 from app.workflow.risk import risk_matrix
 
 router = APIRouter(prefix="/api/v1/findings", tags=["findings"])
@@ -86,6 +88,43 @@ def advance_stage(
 def get_risk_matrix(analysis_id: uuid.UUID, _user: ActiveUser, db: DbSession) -> list[RiskRowOut]:
     analysis = service.get_analysis(db, analysis_id)
     return [RiskRowOut(**asdict(row)) for row in risk_matrix(analysis)]
+
+
+@workflow_router.get("/diagram", response_model=DiagramOut)
+def get_diagram(
+    analysis_id: uuid.UUID,
+    path: str,
+    function: str,
+    _user: ActiveUser,
+    db: DbSession,
+    line: int | None = None,
+) -> DiagramOut:
+    """Stage E5: the flow graph of one planned function, computed from the source now."""
+    analysis = service.get_analysis(db, analysis_id)
+    ref = design.FunctionRef(path=path[:1024], function=function[:200], line=line)
+    return DiagramOut(**design.diagram_payload(db, analysis, ref))
+
+
+@workflow_router.put("/diagram", response_model=DiagramOut)
+def put_diagram_text(
+    analysis_id: uuid.UUID,
+    payload: DiagramTextIn,
+    request: Request,
+    user: DeveloperUser,
+    db: DbSession,
+) -> DiagramOut:
+    """Stage E5 (developer only): the edited Mermaid text, stored as text."""
+    analysis = service.get_analysis(db, analysis_id)
+    ref = design.FunctionRef(path=payload.path, function=payload.function, line=payload.line)
+    design.save_diagram_text(
+        db,
+        analysis=analysis,
+        actor=user,
+        ref=ref,
+        text=payload.text,
+        source_ip=client_ip(request),
+    )
+    return DiagramOut(**design.diagram_payload(db, analysis, ref))
 
 
 @workflow_router.get("/test-plan", response_model=TestPlanOut)

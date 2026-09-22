@@ -108,6 +108,15 @@
         "notBuilt": "This stage cannot be closed yet in this version of the platform."
       },
       "stageNotReached": "That stage has not started yet: the previous ones close first."
+    },
+    "ast": {
+      "failed": "That function's code could not be analyzed.",
+      "unsupportedLanguage": "That file is not in a language the platform analyzes (JS/TS and Python in this version).",
+      "sourceTooLarge": "The file is too large to draw.",
+      "functionNotFound": "We could not find that function in the code.",
+      "parseFailed": "The function has syntax errors; fix them in the code before designing.",
+      "tooDeep": "The function is nested beyond the limit; simplify it before designing.",
+      "functionNotInPlan": "That function is not in the test plan."
     }
   },
   "nav": {
@@ -397,5 +406,50 @@
       "lockedBody": "The plan stage is closed: the case design works on this plan and it cannot change."
     },
     "incomplete": "Include at least one function and write your rationale ({{min}} characters or more)."
+  },
+  "design": {
+    "title": "Case design",
+    "subtitle": "Every function of the plan, drawn from its code. Design your cases looking at the diagram and the brief.",
+    "functionLabel": "Function from the plan",
+    "position": "function {{position}} of {{total}}",
+    "complexity": "{{count}} possible paths",
+    "diagram": {
+      "loading": "Drawing the diagram from the code…",
+      "alt": "Flow diagram of {{name}}: {{count}} possible paths",
+      "legend": "Diamonds: decisions and loops · red border: error or exception · dashed arrow: back to the loop."
+    },
+    "node": {
+      "start": "start · {{name}}",
+      "end": "end"
+    },
+    "edge": {
+      "true": "yes",
+      "false": "no",
+      "loop": "repeat",
+      "except": "error",
+      "default": "other"
+    },
+    "mermaid": {
+      "title": "Diagram (Mermaid) · editable",
+      "textLabel": "Mermaid text of the diagram",
+      "edit": "✎ Edit the diagram",
+      "restore": "Restore the generated one",
+      "save": "Save my version",
+      "cancel": "Cancel",
+      "editedBy": "Text edited by {{user}}. The drawing above is still the code's.",
+      "note": "Arrange the diagram as you like; the brief is computed from the code, not from the diagram."
+    },
+    "cases": {
+      "title": "Your cases, in your words",
+      "intro": "Describe what you will test and what you expect to happen. The code comes later.",
+      "pending": "The brief and the case editor arrive in the platform's next delivery. Meanwhile, review the diagrams."
+    },
+    "nextStep": {
+      "notYetTitle": "Not time to design yet",
+      "notYetBody": "The test plan closes first. You can look at the diagrams meanwhile.",
+      "noPlanTitle": "No functions in the plan",
+      "diagramsTitle": "{{count}} function(s) to design",
+      "diagramsBody": "Review each function's diagram. When the brief arrives, you will write your cases right here."
+    }
   }
 }

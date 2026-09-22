@@ -188,6 +188,28 @@ class TestPlanOut(BaseModel):
     updated_at: datetime
 
 
+class DiagramTextIn(BaseModel):
+    path: str = Field(min_length=1, max_length=1024)
+    function: str = Field(min_length=1, max_length=200)
+    line: int | None = None
+    text: str = Field(max_length=40_000)
+
+
+class DiagramOut(BaseModel):
+    path: str
+    function: str
+    line: int | None
+    language: str
+    complexity: int
+    #: Interchange / editing format; the picture is drawn from ``layout``.
+    mermaid: str
+    graph: dict[str, Any]
+    layout: dict[str, Any]
+    edited_text: str | None
+    edited_by_username: str | None
+    edited_at: datetime | None
+
+
 class VerdictIn(BaseModel):
     verdict: Verdict
     #: Mandatory. The length floor is enforced by the service after whitespace

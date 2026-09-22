@@ -31,16 +31,18 @@ type TabKey = 'home' | 'projects' | 'findings' | 'workflow' | 'report';
  * 05 and 09) once the route names an analysis — they are meaningless without
  * one. Workflow opens the current stage's screen (E4 in P3).
  */
-function tabsFor(route: Route): { key: TabKey; route: Route }[] {
+function tabsFor(route: Route, stage: string | undefined): { key: TabKey; route: Route }[] {
   const tabs: { key: TabKey; route: Route }[] = [
     { key: 'home', route: { kind: 'home' } },
     { key: 'projects', route: { kind: 'projects' } },
   ];
-  if (route.kind === 'findings' || route.kind === 'plan' || route.kind === 'report') {
+  if ('analysisId' in route) {
     const { id, analysisId } = route;
+    // Workflow opens the current stage's screen: E4 until the plan closes, then E5.
+    const workflow = stage !== undefined && stageIndex(stage) >= stageIndex('design') ? 'design' : 'plan';
     tabs.push(
       { key: 'findings', route: { kind: 'findings', id, analysisId } },
-      { key: 'workflow', route: { kind: 'plan', id, analysisId } },
+      { key: 'workflow', route: { kind: workflow, id, analysisId } },
       { key: 'report', route: { kind: 'report', id, analysisId } },
     );
   }
@@ -49,6 +51,7 @@ function tabsFor(route: Route): { key: TabKey; route: Route }[] {
 
 function isActive(tab: Route, route: Route): boolean {
   if (tab.kind === 'projects') return route.kind === 'projects' || route.kind === 'project';
+  if (tab.kind === 'plan' || tab.kind === 'design') return route.kind === 'plan' || route.kind === 'design';
   return tab.kind === route.kind;
 }
 
@@ -82,7 +85,7 @@ export function AppShell({ route, onNavigate, context, stage, children }: Props)
         </div>
       </header>
       <nav className="tabsbar" aria-label={t('nav.label')}>
-        {tabsFor(route).map((tab) => (
+        {tabsFor(route, stage).map((tab) => (
           <a
             key={tab.key}
             className={isActive(tab.route, route) ? 'ptab on' : 'ptab'}

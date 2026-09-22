@@ -64,11 +64,19 @@ non-goal of v1.0.0.
 
 ## Flow diagrams (E5)
 
-Generated deterministically from the same AST (JS/TS and Python in wave 1) as
-Mermaid text, rendered by the bundled Mermaid library (MIT) — no diagram
-service. The developer may edit the diagram; the brief is computed from the
-AST, never from the edited diagram. Large functions can produce unreadable
-diagrams — the same ≤ 10 contingency applies.
+Generated deterministically from the same AST (JS/TS and Python in wave 1,
+tree-sitter, `backend/app/workflow/ast/`) — built 2026-09-22. The graph is
+emitted twice from one source: as Mermaid text (the interchange and editing
+format the plan names) and as a deterministic layered layout that the UI
+draws as class-only SVG (`frontend/src/components/flow-diagram.tsx`) and
+the P5 annex will embed server-side. The Mermaid library itself is not used
+for rendering: its SVG needs inline styles the app's CSP refuses
+(`tasks/phase3-survey.md` §7). The developer may edit the Mermaid text
+(`PUT …/diagram`, developer, only AT E5, stored and shown as text); the
+picture and the brief are computed from the AST, never from the edited
+text. Large functions can produce unreadable diagrams — the same ≤ 10
+contingency applies. Limits: files ≤ 512 KiB, nesting ≤ 40, ≤ 400 nodes,
+syntax errors inside the function → typed refusal.
 
 ## Scaffolds (E6)
 

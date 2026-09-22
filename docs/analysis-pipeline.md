@@ -45,7 +45,7 @@ Every runner has a timeout and CPU/RAM limits, and its raw output is persisted
 before normalization (the plan's day 7), so a normalizer bug never loses a
 tool's result.
 
-Languages: wave 1 JS/TS + Python (P1–P4); wave 2 PHP/Laravel + Java/Spring
+Languages (analysis runners and, since P3 day 14, the tree-sitter AST layer of E5): wave 1 JS/TS + Python (P1–P4); wave 2 PHP/Laravel + Java/Spring
 (P5, first cut under overrun); wave 3 Go + C#/.NET is out of scope for v1.0.0.
 
 ## Rule authoring (`rules/semgrep/`)

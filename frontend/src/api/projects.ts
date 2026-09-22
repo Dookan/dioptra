@@ -133,6 +133,46 @@ export interface PlannedFunction {
   ccn?: number;
 }
 
+export interface FlowNode {
+  id: string;
+  kind: 'start' | 'end' | 'process' | 'decision' | 'loop' | 'return' | 'throw';
+  label: string;
+  line: number | null;
+}
+
+export interface FlowEdge {
+  source: string;
+  target: string;
+  label: string;
+}
+
+export interface PlacedNode extends FlowNode {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface PlacedEdge extends FlowEdge {
+  points: [number, number][];
+  back: boolean;
+}
+
+export interface Diagram {
+  path: string;
+  function: string;
+  line: number | null;
+  language: string;
+  complexity: number;
+  /** Interchange / editing format; the picture is drawn from `layout`. */
+  mermaid: string;
+  graph: { name: string; params: string[]; nodes: FlowNode[]; edges: FlowEdge[] };
+  layout: { width: number; height: number; nodes: PlacedNode[]; edges: PlacedEdge[] };
+  edited_text: string | null;
+  edited_by_username: string | null;
+  edited_at: string | null;
+}
+
 export interface TestPlan {
   analysis_id: string;
   criterion: CoverageCriterion;
@@ -265,6 +305,32 @@ export function saveTestPlan(
     method: 'PUT',
     accessToken,
     body: plan,
+  });
+}
+
+export function getDiagram(
+  accessToken: string,
+  analysisId: string,
+  ref: PlannedFunction,
+): Promise<Diagram> {
+  const query = new URLSearchParams({ path: ref.path, function: ref.function });
+  if (ref.line !== null) query.set('line', String(ref.line));
+  return apiFetch<Diagram>(
+    `/analyses/${encodeURIComponent(analysisId)}/diagram?${query.toString()}`,
+    { accessToken },
+  );
+}
+
+export function saveDiagramText(
+  accessToken: string,
+  analysisId: string,
+  ref: PlannedFunction,
+  text: string,
+): Promise<Diagram> {
+  return apiFetch<Diagram>(`/analyses/${encodeURIComponent(analysisId)}/diagram`, {
+    method: 'PUT',
+    accessToken,
+    body: { path: ref.path, function: ref.function, line: ref.line, text },
   });
 }
 

@@ -22,6 +22,7 @@
   you look through it and check alignment against a reference. It is NOT a
   synonym for "análisis de caja blanca", which is the technique. See
   docs/name-and-identity.md.
+- **Flow graph**: the deterministic control-flow graph of one function (`backend/app/workflow/ast/`), emitted as Mermaid text and as a class-only SVG layout. The picture is always the AST's; the developer's edited Mermaid is text.
 - **Finding**: a detected issue with CWE, OWASP category, CVSS severity,
   path:line, snippet, mitigation, references.
 - **Gate**: server-side precondition between stages. See docs/workflow-gates.md.
