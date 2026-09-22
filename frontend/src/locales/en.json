@@ -106,7 +106,8 @@
         "triagePending": "Findings are still pending review: each one needs a verdict.",
         "testPlanMissing": "The test plan is missing: at least one function, the coverage strictness and your rationale.",
         "notBuilt": "This stage cannot be closed yet in this version of the platform.",
-        "casesNotApproved": "Some functions of the plan still lack approved cases."
+        "casesNotApproved": "Some functions of the plan still lack approved cases.",
+        "testsNotWritten": "Some cases are still unwritten. Write something of your own in each before moving to verification."
       },
       "stageNotReached": "That stage has not started yet: the previous ones close first.",
       "caseItemUnknown": "A case points at a brief item that no longer exists. Reload the page.",
@@ -114,7 +115,10 @@
       "briefNotCovered": "Some points of the brief are still covered by no case.",
       "casesTooFew": "Fewer cases than paths: the brief asks for at least one per path.",
       "testPlanFunctionUnbriefable": "{{function}} ({{path}}, line {{line}}) cannot be read for the brief (unsupported language, file too large, syntax error or a different name): leave it out of the plan.",
-      "testPlanFunctionTooComplex": "{{function}} ({{path}}, line {{line}}) has more paths than one function's design can hold: leave it out of the plan and ask for it to be split."
+      "testPlanFunctionTooComplex": "{{function}} ({{path}}, line {{line}}) has more paths than one function's design can hold: leave it out of the plan and ask for it to be split.",
+      "designNotApproved": "That function's cases are not approved yet, so there is no file to prepare.",
+      "testsUnparsable": "The test file has a syntax error and cannot be read.",
+      "testsTooLarge": "The test file is too large."
     },
     "ast": {
       "failed": "That function's code could not be analyzed.",
@@ -503,5 +507,43 @@
       "blocked_one": "Approve the cases of the plan's one function ({{approved}} of {{count}}).",
       "blocked_other": "Approve the cases of every function in the plan ({{approved}} of {{count}})."
     }
+  },
+  "tests": {
+    "title": "Write the tests",
+    "subtitle": "The platform hands you the file with your cases already named. You write the assertions: writing the test is the learning.",
+    "functionLabel": "Planned function",
+    "position": "function {{position}} of {{total}}",
+    "scaffoldTitle": "What the platform prepares",
+    "scaffoldNote": "File {{filename}}, for {{runner}}. It brings the name, the imports and one case per approved case. No assertion: the machine does not write that.",
+    "casesTitle": "Your approved cases",
+    "caseWritten": "You already wrote something in this case.",
+    "caseEmpty": "Still empty.",
+    "caseCovers": "Demonstrates:",
+    "yourFileTitle": "Your test file",
+    "yourFileNote": "Stored as text and never run here: the tests execute in the next stage, inside the isolated container.",
+    "editorLabel": "File content",
+    "save": "Save my file",
+    "reset": "Back to the prepared file",
+    "saved": "File saved.",
+    "parseError": "The file cannot be read: it has a syntax error. Fix it and save again; until then no case counts as written.",
+    "storedBy": "Saved by {{username}}",
+    "readOnly": "Only the developer writes the tests, and only during this stage.",
+    "nextStep": {
+      "notYetTitle": "Writing tests is not due yet",
+      "notYetBody": "The cases of every function have to be approved in the design first.",
+      "noPlanTitle": "There is no test plan",
+      "doneTitle": "The tests are written",
+      "doneBody": "The stage is closed: now they run and how much they really cover is measured.",
+      "writeBody": "Write at least one line of your own in every case. Whether it proves anything is measured by the next stage, not by this one.",
+      "writeTitle_one": "You have {{written}} of {{count}} case written",
+      "writeTitle_other": "You have {{written}} of {{count}} cases written",
+      "noPlanBody": "The test plan is empty, so there are no cases to write."
+    },
+    "advance": {
+      "label": "Go to run and measure →",
+      "blocked_one": "One case still to write: you have {{written}}.",
+      "blocked_other": "Cases still to write: {{written}} of {{count}}."
+    },
+    "backToDesign": "← Review my cases"
   }
 }

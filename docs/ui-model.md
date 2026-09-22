@@ -1,6 +1,6 @@
 # UI model
 
-> **Status: IN_PROGRESS — tokens, both themes and i18n (P0), the projects screens (P1), the findings / report screens (P2), the E4 plan screen with the status bar and the E5 design screen (P3, 2026-09-22) are built; the E6–E7 screens and Inventario are the target.** Visual anchor:
+> **Status: IN_PROGRESS — tokens, both themes and i18n (P0), the projects screens (P1), the findings / report screens (P2), the E4 plan screen with the status bar, the E5 design screen (P3, 2026-09-22) and the E6 test-writing screen (P4 day 16, 2026-09-22) are built; the E7 screen and Inventario are the target.** Visual anchor:
 > @docs/mockups/index.html (10 screens, approved 2026-08-17).
 
 ## Principles (from the approved mockups)
@@ -149,3 +149,38 @@ Radii: frames 14, cards 12, buttons 9, badges 5. Borders 1px hairline.
 - All fonts and libraries bundled locally — the mockup note applies: no CDN.
 - Mockup-fidelity gate: `dioptra-mockup-fidelity` compares implementation against
   @docs/mockups/index.html tokens, spacing, copy tone, and both themes.
+
+## Phase 4 screens (2026-09-22)
+
+- Route `#/projects/:id/analyses/:aid/tests` (screen 07 "Escribir los tests
+  (E6)"); the **Workflow** tab now opens Plan until E4 closes, Diseño until
+  E5 closes, then Escribir tests.
+- **Escribir los tests (E6)**: left panel "Lo que te prepara la plataforma" —
+  the generated file shown in a `<pre>` as text, with the file name and the
+  runner named in plain words, and the approved cases listed with a chip per
+  case that turns green when the stored file has a body for it; the caption
+  under each says "Ya escribiste algo en este caso" / "Todavía vacío", never
+  "correcto". Right panel "Tu archivo de tests": one textarea that opens on
+  the scaffold (the developer edits it, never a blank page), "Guardar mi
+  archivo" and "Volver al andamiaje", plus the line "Se guarda como texto y
+  no se ejecuta aquí". The banner counts "Llevas k de N casos escritos" and
+  holds the stage button "Pasar a ejecutar y medir →" (`AdvanceStage`,
+  enabled once every case has a body; the server re-checks).
+- The screen states the platform's limit in its own subtitle: "Las
+  aserciones las escribes tú: escribir la prueba es el aprendizaje." A
+  syntax error in the stored file is said plainly ("hasta entonces ningún
+  caso cuenta como escrito"), because that is exactly what the gate does.
+- The analyst and the admin see the whole screen with the textarea read-only
+  (they need the tests to judge the report) and no save button.
+- Recorded deviations from screen 07: the anchor's progress bar ("2 de 5 casos
+  listos · 40 %") is dropped — the count lives in the "next step" banner, which
+  every workflow screen already has and the anchor for 07 does not; the
+  anchor's `.ck` tick list becomes the `.chip` list (a different element, so
+  the case id stays readable — the id is what the gate matches in the file);
+  the anchor's syntax-highlighted code block becomes plain text, deliberately,
+  because the audited function's name and the developer's titles are in it;
+  a `<select>` plus "función N de M" is added, as on screen 06 (the anchor
+  shows one function with no navigation); and `.pagehead` + `.nextstep` are
+  added to a screen the anchor gives neither, as on 04, 05, 06 and 09. The
+  anchor's ghost button "← Revisar mis casos" IS implemented and returns to
+  the design screen.

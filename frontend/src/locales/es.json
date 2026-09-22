@@ -106,7 +106,8 @@
         "triagePending": "Faltan hallazgos por revisar: cada uno necesita un veredicto.",
         "testPlanMissing": "Falta el plan de pruebas: al menos una función, la exigencia de cobertura y tu justificación.",
         "notBuilt": "Esta etapa todavía no se puede cerrar en esta versión de la plataforma.",
-        "casesNotApproved": "Faltan funciones del plan con sus casos aprobados."
+        "casesNotApproved": "Faltan funciones del plan con sus casos aprobados.",
+        "testsNotWritten": "Todavía hay casos sin escribir. Escribe algo propio en cada uno antes de pasar a la verificación."
       },
       "stageNotReached": "Esa etapa todavía no empezó: primero se cierran las anteriores.",
       "caseItemUnknown": "Un caso apunta a un punto de la consigna que ya no existe. Recarga la página.",
@@ -114,7 +115,10 @@
       "briefNotCovered": "Todavía hay puntos de la consigna que ningún caso cubre.",
       "casesTooFew": "Hay menos casos que caminos: la consigna pide al menos uno por camino.",
       "testPlanFunctionUnbriefable": "{{function}} ({{path}}, línea {{line}}) no se puede leer para la consigna (lenguaje no soportado, archivo demasiado grande, error de sintaxis o nombre distinto): déjala fuera del plan.",
-      "testPlanFunctionTooComplex": "{{function}} ({{path}}, línea {{line}}) tiene más caminos de los que cabe diseñar en una sola función: déjala fuera del plan y pide que se divida."
+      "testPlanFunctionTooComplex": "{{function}} ({{path}}, línea {{line}}) tiene más caminos de los que cabe diseñar en una sola función: déjala fuera del plan y pide que se divida.",
+      "designNotApproved": "Esa función todavía no tiene sus casos aprobados, así que no hay archivo que preparar.",
+      "testsUnparsable": "El archivo de tests tiene un error de sintaxis y no se puede leer.",
+      "testsTooLarge": "El archivo de tests es demasiado grande."
     },
     "ast": {
       "failed": "No se pudo analizar el código de esa función.",
@@ -503,5 +507,43 @@
       "blocked_one": "Aprueba los casos de la función del plan ({{approved}} de {{count}}).",
       "blocked_other": "Aprueba los casos de cada función del plan ({{approved}} de {{count}})."
     }
+  },
+  "tests": {
+    "title": "Escribir los tests",
+    "subtitle": "La plataforma te deja el archivo armado con tus casos ya nombrados. Las aserciones las escribes tú: escribir la prueba es el aprendizaje.",
+    "functionLabel": "Función del plan",
+    "position": "función {{position}} de {{total}}",
+    "scaffoldTitle": "Lo que te prepara la plataforma",
+    "scaffoldNote": "Archivo {{filename}}, para {{runner}}. Trae el nombre, los imports y un caso por cada uno de los que aprobaste. Ninguna aserción: eso no lo escribe la máquina.",
+    "casesTitle": "Tus casos aprobados",
+    "caseWritten": "Ya escribiste algo en este caso.",
+    "caseEmpty": "Todavía vacío.",
+    "caseCovers": "Demuestra:",
+    "yourFileTitle": "Tu archivo de tests",
+    "yourFileNote": "Se guarda como texto y no se ejecuta aquí: los tests corren en la siguiente etapa, dentro del contenedor aislado.",
+    "editorLabel": "Contenido del archivo",
+    "save": "Guardar mi archivo",
+    "reset": "Volver al archivo preparado",
+    "saved": "Archivo guardado.",
+    "parseError": "El archivo no se puede leer: tiene un error de sintaxis. Corrígelo y vuelve a guardar; hasta entonces ningún caso cuenta como escrito.",
+    "storedBy": "Guardado por {{username}}",
+    "readOnly": "Solo el programador escribe los tests, y solo durante esta etapa.",
+    "nextStep": {
+      "notYetTitle": "Todavía no toca escribir los tests",
+      "notYetBody": "Primero hay que aprobar los casos de cada función en el diseño.",
+      "noPlanTitle": "No hay plan de pruebas",
+      "doneTitle": "Los tests ya están escritos",
+      "doneBody": "La etapa se cerró: ahora se ejecutan y se mide cuánto cubren de verdad.",
+      "writeBody": "Escribe al menos una línea propia en cada caso. Que sirva o no lo mide la siguiente etapa, no esta.",
+      "writeTitle_one": "Llevas {{written}} de {{count}} caso escrito",
+      "writeTitle_other": "Llevas {{written}} de {{count}} casos escritos",
+      "noPlanBody": "El plan de pruebas está vacío, así que no hay casos que escribir."
+    },
+    "advance": {
+      "label": "Pasar a ejecutar y medir →",
+      "blocked_one": "Te falta escribir {{count}} caso: llevas {{written}}.",
+      "blocked_other": "Te faltan casos por escribir: {{written}} de {{count}}."
+    },
+    "backToDesign": "← Revisar mis casos"
   }
 }

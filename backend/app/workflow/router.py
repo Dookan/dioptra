@@ -4,6 +4,7 @@ Phase 2: ``POST /api/v1/findings/{id}/verdict`` (E3 triage).
 Phase 3: ``POST /api/v1/analyses/{id}/stage/advance`` (the one transition),
 ``GET …/risk-matrix`` and ``GET|PUT …/test-plan`` (E4), ``GET|PUT …/diagram``,
 ``GET …/brief``, ``GET …/case-designs``, ``PUT …/cases`` and ``POST …/cases/approve`` (E5).
+Phase 4: ``GET …/scaffold`` and ``PUT …/tests`` (E6), ``GET …/test-files``.
 """
 
 from __future__ import annotations
@@ -30,12 +31,15 @@ from app.projects.schemas import (
     JustificationIn,
     PlannedFunctionIn,
     RiskRowOut,
+    ScaffoldOut,
     TestPlanIn,
     TestPlanOut,
+    TestsIn,
     VerdictIn,
+    WritingStateOut,
     finding_out,
 )
-from app.workflow import design, stages, test_plan, triage
+from app.workflow import authoring, design, stages, test_plan, triage
 from app.workflow.risk import risk_matrix
 
 router = APIRouter(prefix="/api/v1/findings", tags=["findings"])
@@ -191,6 +195,52 @@ def approve_cases(
     ref = design.FunctionRef(path=payload.path, function=payload.function, line=payload.line)
     design.approve_cases(db, analysis=analysis, actor=user, ref=ref, source_ip=client_ip(request))
     return BriefOut(**design.brief_payload(db, analysis, ref))
+
+
+@workflow_router.get("/scaffold", response_model=ScaffoldOut)
+def get_scaffold(
+    analysis_id: uuid.UUID,
+    path: str,
+    function: str,
+    _user: ActiveUser,
+    db: DbSession,
+    line: int | None = None,
+) -> ScaffoldOut:
+    """Stage E6: the deterministic scaffold and whatever the developer has stored."""
+    analysis = service.get_analysis(db, analysis_id)
+    ref = design.FunctionRef(path=path[:1024], function=function[:200], line=line)
+    return ScaffoldOut(**authoring.scaffold_payload(db, analysis, ref))
+
+
+@workflow_router.put("/tests", response_model=ScaffoldOut)
+def put_tests(
+    analysis_id: uuid.UUID,
+    payload: TestsIn,
+    request: Request,
+    user: DeveloperUser,
+    db: DbSession,
+) -> ScaffoldOut:
+    """Stage E6 (developer only): store the test file the developer wrote."""
+    analysis = service.get_analysis(db, analysis_id)
+    ref = design.FunctionRef(path=payload.path, function=payload.function, line=payload.line)
+    authoring.save_tests(
+        db,
+        analysis=analysis,
+        actor=user,
+        ref=ref,
+        content=payload.content,
+        source_ip=client_ip(request),
+    )
+    return ScaffoldOut(**authoring.scaffold_payload(db, analysis, ref))
+
+
+@workflow_router.get("/test-files", response_model=list[WritingStateOut])
+def get_test_files(
+    analysis_id: uuid.UUID, _user: ActiveUser, db: DbSession
+) -> list[WritingStateOut]:
+    """Stage E6: cases written per planned function — the gate's state, for the banner."""
+    analysis = service.get_analysis(db, analysis_id)
+    return [WritingStateOut(**state) for state in authoring.writing_states(db, analysis)]
 
 
 @workflow_router.get("/test-plan", response_model=TestPlanOut)

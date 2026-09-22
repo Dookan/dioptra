@@ -286,10 +286,10 @@ def test_design_cannot_be_left_until_every_planned_function_is_approved(
     assert left.status_code == 200, left.text
     assert left.json()["stage"] == "tests"
 
-    # E6's gate is P4's: closed by construction.
+    # E6's gate is built (P4 day 16) and closed: no test file has been stored.
     assert (
         _advance(client, headers, analysis.id).json()["message_key"]
-        == "errors.workflow.gate.notBuilt"
+        == "errors.workflow.gate.testsNotWritten"
     )
     db.expire_all()
     assert analysis.stage is Stage.TESTS

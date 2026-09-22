@@ -18,6 +18,7 @@ import { ProjectsScreen } from './screens/projects-screen';
 import { ReportScreen } from './screens/report-screen';
 import { CaseDesignScreen } from './screens/case-design-screen';
 import { TestPlanScreen } from './screens/test-plan-screen';
+import { TestWritingScreen } from './screens/test-writing-screen';
 
 function Authenticated(): React.ReactNode {
   const { route, navigate } = useRoute();
@@ -32,6 +33,8 @@ function Authenticated(): React.ReactNode {
       return <TestPlanScreen route={route} onNavigate={navigate} />;
     case 'design':
       return <CaseDesignScreen route={route} onNavigate={navigate} />;
+    case 'tests':
+      return <TestWritingScreen route={route} onNavigate={navigate} />;
     case 'report':
       return <ReportScreen route={route} onNavigate={navigate} />;
     case 'home':

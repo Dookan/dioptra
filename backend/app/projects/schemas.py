@@ -18,7 +18,7 @@ from app.analysis.models import (
     ToolStatus,
     Verdict,
 )
-from app.workflow.models import MAX_CASES, CoverageCriterion
+from app.workflow.models import MAX_CASES, MAX_TEST_FILE_CHARS, CoverageCriterion
 
 
 class SystemProfileIn(BaseModel):
@@ -238,6 +238,49 @@ class DiagramOut(BaseModel):
     edited_text: str | None
     edited_by_username: str | None
     edited_at: datetime | None
+
+
+class TestsIn(BaseModel):
+    path: str = Field(min_length=1, max_length=1024)
+    function: str = Field(min_length=1, max_length=200)
+    line: int | None = None
+    #: The developer's whole test file, stored as text and never executed here.
+    content: str = Field(max_length=MAX_TEST_FILE_CHARS)
+
+
+class ScaffoldCaseOut(BaseModel):
+    id: str
+    title: str
+    covers: list[str]
+    #: Whether the stored file holds a body of its own for this case.
+    written: bool
+
+
+class ScaffoldOut(BaseModel):
+    path: str
+    function: str
+    line: int | None
+    language: str
+    runner: str
+    filename: str
+    #: What the platform generates — names, imports, the brief items. No assertion.
+    scaffold: str
+    #: What the developer stored (empty until they save).
+    content: str
+    stored_at: datetime | None
+    stored_by_username: str | None
+    #: The stored text does not parse, so no case could be read from it.
+    parse_error: bool
+    cases: list[ScaffoldCaseOut]
+
+
+class WritingStateOut(BaseModel):
+    path: str
+    function: str
+    line: int | None
+    cases: int
+    written: int
+    parse_error: bool
 
 
 class VerdictIn(BaseModel):

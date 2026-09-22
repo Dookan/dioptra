@@ -1,4 +1,8 @@
-"""Workflow tables. Phase 3: the E4 test plan and the E5 case designs."""
+"""Workflow tables. Phase 3: the E4 test plan and the E5 case designs.
+
+Phase 4 adds the E6 test file the developer writes over the scaffold, and the
+``reopened_at`` flag the E7 → E5 loop sets on the designs that failed.
+"""
 
 from __future__ import annotations
 
@@ -77,6 +81,10 @@ class CaseDesign(Base):
     brief: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
     approved_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     approved_by_username: Mapped[str | None] = mapped_column(String(64), default=None)
+    #: Set by the E7 → E5 loop when this function's verification failed: the
+    #: design becomes writable again AT E7 without moving the stage backwards
+    #: (the machine stays monotonic). Approving again clears it.
+    reopened_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     created_by_username: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now, onupdate=utc_now)
@@ -90,6 +98,48 @@ class CaseDesign(Base):
             "function",
             "line",
             name="uq_case_design_function",
+            postgresql_nulls_not_distinct=True,
+        ),
+    )
+
+
+#: A test file the developer stores. Generous, because it is the developer's
+#: own work, but bounded: it is text we parse, and the sandbox writes it out.
+MAX_TEST_FILE_CHARS = 200_000
+
+
+class TestFile(Base):
+    """E6 deliverable: the test file the developer wrote for one planned function.
+
+    Stored as TEXT and never executed outside the E7 sandbox. The platform
+    generated only its scaffold (names, imports, the brief items per case);
+    every assertion in here is the developer's — that separation is the whole
+    pedagogy (docs/roles-and-permissions.md → Rules).
+    """
+
+    __tablename__ = "test_files"
+
+    id: Mapped[uuid.UUID] = mapped_column(default=uuid.uuid4, primary_key=True)
+    analysis_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("analyses.id", ondelete="CASCADE"), index=True
+    )
+    path: Mapped[str] = mapped_column(String(1024))
+    function: Mapped[str] = mapped_column(String(200))
+    line: Mapped[int | None] = mapped_column(Integer, default=None)
+    #: The scaffold's file name; the sandbox writes the content under it.
+    filename: Mapped[str] = mapped_column(String(255))
+    content: Mapped[str] = mapped_column(Text, default="")
+    created_by_username: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now, onupdate=utc_now)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "analysis_id",
+            "path",
+            "function",
+            "line",
+            name="uq_test_file_function",
             postgresql_nulls_not_distinct=True,
         ),
     )

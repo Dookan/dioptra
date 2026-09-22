@@ -38,8 +38,16 @@ function tabsFor(route: Route, stage: string | undefined): { key: TabKey; route:
   ];
   if ('analysisId' in route) {
     const { id, analysisId } = route;
-    // Workflow opens the current stage's screen: E4 until the plan closes, then E5.
-    const workflow = stage !== undefined && stageIndex(stage) >= stageIndex('design') ? 'design' : 'plan';
+    // Workflow opens the current stage's screen: E4 until the plan closes,
+    // then E5, then E6 once the cases are approved and the stage moves on.
+    const workflow =
+      stage === undefined
+        ? 'plan'
+        : stageIndex(stage) >= stageIndex('tests')
+          ? 'tests'
+          : stageIndex(stage) >= stageIndex('design')
+            ? 'design'
+            : 'plan';
     tabs.push(
       { key: 'findings', route: { kind: 'findings', id, analysisId } },
       { key: 'workflow', route: { kind: workflow, id, analysisId } },
@@ -51,7 +59,9 @@ function tabsFor(route: Route, stage: string | undefined): { key: TabKey; route:
 
 function isActive(tab: Route, route: Route): boolean {
   if (tab.kind === 'projects') return route.kind === 'projects' || route.kind === 'project';
-  if (tab.kind === 'plan' || tab.kind === 'design') return route.kind === 'plan' || route.kind === 'design';
+  if (tab.kind === 'plan' || tab.kind === 'design' || tab.kind === 'tests') {
+    return route.kind === 'plan' || route.kind === 'design' || route.kind === 'tests';
+  }
   return tab.kind === route.kind;
 }
 

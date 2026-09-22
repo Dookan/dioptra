@@ -1186,3 +1186,31 @@ button.card:focus-visible {
 .hint.ok {
   color: var(--ok);
 }
+
+/* --- E6: the scaffold and the developer's file (mockup 07) --------------- */
+/* The anchor's code element is `.codeblock`; a whole test file needs more room
+   than its 160px, and that is the only difference worth a rule. */
+.codeblock.tall {
+  max-height: 320px;
+}
+
+/* `--ok` aliases `--acc` in both themes, so swapping only the background would
+   be INVISIBLE in dark: a written case changes fill and glyph, like the
+   anchor's `.ck.done`. */
+.chip.ok {
+  background: var(--acc);
+  color: var(--acc-contrast);
+}
+
+/* `.panel ul` outranks a bare class (see the note above `.brief`): this list is
+   a `ul` inside a panel, so scope it too. */
+.panel .caselist {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+/* Mockup 07: the progress column is 300px and the file gets the wide one. */
+.cols.tests {
+  grid-template-columns: 300px 1fr;
+}

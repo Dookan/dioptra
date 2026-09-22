@@ -20,7 +20,7 @@ from app.db.base import Base
 from app.db.types import UtcDateTime
 
 if TYPE_CHECKING:
-    from app.workflow.models import CaseDesign, TestPlan
+    from app.workflow.models import CaseDesign, TestFile, TestPlan
 
 
 class SourceKind(StrEnum):
@@ -149,6 +149,9 @@ class Analysis(Base):
     )
     case_designs: Mapped[list[CaseDesign]] = relationship(
         "CaseDesign", cascade="all, delete-orphan", order_by="CaseDesign.created_at"
+    )
+    test_files: Mapped[list[TestFile]] = relationship(
+        "TestFile", cascade="all, delete-orphan", order_by="TestFile.created_at"
     )
 
 

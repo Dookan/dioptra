@@ -34,6 +34,7 @@ GATE_MESSAGE_KEYS: dict[str, str] = {
     "test_plan_missing": "errors.workflow.gate.testPlanMissing",
     "gate_not_built": "errors.workflow.gate.notBuilt",
     "cases_not_approved": "errors.workflow.gate.casesNotApproved",
+    "tests_not_written": "errors.workflow.gate.testsNotWritten",
 }
 
 
@@ -144,3 +145,29 @@ class CasesTooFew(WorkflowError):
 
     code = "cases_too_few"
     message_key = "errors.workflow.casesTooFew"
+
+
+class DesignNotApproved(WorkflowError):
+    """A scaffold was asked for a function whose cases are not approved yet."""
+
+    status_code = 409
+    code = "design_not_approved"
+    message_key = "errors.workflow.designNotApproved"
+
+
+class UnparsableTests(WorkflowError):
+    """The stored test file does not parse, so the E6 gate cannot read its cases.
+
+    Named without a ``Test`` prefix on purpose: pytest tries to COLLECT any
+    imported class called ``Test*`` and warns that it has a constructor.
+    """
+
+    code = "tests_unparsable"
+    message_key = "errors.workflow.testsUnparsable"
+
+
+class OversizedTests(WorkflowError):
+    """The submitted test file exceeds the stored size cap."""
+
+    code = "tests_too_large"
+    message_key = "errors.workflow.testsTooLarge"

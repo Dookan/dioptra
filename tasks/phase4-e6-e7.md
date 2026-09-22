@@ -14,7 +14,7 @@ re-audits the tests with mutation testing (E7). A surviving mutant
 demonstrably rejects the gate.
 
 ## Deliverables
-1. **Day 16 — sandbox investigation gate, then E6 scaffolds** — `tasks/phase4-survey.md`, `backend/app/workflow/scaffold/{jest,pytest}.py`, `frontend/src/screens/test-writing-screen.tsx`
+1. **Day 16 — sandbox investigation gate, then E6 scaffolds** — BUILT 2026-09-22 (`tasks/phase4-survey.md`, `backend/app/workflow/scaffold/{__init__,text,inspect}.py`, `backend/app/workflow/authoring.py`, `backend/alembic/versions/0007_test_files.py`, `frontend/src/screens/test-writing-screen.tsx`)
    - `tasks/phase4-survey.md`: read-only survey, sandbox design pseudocode
      (image, user, mounts, limits, timeout, result extraction) and
      `## Verdict`, signed off BEFORE any sandbox edit. No exception.
@@ -25,8 +25,31 @@ demonstrably rejects the gate.
      (P3 day 15): titles are one-line text but still hold quotes,
      backslashes, `*/` and any Unicode — the generator slugs/escapes them at
      ITS boundary before they become identifiers or strings in a test file.
-   - Gate to leave E6: every planned case has a non-empty body written by the
-     developer. Mockup anchor: "Escribir los tests (E6)".
+   - Gate to leave E6: every approved case has a body the developer wrote —
+     `gates.leave_tests`, which PARSES the stored text (tree-sitter) and never
+     executes it. Mockup anchor: "Escribir los tests (E6)".
+   - **Deviation recorded**: the scaffold is one file PER PLANNED FUNCTION
+     (`<stem>.<function>.dioptra.test.<ext>`), not one per module — two
+     planned functions in one file would otherwise collide. The case id opens
+     every case name so the gate still finds a case the developer reworded.
+   - **Decision recorded**: the generated comments are English, unlike the
+     UI. The rule and the mechanism agree — the file is compared byte for
+     byte, so it may not depend on the reader's UI language.
+   - **Carried into day 17 from the precommit panel**: `leave_tests` is the
+     first gate that is not a pure row predicate — it parses every planned
+     function's stored file on each advance attempt (bounded, developer
+     authored, reachable only from `stages.advance` and `GET …/test-files`,
+     and the bound is now stated in `docs/threat-model.md`). Day 17 stores the
+     per-case result when the file is SAVED, which turns the gate back into a
+     row predicate and takes the parse out of the request entirely.
+   - **Open question for `mmarin`**: CLAUDE.md's Hard Rule enumerates the
+     scaffold as "file, imports, and case names". The generator additionally
+     emits a header comment, the `describe()`/docstring wrapper and one
+     comment per declared brief item repeating the item's text and boundary
+     values. That is within the rule's intent (no assertion, no oracle) and
+     `docs/workflow-gates.md` now says it explicitly, but the Hard Rule's own
+     wording is narrower than what is emitted. Decide whether to widen it.
+
 2. **Day 17 — E7 sandbox, coverage, mutation** — `backend/app/sandbox/`, `docker/sandbox-*.Dockerfile`, `backend/app/workflow/verify.py`, `frontend/src/screens/verification-screen.tsx`
    - Docker sandbox: `--network none`, CPU / RAM / pids limits, read-only
      rootfs + tmpfs workdir, timeout, non-root user, `no-new-privileges`, no
@@ -42,7 +65,7 @@ demonstrably rejects the gate.
      Sandbox escape tests (network, FS writes, fork bomb, privilege
      escalation, socket/host mounts, exfiltration via result files).
    - Mockup anchor: "Verificación (E7)".
-3. Tests — `backend/tests/test_scaffold.py`, `test_sandbox.py`, `test_verify.py`
+3. Tests — `backend/tests/test_scaffold.py` and `test_tests_api.py` (day 16, written), `test_sandbox.py`, `test_verify.py` (day 17)
    - Scaffold determinism and assertion-freedom; the gate rejects an
      assertion-less test, a surviving mutant, coverage below criterion; every
      escape test from the threat-model table automated where the host allows.

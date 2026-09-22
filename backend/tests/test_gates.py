@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.analysis.models import Analysis, AnalysisStatus, Stage
 from app.audit.models import AuditLogEntry, AuditOutcome
 from app.auth.models import User
+from app.core.clock import utc_now
 from app.workflow import gates
 from app.workflow import models as workflow_models
 from tests.support import login, make_finding, seed_done_analysis
@@ -165,11 +166,12 @@ def test_leave_plan_checks_every_clause_of_the_plan(db: Session) -> None:
 
 def test_every_unbuilt_gate_is_closed() -> None:
     analysis = Analysis()
-    for stage in (Stage.TESTS, Stage.VERIFICATION):
-        result = gates.check(stage, analysis)
-        assert result.open is False and result.reason == "gate_not_built", stage
-    # DESIGN is built (day 15): closed for its own reason, never open by default.
-    assert gates.check(Stage.DESIGN, analysis).open is False
+    result = gates.check(Stage.VERIFICATION, analysis)
+    assert result.open is False and result.reason == "gate_not_built"
+    # DESIGN (day 15) and TESTS (P4 day 16) are built: closed for their own
+    # reason on an empty analysis, never open by default.
+    for stage in (Stage.DESIGN, Stage.TESTS):
+        assert gates.check(stage, analysis).open is False, stage
     # REGISTER is the project's (always open); REPORT has no gate entry and
     # the default for a missing entry is CLOSED, never open.
     assert gates.check(Stage.REGISTER, analysis).open is True
@@ -255,3 +257,50 @@ def test_stage_is_the_analysis_own(client: TestClient, analyst: User, db: Sessio
 def test_unknown_analysis_is_404(client: TestClient, analyst: User) -> None:
     response = _advance(client, login(client, analyst.username), uuid.uuid4())
     assert response.status_code == 404
+
+
+def test_leave_tests_checks_every_clause_of_its_own(db: Session) -> None:
+    """Defense in depth, as for ``leave_plan``: each clause refuses on its own.
+
+    ``all([])`` is True, so both the empty plan and an approved design with no
+    case would OPEN a server-side gate if either guard were dropped.
+    """
+    analysis = seed_done_analysis(db, [])
+    assert gates.leave_tests(analysis).reason == "test_plan_missing"
+    analysis.test_plan = workflow_models.TestPlan(
+        analysis_id=analysis.id,
+        rationale="Porque sí, con razón escrita.",
+        functions=[],
+        created_by_username="cperez",
+    )
+    assert gates.leave_tests(analysis).reason == "test_plan_missing"
+
+    row = {"path": "a.js", "function": "f", "line": 1, "ccn": 1}
+    analysis.test_plan.functions = [row]
+    assert gates.leave_tests(analysis).reason == "cases_not_approved"
+
+    analysis.case_designs = [
+        workflow_models.CaseDesign(
+            path="a.js",
+            function="f",
+            line=1,
+            cases=[],
+            brief={"items": []},
+            approved_at=utc_now(),
+            approved_by_username="cperez",
+            created_by_username="cperez",
+        )
+    ]
+    analysis.test_files = [
+        workflow_models.TestFile(
+            path="a.js",
+            function="f",
+            line=1,
+            filename="a.f.000000.dioptra.test.js",
+            content="// nothing of mine\n",
+            created_by_username="cperez",
+        )
+    ]
+    db.flush()
+    # A design with no case may not open the gate: there is nothing to have written.
+    assert gates.leave_tests(analysis).reason == "tests_not_written"

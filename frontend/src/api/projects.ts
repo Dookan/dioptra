@@ -422,6 +422,69 @@ export function approveCases(
   });
 }
 
+export interface ScaffoldCase {
+  id: string;
+  title: string;
+  covers: string[];
+  written: boolean;
+}
+
+export interface Scaffold {
+  path: string;
+  function: string;
+  line: number | null;
+  language: string;
+  runner: string;
+  filename: string;
+  scaffold: string;
+  content: string;
+  stored_at: string | null;
+  stored_by_username: string | null;
+  parse_error: boolean;
+  cases: ScaffoldCase[];
+}
+
+export interface WritingState extends PlannedFunction {
+  cases: number;
+  written: number;
+  parse_error: boolean;
+}
+
+export function getScaffold(
+  accessToken: string,
+  analysisId: string,
+  ref: PlannedFunction,
+): Promise<Scaffold> {
+  const query = new URLSearchParams({ path: ref.path, function: ref.function });
+  if (ref.line !== null) query.set('line', String(ref.line));
+  return apiFetch<Scaffold>(
+    `/analyses/${encodeURIComponent(analysisId)}/scaffold?${query.toString()}`,
+    { accessToken },
+  );
+}
+
+export function saveTests(
+  accessToken: string,
+  analysisId: string,
+  ref: PlannedFunction,
+  content: string,
+): Promise<Scaffold> {
+  return apiFetch<Scaffold>(`/analyses/${encodeURIComponent(analysisId)}/tests`, {
+    method: 'PUT',
+    accessToken,
+    body: { path: ref.path, function: ref.function, line: ref.line, content },
+  });
+}
+
+export function getWritingStates(
+  accessToken: string,
+  analysisId: string,
+): Promise<WritingState[]> {
+  return apiFetch<WritingState[]>(`/analyses/${encodeURIComponent(analysisId)}/test-files`, {
+    accessToken,
+  });
+}
+
 export function getReportState(accessToken: string, analysisId: string): Promise<ReportState> {
   return apiFetch<ReportState>(`/analyses/${encodeURIComponent(analysisId)}/report/current`, {
     accessToken,

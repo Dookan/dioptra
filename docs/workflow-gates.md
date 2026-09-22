@@ -1,6 +1,6 @@
 # Workflow gates (E1–E8)
 
-> **Status: IN_PROGRESS — stage machine, gates for leaving E2/E3/E4/E5, the E4 risk matrix and test plan, the E5 diagrams, brief and cases built 2026-09-22 (`backend/app/workflow/{stages,gates,risk,test_plan,design,brief}.py`); E6–E7's gates land in P4 — until then those stages are CLOSED (fail closed), proven by `backend/tests/test_gates.py` and `test_cases_api.py`.**
+> **Status: IN_PROGRESS — stage machine, gates for leaving E2/E3/E4/E5/E6, the E4 risk matrix and test plan, the E5 diagrams, brief and cases (2026-09-22) and the E6 scaffolds and test files (P4 day 16, 2026-09-22) are built (`backend/app/workflow/{stages,gates,risk,test_plan,design,brief,authoring}.py`, `workflow/scaffold/`); E7's gate lands with P4 day 17 — until then that stage is CLOSED (fails closed), proven by `backend/tests/test_gates.py`, `test_cases_api.py` and `test_tests_api.py`.**
 
 ## How the machine works (P3)
 
@@ -40,7 +40,7 @@ discipline does not depend on anyone's goodwill.
 | E3 Analyze + triage | analyst | findings (CWE/OWASP/CVSS) + triage verdicts | EVERY finding confirmed or discarded-with-justification — `gates.leave_analysis` (built) |
 | E4 Test plan | developer | risk matrix selection + coverage criterion + written rationale | ≥1 function selected, criterion chosen, rationale non-empty — `gates.leave_plan` (built); the plan save itself refuses a function E5 could never approve (the AST layer cannot parse it, or its basis paths exceed `MAX_CASES` = 200), naming it — `test_plan.check_briefable` (built) |
 | E5 Case design | developer | AST flow diagrams (Mermaid, deterministic, editable) + test brief + the developer's cases with approval | every planned function has its cases approved — `gates.leave_design` (built); approval itself (`design.approve_cases`) is refused until every brief item is covered by a case and there are at least `min_cases` cases |
-| E6 Test writing | developer | tests (assertions/logic 100% human) over deterministic scaffolds | all planned cases have non-empty test bodies |
+| E6 Test writing | developer | tests (assertions/logic 100% human) over deterministic scaffolds | every approved case has a body the developer wrote — `gates.leave_tests` (built) |
 | E7 Verification | system | coverage vs. brief + mutation results | coverage meets E4 criterion AND zero surviving mutants AND no assertion-less tests |
 | E8 Report | analyst | editable versioned report | analyst signs; export enabled |
 
@@ -107,9 +107,47 @@ syntax errors inside the function → typed refusal.
 
 ## Scaffolds (E6)
 
-Deterministic only: file name, imports and case names derived from the AST
-and the approved pseudocode. Jest/Vitest for JS/TS and pytest for Python in
-P4; PHPUnit and JUnit in P5. The scaffold never contains an assertion.
+Built 2026-09-22 (`backend/app/workflow/scaffold/`). Deterministic only: file
+name, imports and one named case per APPROVED case, derived from the AST and
+from the design snapshot. Vitest for JS/TS and pytest for Python in P4;
+PHPUnit and JUnit in P5. **The scaffold never contains an assertion**, test
+data or an oracle. Per case it writes a `TODO(developer)` line and, above it,
+one comment per brief item that case declared, repeating the item's own text,
+its detail and its boundary values — the brief's INPUTS, which the developer
+is required to exercise anyway, never an expected value.
+
+- One file per planned function:
+  `<stem>.<function>.<6 hex>.dioptra.test.<ext>` /
+  `test_<stem>_<function>_<6 hex>_dioptra.py`. The six hex characters are a
+  digest of `path:line`: the name is otherwise built from basenames, so
+  `components/index.ts::render` and `utils/index.ts::render` would collide —
+  and E7 copies every planned function's file into ONE run directory. The same
+  design row always yields the byte-identical file, checked across processes
+  with different hash seeds (an in-process comparison cannot see a `set()`
+  ordering regression).
+- The case id opens every case name (`it("C1 · …")`, `def test_c1_…`): that
+  is how the gate finds a case after the developer rewords the title, and the
+  generated comment says so.
+- Case titles are the developer's words and the brief items are audited
+  source: both are escaped AT THE GENERATOR'S BOUNDARY
+  (`scaffold/text.py`) before becoming an identifier, a string literal or a
+  comment — quotes, backslashes, `*/` and the JavaScript line terminators
+  U+2028/U+2029 included.
+- The generated comments are ENGLISH, unlike the UI. The rule (CLAUDE.md →
+  English everywhere in code) and the mechanism agree: the file is compared
+  byte for byte, so its content may not depend on the reader's UI language.
+- A function whose Python module path is not importable (a `my-lib/` segment)
+  gets a `TODO(developer)` import line instead of a broken import.
+
+The developer stores their file through `PUT …/tests` (developer, at E6 —
+or at E7 for a function the verification loop reopened), as TEXT, control
+characters stripped, size-capped. It is NEVER executed outside the E7
+sandbox. `gates.leave_tests` parses the stored text with the same tree-sitter
+layer the briefs use and asks one question per case: is there a statement of
+its own — not a comment, not the title string, not `pass`/`...`, and not a
+skipped case (`it.skip`)? A file that does not parse leaves every case
+unwritten; the gate never raises. Whether a test PROVES anything is E7's
+measurement, not this gate's opinion.
 
 ## E7 re-audit rules
 
