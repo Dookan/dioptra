@@ -38,7 +38,7 @@ describe('locale files', () => {
 
   it('cover every error key the backend can return', () => {
     // Mirrors backend/app/auth/errors.py + app/core/errors.py + app/ingest/errors.py
-    // + app/analysis/{normalizer,sbom}.py + app/reports/errors.py.
+    // + app/analysis/{normalizer,sbom}.py + app/reports/errors.py + app/workflow/errors.py.
     const backendKeys = [
       'errors.internal',
       'errors.validation',
@@ -67,6 +67,14 @@ describe('locale files', () => {
       'errors.analysis.noToolRan',
       'errors.analysis.sbomInvalid',
       'errors.report.renderFailed',
+      'errors.report.versionNotFound',
+      'errors.report.versionNotCurrent',
+      'errors.report.versionAlreadySigned',
+      'errors.report.unknownSection',
+      'errors.report.sectionTooLong',
+      'errors.findings.notFound',
+      'errors.workflow.failed',
+      'errors.workflow.justificationRequired',
     ];
     expect(spanish).toEqual(expect.arrayContaining(backendKeys));
   });

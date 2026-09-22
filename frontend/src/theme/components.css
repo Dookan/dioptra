@@ -465,6 +465,11 @@
   grid-template-columns: 1fr 340px;
 }
 
+/* Mockup 09: the sections column is 290px. */
+.cols.narrow {
+  grid-template-columns: 290px 1fr;
+}
+
 .list {
   display: flex;
   flex-direction: column;
@@ -639,4 +644,246 @@ h5.section {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--t2);
+}
+
+/* --- findings + triage (mockup 04) --------------------------------------- */
+.filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.filters .field {
+  margin: 0;
+}
+
+select.input {
+  appearance: auto;
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 72px;
+  font: inherit;
+  line-height: 1.45;
+}
+
+.textarea.tall {
+  min-height: 260px;
+}
+
+/* A card that is also a button: same shell, keyboard reachable. */
+button.card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+button.card:hover {
+  border-color: var(--line-strong);
+}
+
+button.card:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.card.sel {
+  border-color: var(--acc);
+  box-shadow: 0 0 0 3px var(--acc-ring);
+}
+
+/* Mockup 04: the title follows the badge row; mockup 02 cards keep h4 first. */
+.card .row + h4 {
+  margin-top: 7px;
+}
+
+.card .mono {
+  font-size: 12px;
+  color: var(--t2);
+}
+
+.list > li > .hint {
+  margin: 0;
+}
+
+/* --- progress (mockups 02, 04, 09) --------------------------------------- */
+.progress {
+  width: 180px;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.progress .plabel {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--t2);
+  margin-bottom: 3px;
+}
+
+.pbar {
+  display: block;
+  height: 7px;
+  border-radius: 4px;
+  background: var(--s3);
+  overflow: hidden;
+}
+
+.pfill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--acc);
+}
+
+/* Severity tints, scoped to the summary bars: the anchor's bare `.pfill.low`
+   means "coverage below target" (mockup 08) and stays free for P4. */
+.bars .pfill.critical,
+.bars .pfill.high {
+  background: var(--err);
+}
+
+.bars .pfill.medium {
+  background: var(--warn);
+}
+
+.bars .pfill.low,
+.bars .pfill.info {
+  background: var(--info);
+}
+
+/* Widths as classes: the CSP forbids inline styles (docker/nginx.conf). */
+.w0 { width: 0%; }
+.w5 { width: 5%; }
+.w10 { width: 10%; }
+.w15 { width: 15%; }
+.w20 { width: 20%; }
+.w25 { width: 25%; }
+.w30 { width: 30%; }
+.w35 { width: 35%; }
+.w40 { width: 40%; }
+.w45 { width: 45%; }
+.w50 { width: 50%; }
+.w55 { width: 55%; }
+.w60 { width: 60%; }
+.w65 { width: 65%; }
+.w70 { width: 70%; }
+.w75 { width: 75%; }
+.w80 { width: 80%; }
+.w85 { width: 85%; }
+.w90 { width: 90%; }
+.w95 { width: 95%; }
+.w100 { width: 100%; }
+
+/* --- report editor (mockup 09) ------------------------------------------- */
+.checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.checkline {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.checkline:last-child {
+  border-bottom: none;
+}
+
+.ck {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--line-strong);
+  color: var(--t3);
+  flex: 0 0 auto;
+}
+
+.ck.done {
+  background: var(--acc);
+  border-color: var(--acc);
+  color: var(--acc-contrast);
+}
+
+.ck.now {
+  border-color: var(--acc);
+  color: var(--acc);
+}
+
+.linkish {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.linkish.on {
+  color: var(--acc);
+  font-weight: 600;
+}
+
+.linkish:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.repout {
+  background: var(--s2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  padding: 14px 16px;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.repout .rtitle {
+  font-family: Georgia, "Liberation Serif", serif;
+  font-weight: 700;
+  font-size: 13.5px;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.repout .rline {
+  border-top: 1px solid var(--line-strong);
+  margin: 8px 0;
+}
+
+.repout p {
+  margin: 6px 0;
+}
+
+.bars {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 340px;
+}
+
+.barrow {
+  display: grid;
+  grid-template-columns: 90px 28px 1fr;
+  align-items: center;
+  gap: 8px;
 }

@@ -8,8 +8,9 @@ job, at render time, per output format.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.analysis.models import (
     SEVERITY_ORDER,
@@ -24,7 +25,11 @@ from app.core.clock import utc_now
 from app.projects.models import Project
 from app.reports.strings import report_strings
 
+if TYPE_CHECKING:
+    from app.reports.models import ReportVersion
+
 _S = report_strings()
+DATE_FORMAT: str = _S["date_format"]
 NOT_AVAILABLE: str = _S["not_available"]
 UNKNOWN_CWE_LABEL: str = _S["cwe_unknown"]
 UNCLASSIFIED_OWASP_LABEL: str = _S["owasp_unclassified"]
@@ -42,6 +47,9 @@ SPANISH_MONTHS: tuple[str, ...] = tuple(_S["months"])
 
 #: Categories rendered in "Hallazgos de vulnerabilidades" (code + secrets).
 SECURITY_CATEGORIES = frozenset({ToolCategory.SAST, ToolCategory.SECRET})
+
+#: Paragraph separator of the editable prose, both in defaults and overrides.
+PARAGRAPH_BREAK = "\n\n"
 
 
 def _catalog_describe(cwe: int | None, fallback_title: str | None) -> Any:
@@ -144,11 +152,81 @@ def _tool_run_context(run: ToolRun) -> dict[str, Any]:
     }
 
 
-def _sorted_findings(findings: list[Finding]) -> list[Finding]:
+def _sorted_findings(
+    findings: list[Finding], excluded: frozenset[str] | None = None
+) -> list[Finding]:
+    # "Es real — incluir en el reporte": a false positive leaves the report;
+    # a pending finding stays, so an untriaged analysis still exports in full.
+    # A signed version carries the set it was signed with (``excluded``) and
+    # ignores the live triage: what was signed is what renders.
+    if excluded is None:
+        kept = [f for f in findings if f.in_report]
+    else:
+        kept = [f for f in findings if str(f.id) not in excluded]
     return sorted(
-        findings,
+        kept,
         key=lambda f: (SEVERITY_ORDER[f.severity], f.path, f.line if f.line is not None else -1),
     )
+
+
+def _owasp_distribution(findings: list[Finding]) -> list[dict[str, Any]]:
+    counts: dict[str, int] = {}
+    for finding in findings:
+        code = finding.owasp or ""
+        counts[code] = counts.get(code, 0) + 1
+    ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0] or "~"))
+    return [
+        {
+            "code": code or None,
+            "label": code or UNCLASSIFIED_OWASP_LABEL,
+            "title": _owasp_title(code or None),
+            "count": count,
+        }
+        for code, count in ordered
+    ]
+
+
+def _paragraphs(text: str) -> list[str]:
+    return [part.strip() for part in text.split(PARAGRAPH_BREAK) if part.strip()]
+
+
+def default_sections(
+    analysis: Analysis, project: Project, *, excluded: frozenset[str] | None = None
+) -> dict[str, str]:
+    """The institutional prose of every editable section, as plain text."""
+    system = project.system
+    system_name = _or_na(system.name if system is not None else project.name)
+    findings = _sorted_findings(list(analysis.findings), excluded)
+    counts = {level.value: 0 for level in Severity}
+    for finding in findings:
+        counts[finding.severity.value] += 1
+    return {
+        "introduction": PARAGRAPH_BREAK.join(
+            paragraph.format(system_name=system_name) for paragraph in _S["introduction"]
+        ),
+        "summary": _summary_sentence(counts, len(findings)),
+        "findings_intro": _S["findings_intro"],
+        "dependencies_intro": _S["dependencies_intro"],
+        "practices": PARAGRAPH_BREAK.join(_S["commented_code"]),
+        "coverage_intro": _S["coverage_intro"],
+    }
+
+
+def _version_rows(versions: Sequence[ReportVersion], upto: int | None) -> list[dict[str, str]]:
+    rows = [
+        {
+            "version": str(item.number),
+            "areas": item.areas,
+            "description": item.change_summary,
+            # "Fecha de entrega" is the signature date: a draft was never delivered.
+            "delivered_at": (
+                NOT_AVAILABLE if item.signed_at is None else item.signed_at.strftime(DATE_FORMAT)
+            ),
+        }
+        for item in versions
+        if upto is None or item.number <= upto
+    ]
+    return rows or [{**_S["version_control_default"], "delivered_at": NOT_AVAILABLE}]
 
 
 def _summary_sentence(counts: dict[str, int], total: int) -> str:
@@ -166,16 +244,30 @@ def _summary_sentence(counts: dict[str, int], total: int) -> str:
 
 
 def build_context(
-    analysis: Analysis, project: Project, *, generated_at: datetime | None = None
+    analysis: Analysis,
+    project: Project,
+    *,
+    version: ReportVersion | None = None,
+    versions: Sequence[ReportVersion] = (),
+    generated_at: datetime | None = None,
 ) -> dict[str, Any]:
-    """Assemble the pure, serializable context shared by every output format."""
+    """Assemble the pure, serializable context shared by every output format.
+
+    ``version`` supplies the analyst's section overrides and, once signed, the
+    frozen set of excluded findings; ``versions`` the history the "Control de
+    versiones" table lists (rows after ``version`` are left out so a snapshot
+    never shows its own future).
+    """
     now = generated_at or utc_now()
+    excluded: frozenset[str] | None = None
+    if version is not None and version.excluded_findings is not None:
+        excluded = frozenset(version.excluded_findings)
     system = project.system
     system_name = _or_na(system.name if system is not None else project.name)
     detected_frameworks = ", ".join(analysis.frameworks or [])
     framework = (system.framework if system is not None else None) or detected_frameworks
 
-    ordered = _sorted_findings(list(analysis.findings))
+    ordered = _sorted_findings(list(analysis.findings), excluded)
     security = [_finding_context(f) for f in ordered if f.category in SECURITY_CATEGORIES]
     dependencies = [_finding_context(f) for f in ordered if f.category is ToolCategory.SCA]
 
@@ -190,6 +282,12 @@ def build_context(
 
     metrics = analysis.metrics
     commented_files = list(metrics.commented_code_files) if metrics is not None else []
+
+    defaults = default_sections(analysis, project, excluded=excluded)
+    overrides: dict[str, str] = dict(version.sections) if version is not None else {}
+    sections = {
+        key: _paragraphs(overrides.get(key) or default) for key, default in defaults.items()
+    }
 
     return {
         "generated_at": now.isoformat(),
@@ -212,13 +310,26 @@ def build_context(
             "frameworks": list(analysis.frameworks or []),
             "lockfiles": list(analysis.lockfiles or []),
         },
-        # TODO(phase2): derive from the report's version history; until the
-        # editor exists there is exactly one version, the composed one.
-        "version_control": [{**_S["version_control_default"], "delivered_at": NOT_AVAILABLE}],
+        "version_control": _version_rows(versions, version.number if version is not None else None),
+        "report_version": version.number if version is not None else 1,
+        "sections": sections,
         "summary": {
             "total": total,
             "counts": counts,
             "sentence": _summary_sentence(counts, total),
+            "by_severity": [
+                {
+                    "severity": level.value,
+                    "label": SEVERITY_LABELS[level],
+                    "count": counts[level.value],
+                    "percent": round(100 * counts[level.value] / total) if total else 0,
+                }
+                for level in Severity
+            ],
+            "by_owasp": [
+                {**row, "percent": round(100 * row["count"] / total) if total else 0}
+                for row in _owasp_distribution(ordered)
+            ],
         },
         "security_findings": security,
         "dependency_findings": dependencies,

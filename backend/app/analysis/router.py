@@ -15,8 +15,8 @@ from app.db.session import get_db
 from app.ingest import service
 from app.ingest.errors import AnalysisNotFound, AnalysisNotReady
 from app.projects.router import analysis_out
-from app.projects.schemas import AnalysisOut, FindingOut
-from app.reports import engine
+from app.projects.schemas import AnalysisOut, FindingOut, finding_out
+from app.reports import engine, versions
 
 router = APIRouter(prefix="/api/v1/analyses", tags=["analyses"])
 
@@ -39,7 +39,7 @@ def get_analysis(analysis_id: uuid.UUID, _user: ActiveUser, db: DbSession) -> An
 @router.get("/{analysis_id}/findings", response_model=list[FindingOut])
 def list_findings(analysis_id: uuid.UUID, _user: ActiveUser, db: DbSession) -> list[FindingOut]:
     analysis = service.get_analysis(db, analysis_id)
-    return [FindingOut.model_validate(finding) for finding in analysis.findings]
+    return [finding_out(finding) for finding in analysis.findings]
 
 
 @router.get("/{analysis_id}/sbom")
@@ -62,21 +62,30 @@ def get_report(
     _user: ActiveUser,
     db: DbSession,
     format: ReportFormat = "pdf",  # noqa: A002 — the query parameter is named `format` on purpose
+    version: int | None = None,
 ) -> Response:
-    """Stage E8 export of the institutional report (P1: composed, not yet editable)."""
+    """Stage E8 export of the institutional report.
+
+    ``version`` selects a snapshot of the editor (default: the current one;
+    with no saved version the composed baseline renders).
+    """
     analysis = service.get_analysis(db, analysis_id)
     if analysis.status is not AnalysisStatus.DONE:
         raise AnalysisNotReady(analysis.status.value)
     project = service.get_project(db, analysis.project_id)
+    history = versions.list_versions(db, analysis)
+    selected = versions.get_version(db, analysis, version) if version is not None else None
+    if selected is None and history:
+        selected = history[-1]
     body: bytes | str
     if format == "pdf":
-        body = engine.render_pdf(analysis, project)
+        body = engine.render_pdf(analysis, project, version=selected, versions=history)
     elif format == "html":
-        body = engine.render_html(analysis, project)
+        body = engine.render_html(analysis, project, version=selected, versions=history)
     elif format == "md":
-        body = engine.render_markdown(analysis, project)
+        body = engine.render_markdown(analysis, project, version=selected, versions=history)
     else:
-        body = engine.render_docx(analysis, project)
+        body = engine.render_docx(analysis, project, version=selected, versions=history)
     disposition = "inline" if format == "html" else "attachment"
     filename = engine.report_file_name(project.name, format)
     return Response(

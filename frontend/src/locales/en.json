@@ -82,13 +82,27 @@
       "noToolRan": "No analysis tool could run. Check the installation."
     },
     "report": {
-      "renderFailed": "The report could not be generated."
+      "renderFailed": "The report could not be generated.",
+      "versionNotFound": "That report version does not exist.",
+      "versionNotCurrent": "Only the current version can be signed. Reload the page.",
+      "versionAlreadySigned": "This version is already signed.",
+      "unknownSection": "That report section cannot be edited.",
+      "sectionTooLong": "The section text is too long."
+    },
+    "findings": {
+      "notFound": "The finding does not exist."
+    },
+    "workflow": {
+      "failed": "The workflow action could not be completed.",
+      "justificationRequired": "Write a reason of at least 10 characters: it goes to the audit log."
     }
   },
   "nav": {
     "label": "Sections",
     "home": "Home",
-    "projects": "Projects"
+    "projects": "Projects",
+    "findings": "Findings",
+    "report": "Report"
   },
   "stepper": {
     "label": "Process stages",
@@ -157,8 +171,10 @@
     "nextStep": {
       "codeTitle": "Next step: upload the code",
       "codeBody": "Upload a ZIP or paste the repository's HTTPS address. The analysis runs on its own and tells you when it is done.",
-      "doneTitle": "Analysis finished",
-      "doneBody": "Download the report or analyze a new version. Reviewing findings comes in the next stage."
+      "doneTitle": "Findings reviewed",
+      "doneBody": "Edit and sign the report, or analyze a new version. The test plan comes in the next stage.",
+      "triageTitle": "Next step: review the findings",
+      "triageBody": "Confirm or discard every finding with a written reason. When you finish, the test plan unlocks."
     },
     "ingest": {
       "section": "2 · The code",
@@ -192,16 +208,104 @@
       "sbom": "Download SBOM (CycloneDX)"
     },
     "findings": {
-      "show": "Show findings",
-      "hide": "Hide findings",
-      "loading": "Loading findings…",
       "empty": "No findings were found.",
-      "severity": "Severity",
-      "title": "Finding",
-      "classification": "CWE / OWASP",
-      "location": "Location",
       "unknownCwe": "Unknown CWE",
-      "unclassified": "Unclassified"
+      "unclassified": "Unclassified",
+      "review": "Review findings",
+      "editReport": "Edit the report"
+    },
+    "triage": {
+      "pending": "{{count}} finding(s) to review",
+      "done": "Every finding reviewed"
+    }
+  },
+  "findings": {
+    "title": "Findings and review",
+    "listLabel": "Findings list",
+    "line": "line {{line}}",
+    "what": "What did we find?",
+    "why": "Why does it matter?",
+    "how": "How to fix it?",
+    "confirm": "It's real — include in the report",
+    "discard": "Doesn't apply (explain why)",
+    "justificationLabel": "Why? Your reason goes to the audit log",
+    "justificationPlaceholder": "E.g.: the file is a sample that is never deployed; the secret was already rotated.",
+    "justificationHint": "At least {{min}} characters. Required to confirm and to discard.",
+    "reviewedBy": "Reviewed by {{user}} · {{when}}",
+    "progress": "{{reviewed}} of {{total}}",
+    "verdict": {
+      "confirmed": "Confirmed",
+      "false_positive": "Doesn't apply"
+    },
+    "nextStep": {
+      "pendingTitle": "{{count}} findings left to review",
+      "pendingBody": "When you finish, the next step unlocks: planning the tests.",
+      "doneTitle": "Review complete",
+      "doneBody": "Every finding has a verdict. You can edit and sign the report."
+    },
+    "filters": {
+      "all": "All",
+      "none": "No finding matches the filters.",
+      "severity": "Severity",
+      "owasp": "OWASP category",
+      "tool": "Tool",
+      "file": "File"
+    }
+  },
+  "report": {
+    "title": "Report",
+    "subtitle": "Version {{number}} · institutional template",
+    "sections": "Sections",
+    "editing": "editing",
+    "preview": "Preview",
+    "previewTitle": "White-box analysis — {{system}}",
+    "editedHint": "This section has its own text; the rest comes from the template.",
+    "versionLine": "Version {{number}} · edited by {{user}} · full history in the audit log.",
+    "versionLineBaseline": "Version 1 · generated automatically. Saving a change creates version 2.",
+    "nextStep": {
+      "triageTitle": "{{count}} findings left to review",
+      "triageBody": "The report can already be read and exported, but sign it once the review is complete.",
+      "readyTitle": "Report ready to edit and sign",
+      "readyBody": "Review each section, fix what is needed and sign the final version. Signing locks it.",
+      "signedTitle": "Version {{number}} signed",
+      "signedBody": "This version cannot change. Editing a section opens the next version.",
+      "goToFindings": "Go to the findings"
+    },
+    "export": {
+      "pdf": "Export PDF",
+      "docx": "DOCX",
+      "md": "Markdown"
+    },
+    "edit": {
+      "start": "✎ Edit this section",
+      "textLabel": "Section text",
+      "textHint": "Plain text. Separate paragraphs with a blank line.",
+      "changeLabel": "What did you change? It goes to the version control table",
+      "changePlaceholder": "E.g.: the analysis scope was adjusted as agreed.",
+      "save": "Save as version {{number}}",
+      "cancel": "Cancel",
+      "restore": "Back to the template text"
+    },
+    "sign": {
+      "label": "Sign this version — why do you approve it?",
+      "placeholder": "E.g.: reviewed in full with the development team.",
+      "submit": "Sign version {{number}}",
+      "hint": "Signing locks the version. Later changes open a new one.",
+      "locked": "The current version is signed and locked."
+    },
+    "summary": {
+      "bySeverity": "Distribution by severity"
+    },
+    "versions": {
+      "title": "Version control",
+      "none": "No saved versions yet: the report exports as generated.",
+      "number": "Version",
+      "areas": "Areas changed",
+      "change": "Change description",
+      "by": "Saved by",
+      "signed": "Signature",
+      "draft": "Draft",
+      "signedBadge": "Signed"
     }
   }
 }

@@ -34,6 +34,16 @@ export interface ProjectCreate {
 export type AnalysisStatus = 'queued' | 'running' | 'done' | 'failed';
 export type ToolStatus = 'ran' | 'failed' | 'missing' | 'timeout';
 export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info';
+export type Verdict = 'confirmed' | 'false_positive';
+
+/** Stage E3 progress; `complete` is computed by the server (the gate). */
+export interface Triage {
+  total: number;
+  confirmed: number;
+  false_positive: number;
+  pending: number;
+  complete: boolean;
+}
 
 export interface ToolRun {
   tool: string;
@@ -56,8 +66,12 @@ export interface Analysis {
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
+  /** Every finding by severity, verdicts ignored. */
   finding_counts: Partial<Record<Severity, number>>;
+  /** What the report prints: false positives left out. */
+  report_counts: Partial<Record<Severity, number>>;
   tool_runs: ToolRun[];
+  triage: Triage;
 }
 
 export interface Finding {
@@ -76,9 +90,45 @@ export interface Finding {
   snippet: string | null;
   message: string | null;
   references: string[];
+  /** Institutional prose for the CWE — the text the report prints. */
+  description: string;
+  impact: string;
+  mitigation: string[];
+  verdict: Verdict | null;
+  verdict_justification: string | null;
+  verdict_by_username: string | null;
+  verdict_at: string | null;
 }
 
 export type ReportFormat = 'pdf' | 'html' | 'md' | 'docx';
+
+export interface ReportVersion {
+  number: number;
+  change_summary: string;
+  areas: string;
+  created_by_username: string;
+  created_at: string;
+  signed_by_username: string | null;
+  signed_at: string | null;
+  /** Findings frozen out of a signed version; null on a draft. */
+  excluded_findings: string[] | null;
+  content_hash: string | null;
+}
+
+export interface ReportSection {
+  key: string;
+  label: string;
+  text: string;
+  edited: boolean;
+}
+
+export interface ReportState {
+  number: number;
+  persisted: boolean;
+  signed: boolean;
+  sections: ReportSection[];
+  versions: ReportVersion[];
+}
 
 export function listProjects(accessToken: string): Promise<Project[]> {
   return apiFetch<Project[]>('/projects', { accessToken });
@@ -122,13 +172,59 @@ export function ingestGit(accessToken: string, projectId: string, url: string): 
   });
 }
 
+export function postVerdict(
+  accessToken: string,
+  findingId: string,
+  verdict: Verdict,
+  justification: string,
+): Promise<Finding> {
+  return apiFetch<Finding>(`/findings/${encodeURIComponent(findingId)}/verdict`, {
+    method: 'POST',
+    accessToken,
+    body: { verdict, justification },
+  });
+}
+
+export function getReportState(accessToken: string, analysisId: string): Promise<ReportState> {
+  return apiFetch<ReportState>(`/analyses/${encodeURIComponent(analysisId)}/report/current`, {
+    accessToken,
+  });
+}
+
+export function saveReportSections(
+  accessToken: string,
+  analysisId: string,
+  sections: Record<string, string>,
+  changeSummary: string,
+): Promise<ReportState> {
+  return apiFetch<ReportState>(`/analyses/${encodeURIComponent(analysisId)}/report/sections`, {
+    method: 'PUT',
+    accessToken,
+    body: { sections, change_summary: changeSummary },
+  });
+}
+
+export function signReportVersion(
+  accessToken: string,
+  analysisId: string,
+  number: number,
+  justification: string,
+): Promise<ReportState> {
+  return apiFetch<ReportState>(
+    `/analyses/${encodeURIComponent(analysisId)}/report/versions/${String(number)}/sign`,
+    { method: 'POST', accessToken, body: { justification } },
+  );
+}
+
 export function downloadReport(
   accessToken: string,
   analysisId: string,
   format: ReportFormat,
+  version?: number,
 ): Promise<Download> {
+  const query = version === undefined ? '' : `&version=${String(version)}`;
   return apiDownload(
-    `/analyses/${encodeURIComponent(analysisId)}/report?format=${format}`,
+    `/analyses/${encodeURIComponent(analysisId)}/report?format=${format}${query}`,
     accessToken,
     `reporte.${format}`,
   );

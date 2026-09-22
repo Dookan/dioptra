@@ -62,6 +62,13 @@ class Severity(StrEnum):
 SEVERITY_ORDER: dict[Severity, int] = {level: index for index, level in enumerate(Severity)}
 
 
+class Verdict(StrEnum):
+    """The analyst's triage decision (stage E3). ``None`` on the finding = pending."""
+
+    CONFIRMED = "confirmed"
+    FALSE_POSITIVE = "false_positive"
+
+
 def _text_enum(enum_type: type[StrEnum], length: int) -> Enum:
     # Stored as text: a native PG enum would need a migration per new member.
     return Enum(enum_type, native_enum=False, length=length, validate_strings=True)
@@ -147,7 +154,20 @@ class Finding(Base):
     #: (path, line, rule-or-CWE) key used for cross-tool deduplication.
     fingerprint: Mapped[str] = mapped_column(String(64), index=True)
 
+    # Triage (E3). The latest verdict lives here; every verdict ever given,
+    # including revisions, is a row of the append-only audit log — that trail
+    # is the history, so no second table can drift from it.
+    verdict: Mapped[Verdict | None] = mapped_column(_text_enum(Verdict, 16), default=None)
+    verdict_justification: Mapped[str | None] = mapped_column(Text, default=None)
+    verdict_by_username: Mapped[str | None] = mapped_column(String(64), default=None)
+    verdict_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+
     analysis: Mapped[Analysis] = relationship(back_populates="findings")
+
+    @property
+    def in_report(self) -> bool:
+        """ "Es real — incluir en el reporte": only a false positive leaves the report."""
+        return self.verdict is not Verdict.FALSE_POSITIVE
 
 
 class ToolRun(Base):

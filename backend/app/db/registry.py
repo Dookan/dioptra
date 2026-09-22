@@ -12,6 +12,7 @@ from app.audit.models import AuditLogEntry
 from app.auth.models import RefreshToken, User
 from app.db.base import Base
 from app.projects.models import Project, System
+from app.reports.models import ReportVersion
 
 __all__ = [
     "Analysis",
@@ -22,6 +23,7 @@ __all__ = [
     "Project",
     "RawToolOutput",
     "RefreshToken",
+    "ReportVersion",
     "Sbom",
     "System",
     "ToolRun",

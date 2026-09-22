@@ -1,6 +1,6 @@
 # Workflow gates (E1–E8)
 
-> **Status: DESIGN SURFACE — not yet implemented.**
+> **Status: DESIGN SURFACE — the E3 gate condition is computed server-side since P2 (`backend/app/workflow/triage.py::triage_status(...).complete`, exposed as `AnalysisOut.triage`); the stage machine that enforces every transition lands in P3.**
 
 Gates are enforced SERVER-SIDE: the API rejects any transition whose gate is
 unsatisfied. UI state is presentation only. The proof, per the plan (day 13),

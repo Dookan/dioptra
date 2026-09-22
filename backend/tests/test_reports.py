@@ -189,6 +189,34 @@ def test_context_defaults_and_counts() -> None:
     assert ctx["author"] == "Moises Marin"
 
 
+def test_context_distribution_orders_and_percentages() -> None:
+    # _hostile_analysis: A03 (high), unclassified (low), A06 (high) → 3 findings.
+    ctx = build_context(_hostile_analysis(), _project())
+    by_severity = {row["severity"]: row for row in ctx["summary"]["by_severity"]}
+    assert by_severity["high"]["count"] == 2 and by_severity["high"]["percent"] == 67
+    assert by_severity["low"]["count"] == 1 and by_severity["low"]["percent"] == 33
+    assert by_severity["critical"]["count"] == 0 and by_severity["critical"]["percent"] == 0
+    by_owasp = ctx["summary"]["by_owasp"]
+    assert [row["count"] for row in by_owasp] == [1, 1, 1]
+    # Ties break by code; the unclassified bucket always comes last.
+    assert [row["code"] for row in by_owasp] == ["A03:2021", "A06:2021", None]
+    assert by_owasp[-1]["label"] == "Sin clasificar"
+    assert by_owasp[0]["title"] == "Injection"
+
+    doubled = _analysis(
+        findings=[_finding(), _finding(line=40), _finding(owasp="A06:2021", cwe=1395)]
+    )
+    ranked = build_context(doubled, _project())["summary"]["by_owasp"]
+    assert [(row["code"], row["count"], row["percent"]) for row in ranked] == [
+        ("A03:2021", 2, 67),
+        ("A06:2021", 1, 33),
+    ]
+
+    empty = build_context(_analysis(findings=[]), _project())["summary"]
+    assert empty["by_owasp"] == []
+    assert all(row["percent"] == 0 and row["count"] == 0 for row in empty["by_severity"])
+
+
 def test_context_framework_falls_back_to_detected_and_no_system() -> None:
     project = _project(with_system=False)
     ctx = build_context(_analysis(), project)

@@ -1,0 +1,107 @@
+"""Stage E3 triage: the analyst's verdict on every finding.
+
+The E3 gate condition lives here — ``triage_status(...).complete`` — so the
+stage machine of P3 and the UI banner read the same number. Every verdict,
+including a revision, is a row of the append-only audit log carrying the
+justification (CLAUDE.md → Hard Rules → Auth).
+"""
+
+from __future__ import annotations
+
+import re
+import uuid
+from dataclasses import dataclass
+
+from sqlalchemy.orm import Session
+
+from app.analysis.models import Analysis, Finding, Verdict
+from app.audit import service as audit
+from app.auth.models import User
+from app.core.clock import utc_now
+from app.workflow.errors import FindingNotFound, JustificationRequired
+
+#: Shortest justification accepted after stripping whitespace. "ok" is not a
+#: reason; ten characters is the floor at which a sentence can exist.
+MIN_JUSTIFICATION_CHARS = 10
+MAX_JUSTIFICATION_CHARS = 4000
+
+#: C0/C1 control characters other than tab, newline and carriage return. JSON
+#: carries them happily; python-docx refuses them ("All strings must be XML
+#: compatible"), and a signed version is immutable — so one such character
+#: would make a version un-exportable as DOCX forever. Stripped at the boundary.
+CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
+
+
+def strip_control_chars(raw: str) -> str:
+    return CONTROL_CHARS.sub("", raw)
+
+
+@dataclass(frozen=True)
+class TriageStatus:
+    total: int
+    confirmed: int
+    false_positive: int
+    pending: int
+
+    @property
+    def complete(self) -> bool:
+        """The E3 gate: every finding has a verdict. An empty analysis has nothing to triage."""
+        return self.pending == 0
+
+
+def clean_justification(raw: str) -> str:
+    """Normalize a justification or raise :class:`JustificationRequired`."""
+    text = " ".join(strip_control_chars(raw).split())
+    if len(text) < MIN_JUSTIFICATION_CHARS:
+        raise JustificationRequired(f"justification shorter than {MIN_JUSTIFICATION_CHARS}")
+    if len(text) > MAX_JUSTIFICATION_CHARS:
+        raise JustificationRequired(f"justification longer than {MAX_JUSTIFICATION_CHARS}")
+    return text
+
+
+def get_finding(db: Session, finding_id: uuid.UUID) -> Finding:
+    finding = db.get(Finding, finding_id)
+    if finding is None:
+        raise FindingNotFound(str(finding_id))
+    return finding
+
+
+def record_verdict(
+    db: Session,
+    *,
+    finding: Finding,
+    actor: User,
+    verdict: Verdict,
+    justification: str,
+    source_ip: str | None,
+) -> Finding:
+    """Store the analyst's verdict and append it to the audit trail."""
+    text = clean_justification(justification)
+    finding.verdict = verdict
+    finding.verdict_justification = text
+    finding.verdict_by_username = actor.username
+    finding.verdict_at = utc_now()
+    audit.record(
+        db,
+        actor_username=actor.username,
+        actor_id=actor.id,
+        actor_role=actor.role.value,
+        action=f"finding.verdict.{verdict.value}",
+        target=f"finding:{finding.id}",
+        justification=text,
+        source_ip=source_ip,
+    )
+    db.flush()
+    return finding
+
+
+def triage_status(analysis: Analysis) -> TriageStatus:
+    confirmed = sum(1 for f in analysis.findings if f.verdict is Verdict.CONFIRMED)
+    false_positive = sum(1 for f in analysis.findings if f.verdict is Verdict.FALSE_POSITIVE)
+    total = len(analysis.findings)
+    return TriageStatus(
+        total=total,
+        confirmed=confirmed,
+        false_positive=false_positive,
+        pending=total - confirmed - false_positive,
+    )

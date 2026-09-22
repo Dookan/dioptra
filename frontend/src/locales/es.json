@@ -82,13 +82,27 @@
       "noToolRan": "Ninguna herramienta de análisis pudo ejecutarse. Revisa la instalación."
     },
     "report": {
-      "renderFailed": "No se pudo generar el reporte."
+      "renderFailed": "No se pudo generar el reporte.",
+      "versionNotFound": "Esa versión del reporte no existe.",
+      "versionNotCurrent": "Solo se puede firmar la versión actual. Recarga la página.",
+      "versionAlreadySigned": "Esta versión ya está firmada.",
+      "unknownSection": "Esa sección del reporte no se puede editar.",
+      "sectionTooLong": "El texto de la sección es demasiado largo."
+    },
+    "findings": {
+      "notFound": "El hallazgo no existe."
+    },
+    "workflow": {
+      "failed": "No se pudo completar la acción del flujo de trabajo.",
+      "justificationRequired": "Escribe una razón de al menos 10 caracteres: queda en la bitácora."
     }
   },
   "nav": {
     "label": "Secciones",
     "home": "Inicio",
-    "projects": "Proyectos"
+    "projects": "Proyectos",
+    "findings": "Hallazgos",
+    "report": "Reporte"
   },
   "stepper": {
     "label": "Etapas del proceso",
@@ -157,8 +171,10 @@
     "nextStep": {
       "codeTitle": "Siguiente paso: sube el código",
       "codeBody": "Sube un ZIP o pega la dirección HTTPS del repositorio. El análisis corre solo y te avisa cuando termina.",
-      "doneTitle": "Análisis terminado",
-      "doneBody": "Descarga el informe o vuelve a analizar una versión nueva. La revisión de hallazgos llega en la próxima etapa."
+      "doneTitle": "Hallazgos revisados",
+      "doneBody": "Edita y firma el reporte, o vuelve a analizar una versión nueva. El plan de pruebas llega en la próxima etapa.",
+      "triageTitle": "Siguiente paso: revisa los hallazgos",
+      "triageBody": "Confirma o descarta cada hallazgo con una razón escrita. Cuando termines se desbloquea el plan de pruebas."
     },
     "ingest": {
       "section": "2 · El código",
@@ -192,16 +208,104 @@
       "sbom": "Descargar SBOM (CycloneDX)"
     },
     "findings": {
-      "show": "Ver hallazgos",
-      "hide": "Ocultar hallazgos",
-      "loading": "Cargando hallazgos…",
       "empty": "No se encontraron hallazgos.",
-      "severity": "Severidad",
-      "title": "Hallazgo",
-      "classification": "CWE / OWASP",
-      "location": "Ubicación",
       "unknownCwe": "CWE desconocido",
-      "unclassified": "Sin clasificar"
+      "unclassified": "Sin clasificar",
+      "review": "Revisar hallazgos",
+      "editReport": "Editar el reporte"
+    },
+    "triage": {
+      "pending": "{{count}} hallazgo(s) sin revisar",
+      "done": "Todos los hallazgos revisados"
+    }
+  },
+  "findings": {
+    "title": "Hallazgos y revisión",
+    "listLabel": "Lista de hallazgos",
+    "line": "línea {{line}}",
+    "what": "¿Qué encontramos?",
+    "why": "¿Por qué importa?",
+    "how": "¿Cómo corregirlo?",
+    "confirm": "Es real — incluir en el reporte",
+    "discard": "No aplica (explicar por qué)",
+    "justificationLabel": "¿Por qué? Tu razón queda en la bitácora",
+    "justificationPlaceholder": "Ej.: el archivo es un ejemplo que no se despliega; el secreto ya fue rotado.",
+    "justificationHint": "Al menos {{min}} caracteres. Hace falta para confirmar y para descartar.",
+    "reviewedBy": "Revisado por {{user}} · {{when}}",
+    "progress": "{{reviewed}} de {{total}}",
+    "verdict": {
+      "confirmed": "Confirmado",
+      "false_positive": "No aplica"
+    },
+    "nextStep": {
+      "pendingTitle": "Te faltan {{count}} hallazgos por revisar",
+      "pendingBody": "Cuando termines se desbloquea el siguiente paso: planificar las pruebas.",
+      "doneTitle": "Revisión completa",
+      "doneBody": "Todos los hallazgos tienen veredicto. Puedes editar y firmar el reporte."
+    },
+    "filters": {
+      "all": "Todos",
+      "none": "Ningún hallazgo coincide con los filtros.",
+      "severity": "Severidad",
+      "owasp": "Categoría OWASP",
+      "tool": "Herramienta",
+      "file": "Archivo"
+    }
+  },
+  "report": {
+    "title": "Reporte",
+    "subtitle": "Versión {{number}} · plantilla institucional",
+    "sections": "Secciones",
+    "editing": "editando",
+    "preview": "Vista previa",
+    "previewTitle": "Análisis de Caja Blanca — {{system}}",
+    "editedHint": "Esta sección tiene texto propio; el resto sale de la plantilla.",
+    "versionLine": "Versión {{number}} · editada por {{user}} · historial completo en la bitácora.",
+    "versionLineBaseline": "Versión 1 · generada automáticamente. Al guardar un cambio se crea la versión 2.",
+    "nextStep": {
+      "triageTitle": "Te faltan {{count}} hallazgos por revisar",
+      "triageBody": "El reporte ya se puede leer y exportar, pero conviene firmarlo con la revisión completa.",
+      "readyTitle": "Reporte listo para editar y firmar",
+      "readyBody": "Revisa cada sección, corrige lo que haga falta y firma la versión final. Firmar la bloquea.",
+      "signedTitle": "Versión {{number}} firmada",
+      "signedBody": "Esta versión no se puede modificar. Si editas una sección se abre la siguiente versión.",
+      "goToFindings": "Ir a los hallazgos"
+    },
+    "export": {
+      "pdf": "Exportar PDF",
+      "docx": "DOCX",
+      "md": "Markdown"
+    },
+    "edit": {
+      "start": "✎ Editar esta sección",
+      "textLabel": "Texto de la sección",
+      "textHint": "Texto plano. Separa los párrafos con una línea en blanco.",
+      "changeLabel": "¿Qué cambiaste? Queda en el control de versiones",
+      "changePlaceholder": "Ej.: se ajustó el alcance del análisis según lo acordado.",
+      "save": "Guardar como versión {{number}}",
+      "cancel": "Cancelar",
+      "restore": "Volver al texto de la plantilla"
+    },
+    "sign": {
+      "label": "Firmar esta versión — ¿por qué la das por buena?",
+      "placeholder": "Ej.: revisado en su totalidad con el equipo de desarrollo.",
+      "submit": "Firmar la versión {{number}}",
+      "hint": "Firmar bloquea la versión. Los cambios posteriores abren una versión nueva.",
+      "locked": "La versión actual está firmada y bloqueada."
+    },
+    "summary": {
+      "bySeverity": "Distribución por severidad"
+    },
+    "versions": {
+      "title": "Control de versiones",
+      "none": "Todavía no hay versiones guardadas: el reporte sale tal como se generó.",
+      "number": "Versión",
+      "areas": "Áreas modificadas",
+      "change": "Descripción del cambio",
+      "by": "Guardada por",
+      "signed": "Firma",
+      "draft": "Borrador",
+      "signedBadge": "Firmada"
     }
   }
 }

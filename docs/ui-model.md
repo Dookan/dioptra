@@ -1,6 +1,6 @@
 # UI model
 
-> **Status: DESIGN SURFACE — tokens, both themes and i18n are built (P0, `frontend/src/theme/`, `frontend/src/locales/`); the screens are the target.** Visual anchor:
+> **Status: IN_PROGRESS — tokens, both themes and i18n (P0), the projects screens (P1) and the findings / report screens (P2, 2026-09-22) are built; the workflow screens E4–E7 and Inventario are the target.** Visual anchor:
 > @docs/mockups/index.html (10 screens, approved 2026-08-17).
 
 ## Principles (from the approved mockups)
@@ -49,6 +49,29 @@ Added to `docs/mockups/index.html` on 2026-08-28, same tokens and principles:
 - **Drop zone** of screen 03 "2 · El código" (`.drop`, dashed accent) is a
   native file input in P1; the buttons say what they do ("Subir y analizar" /
   "Clonar y analizar"). The drag-and-drop affordance is deferred to P2.
+
+## Phase 2 screens (2026-09-22)
+
+- Routes: `#/projects/:id/analyses/:aid/findings` (screen 04) and
+  `#/projects/:id/analyses/:aid/report` (screen 09). The tabs bar shows
+  Hallazgos and Reporte only when the route names an analysis; Inicio and
+  Proyectos stay (the Proyectos deviation above is still open).
+- **Hallazgos (E3)**: the "next step" banner counts what is left ("Te faltan
+  N hallazgos por revisar", "k de M" progress); filters by severity, OWASP,
+  tool and file; left list of cards, right detail with "¿Qué encontramos?" /
+  "¿Por qué importa?" / "¿Cómo corregirlo?" (the catalog prose the PDF
+  prints); the two mockup buttons. The written reason is mandatory for BOTH
+  verdicts (CLAUDE.md → Auth), not only for "No aplica" as the mockup's
+  caption suggests — the field is one textarea, ten characters minimum, and
+  the server enforces it. A developer sees the screen without the form.
+- **Reporte (E8)**: sections list with ✓ (edited) / ✎ (editing) / · states,
+  export buttons, the "Versión N · editada por …" line, sign form; preview of
+  one section as text with "✎ Editar esta sección"; the severity bars of the
+  executive summary; the version-control table. No rich text (see
+  docs/report-format.md).
+- Progress widths are stepped CSS classes (`w0` … `w100`,
+  `frontend/src/components/width-class.ts`): the app's CSP is
+  `style-src 'self'`, so inline styles never render.
 
 ## Tokens (frontend/src/theme/tokens.css — single source)
 

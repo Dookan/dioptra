@@ -6,13 +6,29 @@
 
 ## INTRODUCCIÓN
 
-Este informe detalla el análisis de caja blanca del código fuente del sistema {{ system.name | md }}. El propósito de esta auditoría es identificar código potencialmente inseguro o mal escrito, dependencias con vulnerabilidades conocidas y secretos expuestos, mapear cada hallazgo al estándar OWASP y recomendar su mitigación.
+{% for paragraph in sections.introduction %}
+{{ paragraph | md }}
 
-La revisión se efectuó mediante análisis estático automatizado: análisis de seguridad del código (SAST), análisis de composición de software para las dependencias (SCA) y detección de secretos. Cada hallazgo conserva su ubicación exacta (archivo y línea) y el fragmento de código correspondiente. Las herramientas que no pudieron ejecutarse se registran como brechas de cobertura en la sección correspondiente.
-
+{% endfor %}
 ## RESUMEN EJECUTIVO
 
-{{ summary.sentence }}
+{% for paragraph in sections.summary %}
+{{ paragraph | md }}
+
+{% endfor %}
+{% if summary.total %}
+| Severidad | Cantidad |
+|---|---|
+{% for row in summary.by_severity %}
+| {{ row.label }} | {{ row.count }} |
+{% endfor %}
+
+| Categoría OWASP | Cantidad |
+|---|---|
+{% for row in summary.by_owasp %}
+| {{ row.label | md }}{% if row.title %} — {{ row.title | md }}{% endif %} | {{ row.count }} |
+{% endfor %}
+{% endif %}
 
 ## DETALLES DEL SISTEMA
 
@@ -79,8 +95,10 @@ La revisión se efectuó mediante análisis estático automatizado: análisis de
 {% if security_findings %}
 ## HALLAZGOS DE VULNERABILIDADES
 
-En este apartado se examinan las vulnerabilidades identificadas en la estructura y configuración del código, que podrían exponer el sistema a riesgos de seguridad. A continuación lo encontrado:
+{% for paragraph in sections.findings_intro %}
+{{ paragraph | md }}
 
+{% endfor %}
 {% for f in security_findings %}
 {{ finding_block(f) }}
 {% endfor %}
@@ -88,8 +106,10 @@ En este apartado se examinan las vulnerabilidades identificadas en la estructura
 ## HALLAZGOS SOBRE PAQUETES Y DEPENDENCIAS
 
 {% if dependency_findings or dependency_scan_ran %}
-En este apartado, se examinan y describen las vulnerabilidades identificadas en los paquetes y dependencias del código, que podrían exponer el sistema a diversos riesgos de seguridad. Cabe destacar que estas vulnerabilidades pueden o no aplicar directamente a la estructura o implementación del código analizado; sin embargo, deben ser informadas y documentadas como parte del proceso de gestión y transparencia de riesgos.
+{% for paragraph in sections.dependencies_intro %}
+{{ paragraph | md }}
 
+{% endfor %}
 {% if dependency_findings %}
 A continuación lo encontrado:
 
@@ -108,10 +128,10 @@ La revisión de dependencias contra la base de vulnerabilidades (OSV) no pudo ej
 
 ### Presencia de código comentado en el sistema
 
-Se detectaron múltiples líneas de código comentado dentro del sistema. Mantener código obsoleto o desactivado de esta forma afecta la legibilidad, dificulta las tareas de mantenimiento y puede inducir a errores durante futuras modificaciones. Además, podría exponer información sensible o lógica interna previamente utilizada, lo cual representa un riesgo de divulgación no intencionada.
+{% for paragraph in sections.practices %}
+{{ paragraph | md }}
 
-Se recomienda eliminar el código comentado que no sea estrictamente necesario y, en caso de requerir su preservación por motivos históricos o de referencia, almacenarlo en el control de versiones (Git) mediante commits adecuados, evitando su permanencia en el código activo.
-
+{% endfor %}
 Existe código comentado en los siguientes archivos del sistema:
 
 {% for path in commented_code_files %}
@@ -121,8 +141,10 @@ Existe código comentado en los siguientes archivos del sistema:
 {% endif %}
 ## COBERTURA DE HERRAMIENTAS
 
-Estado de las herramientas de análisis. Una herramienta no instalada o con error es una brecha de cobertura registrada, no un fallo del análisis.
+{% for paragraph in sections.coverage_intro %}
+{{ paragraph | md }}
 
+{% endfor %}
 | Herramienta | Categoría | Estado | Detalle |
 |---|---|---|---|
 {% for run in tool_runs %}

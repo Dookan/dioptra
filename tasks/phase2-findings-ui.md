@@ -1,7 +1,9 @@
 # Task: Phase 2 — Findings UI
 
-> **Status: DESIGN — deadline 2026-09-08 (plan days 11–12); starts the moment
-> P1 closes.** Closes together with P3 at the ◆ "P2+P3" milestone, 2026-09-11.
+> **Status: IN_PROGRESS — started 2026-09-22 (deadline 2026-09-08, plan days
+> 11–12, passed) on P1's data per the contingency "PDF fidelity slips → P2
+> starts anyway". Survey: `tasks/phase2-survey.md` ("go" by `mmarin`).**
+> Closes together with P3 at the ◆ "P2+P3" milestone, 2026-09-11.
 
 ## Objective
 Let the analyst work inside the platform: review every finding with a verdict
@@ -50,7 +52,7 @@ control. E3's gate becomes usable start to finish in the UI.
 - [ ] Mutation pass on the triage gate module (phase-close)
 - [ ] No secrets in diff (Gitleaks clean); locale parity check green
 - [ ] `/precommit` returned `READY TO COMMIT` (including mockup fidelity)
-- [ ] `tasks/phase2-survey.md` written and signed off before the report-versioning edits
+- [x] `tasks/phase2-survey.md` written and signed off before the report-versioning edits
 - [ ] E3 walked start to finish in the UI on the P1 project: every finding
       has a verdict, the gate opens, the report version exports
 - [ ] CLAUDE.md phase status + docs/development-phases.md: Phase 2 → DONE with date and commit
@@ -60,6 +62,8 @@ control. E3's gate becomes usable start to finish in the UI.
 - Inventory panel and VEX authoring UI (P5) — P2 only stores the verdict
 - Report sections 7–10 (metrics, test debt, inventory, annexes — P5)
 - New dependencies without license + rationale
+- Rich-text sections (plain paragraphs only, escaped at render — survey §5)
+- Cryptographic (PKI) signatures — signing is an attested, immutable lock
 
 ## References
 - `CLAUDE.md` → Roles, Hard Rules, Code Conventions

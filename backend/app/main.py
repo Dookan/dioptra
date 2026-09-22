@@ -22,6 +22,8 @@ from app.auth.router import router as auth_router
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.projects.router import router as projects_router
+from app.reports.router import router as reports_router
+from app.workflow.router import router as workflow_router
 
 logger = logging.getLogger("dioptra")
 
@@ -116,4 +118,6 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(projects_router)
     app.include_router(analysis_router)
+    app.include_router(workflow_router)
+    app.include_router(reports_router)
     return app

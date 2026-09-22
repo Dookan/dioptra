@@ -1,14 +1,15 @@
 /**
- * One project: stage E2 ingest, the analyses it produced, a read-only findings
- * list and the report downloads. Mockup anchors: screen 03 "2 · El código" and
- * the `.steps` / `.nextstep` blocks of screens 04–09. Triage (verdicts) is P2.
+ * One project: stage E2 ingest, the analyses it produced, the report downloads
+ * and the doors to triage (E3) and the report editor (E8). Mockup anchors:
+ * screen 03 "2 · El código" and the `.steps` / `.nextstep` blocks of screens
+ * 04–09.
  */
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ApiError } from '../api/client';
 import * as api from '../api/projects';
-import type { Analysis, Finding, Project, ReportFormat, Severity } from '../api/projects';
+import type { Analysis, Project, ReportFormat, Severity } from '../api/projects';
 import { useAuth } from '../auth/auth-context';
 import { AppShell } from '../components/app-shell';
 import { SeverityBadge, StatusBadge, ToolBadge } from '../components/status-badge';
@@ -26,8 +27,11 @@ interface Props {
 }
 
 function stageFor(analyses: Analysis[]): number {
-  // Registro is done once the project exists; Código once an analysis finished.
-  return analyses.some((analysis) => analysis.status === 'done') ? 2 : 1;
+  // Registro is done once the project exists; Código once an analysis finished;
+  // Análisis once every finding of the latest finished analysis has a verdict.
+  const done = analyses.find((analysis) => analysis.status === 'done');
+  if (done === undefined) return 1;
+  return done.triage.complete && done.triage.total > 0 ? 3 : 2;
 }
 
 function IngestCard({
@@ -185,72 +189,14 @@ function Downloads({ analysis }: { analysis: Analysis }): React.ReactNode {
   );
 }
 
-function FindingsTable({ analysisId }: { analysisId: string }): React.ReactNode {
-  const { t } = useTranslation();
-  const { accessToken } = useAuth();
-  const [findings, setFindings] = useState<Finding[] | null>(null);
-
-  useEffect(() => {
-    if (accessToken === null) return;
-    let cancelled = false;
-    api
-      .listFindings(accessToken, analysisId)
-      .then((list) => {
-        if (!cancelled) setFindings(list);
-      })
-      .catch(() => {
-        if (!cancelled) setFindings([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [accessToken, analysisId]);
-
-  if (findings === null) return <p className="hint">{t('project.findings.loading')}</p>;
-  if (findings.length === 0) return <p className="hint">{t('project.findings.empty')}</p>;
-
-  return (
-    <table className="table">
-      <thead>
-        <tr>
-          <th scope="col">{t('project.findings.severity')}</th>
-          <th scope="col">{t('project.findings.title')}</th>
-          <th scope="col">{t('project.findings.classification')}</th>
-          <th scope="col">{t('project.findings.location')}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {findings.map((finding) => (
-          <tr key={finding.id}>
-            <td>
-              <SeverityBadge severity={finding.severity} />
-            </td>
-            <td>
-              {/* Text nodes only: the title and snippet come from the audited tree. */}
-              <b>{finding.title}</b>
-              {finding.snippet !== null && finding.snippet !== '' && (
-                <pre className="codeblock">{finding.snippet}</pre>
-              )}
-            </td>
-            <td className="mono">
-              {finding.cwe === null ? t('project.findings.unknownCwe') : `CWE-${finding.cwe}`}
-              {' · '}
-              {finding.owasp ?? t('project.findings.unclassified')}
-            </td>
-            <td className="mono">
-              {finding.path}
-              {finding.line !== null && `:${finding.line}`}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-function AnalysisCard({ analysis }: { analysis: Analysis }): React.ReactNode {
+function AnalysisCard({
+  analysis,
+  onNavigate,
+}: {
+  analysis: Analysis;
+  onNavigate: (route: Route) => void;
+}): React.ReactNode {
   const { t, i18n } = useTranslation();
-  const [showFindings, setShowFindings] = useState(false);
   const languages = Object.entries(analysis.languages);
   const total = SEVERITIES.reduce((sum, level) => sum + (analysis.finding_counts[level] ?? 0), 0);
   const when = new Date(analysis.created_at).toLocaleString(i18n.resolvedLanguage, {
@@ -307,21 +253,37 @@ function AnalysisCard({ analysis }: { analysis: Analysis }): React.ReactNode {
           ))}
         </ul>
       )}
+      {analysis.status === 'done' && (
+        <div className="row">
+          <span className="sub">
+            {analysis.triage.pending > 0
+              ? t('project.triage.pending', { count: analysis.triage.pending })
+              : t('project.triage.done')}
+          </span>
+        </div>
+      )}
       <Downloads analysis={analysis} />
       {analysis.status === 'done' && (
-        <>
+        <div className="actions wrap">
+          <button
+            type="button"
+            className="btn"
+            onClick={() => {
+              onNavigate({ kind: 'findings', id: analysis.project_id, analysisId: analysis.id });
+            }}
+          >
+            {t('project.findings.review')}
+          </button>
           <button
             type="button"
             className="btn ghost"
-            aria-expanded={showFindings}
             onClick={() => {
-              setShowFindings((value) => !value);
+              onNavigate({ kind: 'report', id: analysis.project_id, analysisId: analysis.id });
             }}
           >
-            {showFindings ? t('project.findings.hide') : t('project.findings.show')}
+            {t('project.findings.editReport')}
           </button>
-          {showFindings && <FindingsTable analysisId={analysis.id} />}
-        </>
+        </div>
       )}
     </li>
   );
@@ -387,8 +349,20 @@ export function ProjectScreen({ route, projectId, onNavigate }: Props): React.Re
           </div>
           <section className="nextstep">
             <div className="txt">
-              <b>{stage === 1 ? t('project.nextStep.codeTitle') : t('project.nextStep.doneTitle')}</b>
-              <div>{stage === 1 ? t('project.nextStep.codeBody') : t('project.nextStep.doneBody')}</div>
+              <b>
+                {stage === 1
+                  ? t('project.nextStep.codeTitle')
+                  : stage === 2
+                    ? t('project.nextStep.triageTitle')
+                    : t('project.nextStep.doneTitle')}
+              </b>
+              <div>
+                {stage === 1
+                  ? t('project.nextStep.codeBody')
+                  : stage === 2
+                    ? t('project.nextStep.triageBody')
+                    : t('project.nextStep.doneBody')}
+              </div>
             </div>
           </section>
           <div className="cols side">
@@ -424,7 +398,7 @@ export function ProjectScreen({ route, projectId, onNavigate }: Props): React.Re
             ) : (
               <ul className="list" aria-label={t('project.analyses.title')}>
                 {analyses.map((analysis) => (
-                  <AnalysisCard key={analysis.id} analysis={analysis} />
+                  <AnalysisCard key={analysis.id} analysis={analysis} onNavigate={onNavigate} />
                 ))}
               </ul>
             )}

@@ -21,10 +21,26 @@ interface Props {
   children: ReactNode;
 }
 
-const TABS: { key: 'home' | 'projects'; route: Route }[] = [
-  { key: 'home', route: { kind: 'home' } },
-  { key: 'projects', route: { kind: 'projects' } },
-];
+type TabKey = 'home' | 'projects' | 'findings' | 'report';
+
+/**
+ * Inicio and Proyectos always; Hallazgos and Reporte (mockups 04 and 09) once
+ * the route names an analysis — they are meaningless without one.
+ */
+function tabsFor(route: Route): { key: TabKey; route: Route }[] {
+  const tabs: { key: TabKey; route: Route }[] = [
+    { key: 'home', route: { kind: 'home' } },
+    { key: 'projects', route: { kind: 'projects' } },
+  ];
+  if (route.kind === 'findings' || route.kind === 'report') {
+    const { id, analysisId } = route;
+    tabs.push(
+      { key: 'findings', route: { kind: 'findings', id, analysisId } },
+      { key: 'report', route: { kind: 'report', id, analysisId } },
+    );
+  }
+  return tabs;
+}
 
 function isActive(tab: Route, route: Route): boolean {
   if (tab.kind === 'projects') return route.kind === 'projects' || route.kind === 'project';
@@ -61,7 +77,7 @@ export function AppShell({ route, onNavigate, context, children }: Props): React
         </div>
       </header>
       <nav className="tabsbar" aria-label={t('nav.label')}>
-        {TABS.map((tab) => (
+        {tabsFor(route).map((tab) => (
           <a
             key={tab.key}
             className={isActive(tab.route, route) ? 'ptab on' : 'ptab'}

@@ -16,12 +16,37 @@
   <div class="period">{{ period }}</div>
 </section>
 
+{# Editable prose (P2): each section is the institutional default or the
+   analyst's override of the rendered version, paragraph by paragraph. #}
 <h2 class="break">INTRODUCCIÓN</h2>
-<p>Este informe detalla el análisis de caja blanca del código fuente del sistema {{ system.name }}. El propósito de esta auditoría es identificar código potencialmente inseguro o mal escrito, dependencias con vulnerabilidades conocidas y secretos expuestos, mapear cada hallazgo al estándar OWASP y recomendar su mitigación.</p>
-<p>La revisión se efectuó mediante análisis estático automatizado: análisis de seguridad del código (SAST), análisis de composición de software para las dependencias (SCA) y detección de secretos. Cada hallazgo conserva su ubicación exacta (archivo y línea) y el fragmento de código correspondiente. Las herramientas que no pudieron ejecutarse se registran como brechas de cobertura en la sección correspondiente.</p>
+{% for paragraph in sections.introduction %}
+<p>{{ paragraph }}</p>
+{% endfor %}
 
 <h2>RESUMEN EJECUTIVO</h2>
-<p>{{ summary.sentence }}</p>
+{% for paragraph in sections.summary %}
+<p>{{ paragraph }}</p>
+{% endfor %}
+{% if summary.total %}
+<table class="distribution">
+  <colgroup><col class="a"><col class="b"><col class="c"></colgroup>
+  <thead><tr><th>Severidad</th><th>Cantidad</th><th>Distribución por severidad</th></tr></thead>
+  <tbody>
+  {% for row in summary.by_severity %}
+    <tr><td>{{ row.label }}</td><td class="count">{{ row.count }}</td><td class="bar"><span class="track"><span class="fill {{ row.severity }} w{{ (row.percent / 5) | round | int * 5 }}"></span></span></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<table class="distribution">
+  <colgroup><col class="a"><col class="b"><col class="c"></colgroup>
+  <thead><tr><th>Categoría</th><th>Cantidad</th><th>Distribución por categoría OWASP</th></tr></thead>
+  <tbody>
+  {% for row in summary.by_owasp %}
+    <tr><td>{{ row.label }}{% if row.title %} — {{ row.title }}{% endif %}</td><td class="count">{{ row.count }}</td><td class="bar"><span class="track"><span class="fill w{{ (row.percent / 5) | round | int * 5 }}"></span></span></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
 
 <h2>DETALLES DEL SISTEMA</h2>
 <table class="details">
@@ -94,7 +119,9 @@
 
 {% if security_findings %}
 <h2>HALLAZGOS DE VULNERABILIDADES</h2>
-<p>En este apartado se examinan las vulnerabilidades identificadas en la estructura y configuración del código, que podrían exponer el sistema a riesgos de seguridad. A continuación lo encontrado:</p>
+{% for paragraph in sections.findings_intro %}
+<p>{{ paragraph }}</p>
+{% endfor %}
 {% for f in security_findings %}
 {{ finding_block(f) }}
 {% endfor %}
@@ -102,7 +129,9 @@
 
 {% if dependency_findings or dependency_scan_ran %}
 <h2>HALLAZGOS SOBRE PAQUETES Y DEPENDENCIAS</h2>
-<p>En este apartado, se examinan y describen las vulnerabilidades identificadas en los paquetes y dependencias del código, que podrían exponer el sistema a diversos riesgos de seguridad. Cabe destacar que estas vulnerabilidades pueden o no aplicar directamente a la estructura o implementación del código analizado; sin embargo, deben ser informadas y documentadas como parte del proceso de gestión y transparencia de riesgos.</p>
+{% for paragraph in sections.dependencies_intro %}
+<p>{{ paragraph }}</p>
+{% endfor %}
 {% if dependency_findings %}
 <p>A continuación lo encontrado:</p>
 {% for f in dependency_findings %}
@@ -119,8 +148,9 @@
 {% if commented_code_files %}
 <h2>ERRORES Y PRÁCTICAS NO ADECUADAS EN EL CÓDIGO</h2>
 <h3 class="centered">Presencia de código comentado en el sistema</h3>
-<p>Se detectaron múltiples líneas de código comentado dentro del sistema. Mantener código obsoleto o desactivado de esta forma afecta la legibilidad, dificulta las tareas de mantenimiento y puede inducir a errores durante futuras modificaciones. Además, podría exponer información sensible o lógica interna previamente utilizada, lo cual representa un riesgo de divulgación no intencionada.</p>
-<p>Se recomienda eliminar el código comentado que no sea estrictamente necesario y, en caso de requerir su preservación por motivos históricos o de referencia, almacenarlo en el control de versiones (Git) mediante commits adecuados, evitando su permanencia en el código activo.</p>
+{% for paragraph in sections.practices %}
+<p>{{ paragraph }}</p>
+{% endfor %}
 <p>Existe código comentado en los siguientes archivos del sistema:</p>
 <ul class="files">
 {% for path in commented_code_files %}
@@ -131,7 +161,9 @@
 
 {% if tool_runs %}
 <h2>COBERTURA DE HERRAMIENTAS</h2>
-<p>Estado de las herramientas de análisis. Una herramienta no instalada o con error es una brecha de cobertura registrada, no un fallo del análisis.</p>
+{% for paragraph in sections.coverage_intro %}
+<p>{{ paragraph }}</p>
+{% endfor %}
 <table class="four">
   <colgroup><col class="a"><col class="b"><col class="c"><col class="d"></colgroup>
   <thead>

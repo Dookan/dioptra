@@ -47,6 +47,8 @@ function analysis(status: 'queued' | 'done') {
     started_at: null,
     finished_at: null,
     finding_counts: { high: 2, medium: 1 },
+    report_counts: { high: 2, medium: 1 },
+    triage: { total: 3, confirmed: 0, false_positive: 0, pending: 3, complete: false },
     tool_runs: [
       { tool: 'semgrep', category: 'sast', status: 'ran', detail: null, duration_ms: 10 },
       { tool: 'osv-scanner', category: 'sca', status: 'missing', detail: 'no database', duration_ms: null },
@@ -129,5 +131,8 @@ describe('project screen', () => {
     });
     expect(screen.getByText(es.analysis.tool.missing)).toBeInTheDocument();
     expect(screen.getByText('Express')).toBeInTheDocument();
+    // The next step is the review, and the door to it is a button that says so.
+    expect(screen.getByText(es.project.nextStep.triageTitle)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: es.project.findings.review })).toBeInTheDocument();
   });
 });

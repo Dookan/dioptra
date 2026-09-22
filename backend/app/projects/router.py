@@ -15,7 +15,14 @@ from app.core.config import get_settings
 from app.db.session import get_db
 from app.ingest import service
 from app.ingest.errors import ZipTooLarge
-from app.projects.schemas import AnalysisOut, GitIngestRequest, ProjectCreate, ProjectOut
+from app.projects.schemas import (
+    AnalysisOut,
+    GitIngestRequest,
+    ProjectCreate,
+    ProjectOut,
+    TriageOut,
+)
+from app.workflow.triage import triage_status
 
 router = APIRouter(prefix="/api/v1/projects", tags=["projects"])
 
@@ -26,10 +33,22 @@ IngestUser = Annotated[User, Depends(require_roles(Role.ADMIN, Role.ANALYST))]
 
 def analysis_out(analysis: Analysis) -> AnalysisOut:
     counts = dict.fromkeys((level.value for level in Severity), 0)
+    report_counts = dict(counts)
     for finding in analysis.findings:
         counts[finding.severity.value] += 1
+        if finding.in_report:
+            report_counts[finding.severity.value] += 1
     payload = AnalysisOut.model_validate(analysis)
     payload.finding_counts = counts
+    payload.report_counts = report_counts
+    status = triage_status(analysis)
+    payload.triage = TriageOut(
+        total=status.total,
+        confirmed=status.confirmed,
+        false_positive=status.false_positive,
+        pending=status.pending,
+        complete=status.complete,
+    )
     return payload
 
 

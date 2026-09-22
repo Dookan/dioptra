@@ -1,6 +1,6 @@
 # Report format
 
-> **Status: IN_PROGRESS — sections 1–6 plus "Hallazgos sobre paquetes", "Errores y prácticas" and "Cobertura de herramientas" built 2026-09-21 (`backend/app/reports/`, `backend/templates/report/`); PDF fidelity is a first structural pass, see the scope-change log.** Anchor: the institution's
+> **Status: IN_PROGRESS — sections 1–6 plus "Hallazgos sobre paquetes", "Errores y prácticas" and "Cobertura de herramientas" built 2026-09-21 (`backend/app/reports/`, `backend/templates/report/`); versioning, signing and the editable sections built 2026-09-22 (`backend/app/reports/{versions,router}.py`, `frontend/src/screens/report-screen.tsx`); PDF fidelity is a first structural pass, see the scope-change log.** Anchor: the institution's
 > manual white-box reports on the MINCYT form systems, in
 > `/home/user/Desktop/UTD/CAJA-BLANCA/*.pdf` (structure is authoritative; the
 > platform must reproduce it indistinguishably — the P1 success criterion,
@@ -11,9 +11,9 @@
 
 1. Cover (institutional header, system name, date)
 2. Introducción
-3. Resumen ejecutivo — now with severity/OWASP distribution visuals
+3. Resumen ejecutivo — with severity/OWASP distribution tables and bars (P2, pure CSS in the PDF, tokens in the UI)
 4. Detalles del sistema (name, framework, DB, developer, install date)
-5. Control de versiones (auto-filled from report edit history)
+5. Control de versiones (auto-filled from the report versions: number, areas changed, change description, delivery date = signature date, `N/A` for a draft)
 6. Hallazgos — per finding: title, severity, CWE, OWASP code, description,
    impact, detection (path:line + escaped snippet), mitigation, references
 7. **New:** Métricas de código (complexity, critical functions, duplication)
@@ -32,10 +32,27 @@ the visual executive summary in P2; sections 7–10 in P5 (day 19).
 
 ## Behavior
 
-- The report composes itself from workflow data; every section is editable in
-  the platform BEFORE export (rich text), with versioned snapshots.
-- Signing locks a version; later edits create the next version and the
-  "Control de versiones" table updates automatically.
+- The report composes itself from workflow data; the prose sections
+  (Introducción, Resumen ejecutivo, the intros of Hallazgos / Paquetes /
+  Cobertura, Errores y prácticas) are editable in the platform BEFORE export,
+  with versioned snapshots. **Plain text, not rich text** (P2 decision,
+  `tasks/phase2-survey.md` §5): paragraphs separated by a blank line, escaped
+  at every render — HTML authored in a browser and fed to WeasyPrint is the
+  stored-XSS path the threat model names. A sanitized subset (bold, lists) is
+  a later decision, not a gap.
+- Version 1 is the composed baseline; every save inserts the next number with
+  the merged overrides. Signing (analyst only, written justification, audit
+  row `report.sign`) records actor, time and a SHA-256 of the signed content (version number,
+  section overrides and the ids of the findings excluded by triage at signing
+  time) and makes the row immutable by database trigger; a signed version
+  keeps rendering exactly the finding set it was signed with — a verdict
+  revised afterwards is allowed and logged, and lands in the next version; later edits open the next
+  version and the "Control de versiones" table updates automatically. An
+  export may name a version (`?version=N`); a snapshot never lists versions
+  after its own.
+- Triage feeds the report: a finding the analyst marked "No aplica" (false
+  positive) leaves every format and the executive-summary counts; a pending
+  finding stays, so an untriaged analysis still exports in full.
 - Exports: PDF (Jinja2 → HTML → WeasyPrint, template identical to the manual
   one), DOCX (basic in P1, python-docx as the candidate library), Markdown.
   Report language follows the UI language (es default).

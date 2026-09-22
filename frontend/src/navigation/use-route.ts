@@ -1,19 +1,30 @@
 /**
  * Hash routing without a router dependency.
  *
- * Phase 1 has three destinations; a routing library would be a new dependency
- * (license + rationale) for a switch statement. The hash keeps the project
- * screen bookmarkable and survives a reload. Revisit when the workflow screens
- * of P3 need nested routes.
+ * Five destinations; a routing library would be a new dependency (license +
+ * rationale) for a switch statement. The hash keeps every screen bookmarkable
+ * and survives a reload. Revisit when the workflow screens of P3 need nested
+ * routes.
  */
 import { useCallback, useEffect, useState } from 'react';
 
-export type Route = { kind: 'home' } | { kind: 'projects' } | { kind: 'project'; id: string };
+export type Route =
+  | { kind: 'home' }
+  | { kind: 'projects' }
+  | { kind: 'project'; id: string }
+  | { kind: 'findings'; id: string; analysisId: string }
+  | { kind: 'report'; id: string; analysisId: string };
 
 const PROJECT = /^#\/projects\/([A-Za-z0-9-]+)$/;
+const ANALYSIS = /^#\/projects\/([A-Za-z0-9-]+)\/analyses\/([A-Za-z0-9-]+)\/(findings|report)$/;
 
 export function parseHash(hash: string): Route {
   if (hash === '#/projects') return { kind: 'projects' };
+  const nested = ANALYSIS.exec(hash);
+  if (nested?.[1] !== undefined && nested[2] !== undefined) {
+    const kind = nested[3] === 'report' ? 'report' : 'findings';
+    return { kind, id: nested[1], analysisId: nested[2] };
+  }
   const match = PROJECT.exec(hash);
   if (match?.[1] !== undefined) return { kind: 'project', id: match[1] };
   return { kind: 'home' };
@@ -27,6 +38,9 @@ export function hrefFor(route: Route): string {
       return '#/projects';
     case 'project':
       return `#/projects/${route.id}`;
+    case 'findings':
+    case 'report':
+      return `#/projects/${route.id}/analyses/${route.analysisId}/${route.kind}`;
   }
 }
 

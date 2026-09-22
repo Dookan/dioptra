@@ -65,7 +65,7 @@ Single authoritative list. Anything not on it MUST NOT embed the product name.
 | Refresh cookie | `dioptra_refresh` |
 | JWT issuer claim | `dioptra` |
 | Browser storage keys | `dioptra.theme`, `dioptra.language` |
-| Append-only trigger function | `dioptra_audit_log_append_only()` |
+| Append-only trigger functions | `dioptra_audit_log_append_only()`, `dioptra_report_version_signed_immutable()` |
 | Review panel agents | `.claude/agents/dioptra-*.md` |
 | i18n keys | `app.name`, `app.brandInitials` in `es.json` / `en.json` |
 | Browser tab title | `Dioptra` in `frontend/index.html` |

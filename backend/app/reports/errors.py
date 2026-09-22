@@ -28,3 +28,35 @@ class ForbiddenAssetFetch(ReportError):
     status_code = 500
     code = "report_asset_forbidden"
     message_key = "errors.report.renderFailed"
+
+
+class ReportVersionNotFound(ReportError):
+    status_code = 404
+    code = "report_version_not_found"
+    message_key = "errors.report.versionNotFound"
+
+
+class VersionNotCurrent(ReportError):
+    """Only the latest version can be signed; an older number is stale."""
+
+    status_code = 409
+    code = "report_version_not_current"
+    message_key = "errors.report.versionNotCurrent"
+
+
+class VersionAlreadySigned(ReportError):
+    status_code = 409
+    code = "report_version_already_signed"
+    message_key = "errors.report.versionAlreadySigned"
+
+
+class UnknownSection(ReportError):
+    status_code = 422
+    code = "report_unknown_section"
+    message_key = "errors.report.unknownSection"
+
+
+class SectionTooLong(ReportError):
+    status_code = 422
+    code = "report_section_too_long"
+    message_key = "errors.report.sectionTooLong"

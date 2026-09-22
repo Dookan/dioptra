@@ -9,11 +9,13 @@ import { useTranslation } from 'react-i18next';
 
 import { useAuth } from './auth/auth-context';
 import { useRoute } from './navigation/use-route';
+import { FindingsScreen } from './screens/findings-screen';
 import { HomeScreen } from './screens/home-screen';
 import { LoginScreen } from './screens/login-screen';
 import { PasswordChangeScreen } from './screens/password-change-screen';
 import { ProjectScreen } from './screens/project-screen';
 import { ProjectsScreen } from './screens/projects-screen';
+import { ReportScreen } from './screens/report-screen';
 
 function Authenticated(): React.ReactNode {
   const { route, navigate } = useRoute();
@@ -22,6 +24,10 @@ function Authenticated(): React.ReactNode {
       return <ProjectsScreen route={route} onNavigate={navigate} />;
     case 'project':
       return <ProjectScreen route={route} projectId={route.id} onNavigate={navigate} />;
+    case 'findings':
+      return <FindingsScreen route={route} onNavigate={navigate} />;
+    case 'report':
+      return <ReportScreen route={route} onNavigate={navigate} />;
     case 'home':
       return <HomeScreen route={route} onNavigate={navigate} />;
   }

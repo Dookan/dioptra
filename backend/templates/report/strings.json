@@ -104,5 +104,26 @@
   "coverage_intro": "Estado de las herramientas de análisis. Una herramienta no instalada o con error es una brecha de cobertura registrada, no un fallo del análisis.",
   "none_found": "ninguno",
   "dependency_title": "Dependencia con Vulnerabilidad {severity}: {package} versión {version}",
-  "dependency_subtitle": "Vulnerabilidad conocida: {advisory_id}"
+  "dependency_subtitle": "Vulnerabilidad conocida: {advisory_id}",
+  "section_labels": {
+    "introduction": "Introducción",
+    "summary": "Resumen ejecutivo",
+    "findings_intro": "Hallazgos de vulnerabilidades",
+    "dependencies_intro": "Hallazgos sobre paquetes y dependencias",
+    "practices": "Errores y prácticas no adecuadas en el código",
+    "coverage_intro": "Cobertura de herramientas"
+  },
+  "version_baseline": {
+    "description": "Informe generado automáticamente",
+    "areas": "Todas",
+    "areas_none": "Ninguna"
+  },
+  "distribution": {
+    "by_severity": "Distribución por severidad",
+    "by_owasp": "Distribución por categoría OWASP",
+    "severity": "Severidad",
+    "category": "Categoría",
+    "count": "Cantidad"
+  },
+  "date_format": "%d/%m/%Y"
 }

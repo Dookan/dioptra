@@ -1,6 +1,6 @@
 # Roles and permissions
 
-> **Status: DESIGN SURFACE — roles, sessions and admin-only accounts are built (P0, `backend/app/auth/`); the per-stage permission rows are the target.**
+> **Status: IN_PROGRESS — roles, sessions and admin-only accounts (P0, `backend/app/auth/`), the E1–E2 rows (P1) and the E3 triage / E8 edit-and-sign rows (P2, `backend/app/workflow/router.py`, `backend/app/reports/router.py`) are enforced; E4–E7 rows are the target.**
 
 Usernames are initial + lastname, lowercase, no dots: `mmarin`, `cperez`,
 `amedina`. Roles are enforced on EVERY endpoint; the UI only mirrors them.

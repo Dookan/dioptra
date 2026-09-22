@@ -20,7 +20,7 @@ from __future__ import annotations
 import io
 import logging
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -34,6 +34,7 @@ from app.analysis.models import Analysis
 from app.projects.models import Project
 from app.reports.context import build_context
 from app.reports.errors import ForbiddenAssetFetch, ReportRenderError
+from app.reports.models import ReportVersion
 from app.reports.strings import report_strings
 
 logger = logging.getLogger("dioptra.reports")
@@ -164,16 +165,28 @@ def restricted_url_fetcher(url: str) -> Any:
     return _restricted_fetcher_class()()(url)
 
 
-def render_html(analysis: Analysis, project: Project) -> str:
-    context = build_context(analysis, project)
+def render_html(
+    analysis: Analysis,
+    project: Project,
+    *,
+    version: ReportVersion | None = None,
+    versions: Sequence[ReportVersion] = (),
+) -> str:
+    context = build_context(analysis, project, version=version, versions=versions)
     template = _html_environment().get_template(HTML_TEMPLATE)
     # The stylesheet is a trusted, static file of ours: it is the one value that
     # legitimately bypasses autoescape.
     return template.render(**context, stylesheet=Markup(stylesheet()))  # noqa: S704
 
 
-def render_markdown(analysis: Analysis, project: Project) -> str:
-    context = build_context(analysis, project)
+def render_markdown(
+    analysis: Analysis,
+    project: Project,
+    *,
+    version: ReportVersion | None = None,
+    versions: Sequence[ReportVersion] = (),
+) -> str:
+    context = build_context(analysis, project, version=version, versions=versions)
     template = _markdown_environment().get_template(MARKDOWN_TEMPLATE)
     return template.render(**context)
 
@@ -184,8 +197,14 @@ def render_bundle(analysis: Analysis, project: Project) -> ReportBundle:
     )
 
 
-def render_pdf(analysis: Analysis, project: Project) -> bytes:
-    html = render_html(analysis, project)
+def render_pdf(
+    analysis: Analysis,
+    project: Project,
+    *,
+    version: ReportVersion | None = None,
+    versions: Sequence[ReportVersion] = (),
+) -> bytes:
+    html = render_html(analysis, project, version=version, versions=versions)
     try:
         from weasyprint import HTML  # type: ignore[import-untyped]  # noqa: PLC0415
 
@@ -215,12 +234,19 @@ def _docx_table(document: Any, headers: list[str], rows: list[list[str]]) -> Non
             cells[index].text = value
 
 
-def render_docx(analysis: Analysis, project: Project) -> bytes:
-    """Basic DOCX: headings, paragraphs and the two tables. Text runs only.
+def render_docx(
+    analysis: Analysis,
+    project: Project,
+    *,
+    version: ReportVersion | None = None,
+    versions: Sequence[ReportVersion] = (),
+) -> bytes:
+    """Basic DOCX: headings, paragraphs and the tables. Text runs only.
 
-    Every label and paragraph comes from ``templates/report/strings.json``.
+    Every label comes from ``templates/report/strings.json``; the prose is the
+    rendered version's sections (defaults or the analyst's overrides).
     """
-    context = build_context(analysis, project)
+    context = build_context(analysis, project, version=version, versions=versions)
     try:
         from docx import Document  # noqa: PLC0415
     except ImportError as exc:  # pragma: no cover - dependency is pinned
@@ -236,11 +262,25 @@ def render_docx(analysis: Analysis, project: Project) -> bytes:
     add(context["period"])
     doc.add_page_break()  # type: ignore[no-untyped-call]
 
+    sections = context["sections"]
+    distribution = strings["distribution"]
     doc.add_heading(heading["introduction"], level=1)
-    for paragraph in strings["introduction"]:
-        add(paragraph.format(system_name=context["system"]["name"]))
+    for paragraph in sections["introduction"]:
+        add(paragraph)
     doc.add_heading(heading["summary"], level=1)
-    add(context["summary"]["sentence"])
+    for paragraph in sections["summary"]:
+        add(paragraph)
+    if context["summary"]["total"]:
+        _docx_table(
+            doc,
+            [distribution["severity"], distribution["count"]],
+            [[r["label"], str(r["count"])] for r in context["summary"]["by_severity"]],
+        )
+        _docx_table(
+            doc,
+            [distribution["category"], distribution["count"]],
+            [[r["label"], str(r["count"])] for r in context["summary"]["by_owasp"]],
+        )
 
     doc.add_heading(heading["system"], level=1)
     system = context["system"]
@@ -293,13 +333,15 @@ def render_docx(analysis: Analysis, project: Project) -> bytes:
 
     if context["security_findings"]:
         doc.add_heading(heading["findings"], level=1)
-        add(strings["findings_intro"])
+        for paragraph in sections["findings_intro"]:
+            add(paragraph)
         for finding in context["security_findings"]:
             finding_block(finding)
 
     doc.add_heading(heading["dependencies"], level=1)
     if context["dependency_findings"] or context["dependency_scan_ran"]:
-        add(strings["dependencies_intro"])
+        for paragraph in sections["dependencies_intro"]:
+            add(paragraph)
         if context["dependency_findings"]:
             add(label["found_below"])
             for finding in context["dependency_findings"]:
@@ -312,14 +354,15 @@ def render_docx(analysis: Analysis, project: Project) -> bytes:
     if context["commented_code_files"]:
         doc.add_heading(heading["practices"], level=1)
         doc.add_heading(heading["commented_code"], level=2)
-        for paragraph in strings["commented_code"]:
+        for paragraph in sections["practices"]:
             add(paragraph)
         add(label["commented_files"])
         for path in context["commented_code_files"]:
             add(path, style="List Bullet")
 
     doc.add_heading(heading["coverage"], level=1)
-    add(strings["coverage_intro"])
+    for paragraph in sections["coverage_intro"]:
+        add(paragraph)
     _docx_table(
         doc,
         [label["tool"], label["category"], label["status"], label["detail"]],
