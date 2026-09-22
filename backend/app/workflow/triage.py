@@ -14,11 +14,11 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
-from app.analysis.models import Analysis, Finding, Verdict
+from app.analysis.models import STAGE_ORDER, Analysis, Finding, Stage, Verdict
 from app.audit import service as audit
 from app.auth.models import User
 from app.core.clock import utc_now
-from app.workflow.errors import FindingNotFound, JustificationRequired
+from app.workflow.errors import FindingNotFound, JustificationRequired, StageLocked
 
 #: Shortest justification accepted after stripping whitespace. "ok" is not a
 #: reason; ten characters is the floor at which a sentence can exist.
@@ -75,7 +75,16 @@ def record_verdict(
     justification: str,
     source_ip: str | None,
 ) -> Finding:
-    """Store the analyst's verdict and append it to the audit trail."""
+    """Store the analyst's verdict and append it to the audit trail.
+
+    Refused once the analysis has left E3: the E4 ranking and everything after
+    it are computed on the verdicts, so they must not move underneath a saved
+    plan (same rule as the plan itself once E4 is left). A re-review means a
+    new ingested version.
+    """
+    analysis = finding.analysis
+    if STAGE_ORDER.index(analysis.stage) > STAGE_ORDER.index(Stage.ANALYSIS):
+        raise StageLocked(f"analysis {analysis.id} is at {analysis.stage.value}")
     text = clean_justification(justification)
     finding.verdict = verdict
     finding.verdict_justification = text

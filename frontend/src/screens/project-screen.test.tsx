@@ -40,6 +40,7 @@ function analysis(status: 'queued' | 'done') {
     source_ref: 'src.zip',
     status,
     failure_code: null,
+    stage: status === 'done' ? 'analysis' : 'code',
     languages: { JavaScript: 3 },
     frameworks: ['Express'],
     lockfiles: ['package-lock.json'],

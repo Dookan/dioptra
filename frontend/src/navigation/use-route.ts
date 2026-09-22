@@ -13,16 +13,20 @@ export type Route =
   | { kind: 'projects' }
   | { kind: 'project'; id: string }
   | { kind: 'findings'; id: string; analysisId: string }
+  | { kind: 'plan'; id: string; analysisId: string }
   | { kind: 'report'; id: string; analysisId: string };
 
+export type AnalysisRoute = Extract<Route, { analysisId: string }>;
+
 const PROJECT = /^#\/projects\/([A-Za-z0-9-]+)$/;
-const ANALYSIS = /^#\/projects\/([A-Za-z0-9-]+)\/analyses\/([A-Za-z0-9-]+)\/(findings|report)$/;
+const ANALYSIS =
+  /^#\/projects\/([A-Za-z0-9-]+)\/analyses\/([A-Za-z0-9-]+)\/(findings|plan|report)$/;
 
 export function parseHash(hash: string): Route {
   if (hash === '#/projects') return { kind: 'projects' };
   const nested = ANALYSIS.exec(hash);
   if (nested?.[1] !== undefined && nested[2] !== undefined) {
-    const kind = nested[3] === 'report' ? 'report' : 'findings';
+    const kind = nested[3] === 'report' ? 'report' : nested[3] === 'plan' ? 'plan' : 'findings';
     return { kind, id: nested[1], analysisId: nested[2] };
   }
   const match = PROJECT.exec(hash);
@@ -39,6 +43,7 @@ export function hrefFor(route: Route): string {
     case 'project':
       return `#/projects/${route.id}`;
     case 'findings':
+    case 'plan':
     case 'report':
       return `#/projects/${route.id}/analyses/${route.analysisId}/${route.kind}`;
   }

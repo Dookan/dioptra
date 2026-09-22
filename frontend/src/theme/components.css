@@ -887,3 +887,145 @@ button.card:focus-visible {
   align-items: center;
   gap: 8px;
 }
+
+/* --- status bar (mockups 02–11) ------------------------------------------ */
+.statusbar {
+  display: flex;
+  align-items: center;
+  background: var(--s1);
+  border-top: 1px solid var(--line);
+  color: var(--t2);
+  font-size: 11.5px;
+  padding: 6px 16px;
+  gap: 12px;
+}
+
+.statusbar .mid {
+  flex: 1;
+  text-align: center;
+}
+
+.statusbar .z {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.avatar.small {
+  width: 20px;
+  height: 20px;
+  font-size: 9px;
+}
+
+/* --- test plan (mockup 05) ----------------------------------------------- */
+.ranking {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+}
+
+.rowline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--s1);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 11px 14px;
+}
+
+.rowline + .rowline {
+  margin-top: 8px;
+}
+
+.rowline.sel {
+  border-color: var(--acc);
+}
+
+.rowline .grow {
+  flex: 1;
+  min-width: 0;
+}
+
+.rowline b {
+  font-size: 13.5px;
+}
+
+.rowline .sub {
+  color: var(--t2);
+  font-size: 12px;
+}
+
+.prio {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--acc-soft);
+  color: var(--acc);
+  font-weight: 700;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.radios {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.radio {
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 4px 13px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--t2);
+  background: transparent;
+  cursor: pointer;
+}
+
+.radio.on {
+  border-color: var(--acc);
+  background: var(--acc-soft);
+  color: var(--acc);
+  font-weight: 650;
+}
+
+.radio[disabled] {
+  cursor: default;
+}
+
+.radio:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.advance {
+  flex: 1 1 320px;
+  max-width: 420px;
+}
+
+.advance .field {
+  margin-bottom: 6px;
+}
+
+/* The banner's single-CTA rule must not push the open form's two buttons apart. */
+.nextstep .advance .btn,
+.nextstep .advance-cta .btn {
+  margin-left: 0;
+}
+
+.advance .actions {
+  flex-wrap: wrap;
+}
+
+.advance-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}

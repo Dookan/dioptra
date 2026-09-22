@@ -15,6 +15,7 @@ import * as api from '../api/projects';
 import type { Analysis, Project, ReportFormat, ReportState, Severity } from '../api/projects';
 import { useAuth } from '../auth/auth-context';
 import { AppShell } from '../components/app-shell';
+import { stageIndex } from '../components/stages';
 import { SeverityBadge } from '../components/status-badge';
 import { Stepper } from '../components/stepper';
 import { widthClass } from '../components/width-class';
@@ -210,8 +211,8 @@ export function ReportScreen({ route, onNavigate }: Props): React.ReactNode {
   const triageDone = analysis?.triage.complete ?? false;
 
   return (
-    <AppShell route={route} onNavigate={onNavigate} context={project?.name}>
-      <Stepper current={7} />
+    <AppShell route={route} onNavigate={onNavigate} context={project?.name} stage={analysis?.stage}>
+      {analysis !== null && <Stepper current={stageIndex(analysis.stage)} />}
       {errorKey !== null && (
         <p className="alert" role="alert">
           {t(errorKey)}

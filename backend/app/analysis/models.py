@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import JSON, Enum, Float, ForeignKey, Integer, LargeBinary, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -18,6 +18,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.clock import utc_now
 from app.db.base import Base
 from app.db.types import UtcDateTime
+
+if TYPE_CHECKING:
+    from app.workflow.models import TestPlan
 
 
 class SourceKind(StrEnum):
@@ -62,6 +65,22 @@ class Severity(StrEnum):
 SEVERITY_ORDER: dict[Severity, int] = {level: index for index, level in enumerate(Severity)}
 
 
+class Stage(StrEnum):
+    """Workflow stages E1–E8 (docs/workflow-gates.md), in order. Names, never E-codes."""
+
+    REGISTER = "register"
+    CODE = "code"
+    ANALYSIS = "analysis"
+    PLAN = "plan"
+    DESIGN = "design"
+    TESTS = "tests"
+    VERIFICATION = "verification"
+    REPORT = "report"
+
+
+STAGE_ORDER: tuple[Stage, ...] = tuple(Stage)
+
+
 class Verdict(StrEnum):
     """The analyst's triage decision (stage E3). ``None`` on the finding = pending."""
 
@@ -91,6 +110,9 @@ class Analysis(Base):
     )
     #: Typed failure code (``IngestError.code``), never a message or a trace.
     failure_code: Mapped[str | None] = mapped_column(String(64), default=None)
+    #: Workflow stage of this ingested version. E1 (register) is the project's;
+    #: an analysis is born at E2 and only ``app.workflow.stages.advance`` moves it.
+    stage: Mapped[Stage] = mapped_column(_text_enum(Stage, 12), default=Stage.CODE, index=True)
     #: Absolute path of the jail; only the worker reads it.
     workspace_path: Mapped[str | None] = mapped_column(String(512), default=None)
 
@@ -119,6 +141,11 @@ class Analysis(Base):
     )
     metrics: Mapped[CodeMetrics | None] = relationship(
         back_populates="analysis", uselist=False, cascade="all, delete-orphan"
+    )
+    # String target: app.workflow.models imports nothing from here, and the
+    # registry maps both before the first query configures the mappers.
+    test_plan: Mapped[TestPlan | None] = relationship(
+        "TestPlan", uselist=False, cascade="all, delete-orphan"
     )
 
 

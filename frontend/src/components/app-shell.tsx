@@ -11,6 +11,7 @@ import { hrefFor, type Route } from '../navigation/use-route';
 import { useTheme } from '../theme/use-theme';
 import { initials } from './initials';
 import { LanguageToggle } from './language-toggle';
+import { STAGES, stageIndex } from './stages';
 import { ThemeToggle } from './theme-toggle';
 
 interface Props {
@@ -18,24 +19,28 @@ interface Props {
   onNavigate: (route: Route) => void;
   /** Right-hand text of the tabs bar (project name, role). */
   context?: string;
+  /** Current workflow stage of the analysis in context; shows the status bar. */
+  stage?: string;
   children: ReactNode;
 }
 
-type TabKey = 'home' | 'projects' | 'findings' | 'report';
+type TabKey = 'home' | 'projects' | 'findings' | 'workflow' | 'report';
 
 /**
- * Inicio and Proyectos always; Hallazgos and Reporte (mockups 04 and 09) once
- * the route names an analysis — they are meaningless without one.
+ * Inicio and Proyectos always; Hallazgos, Workflow and Reporte (mockups 04,
+ * 05 and 09) once the route names an analysis — they are meaningless without
+ * one. Workflow opens the current stage's screen (E4 in P3).
  */
 function tabsFor(route: Route): { key: TabKey; route: Route }[] {
   const tabs: { key: TabKey; route: Route }[] = [
     { key: 'home', route: { kind: 'home' } },
     { key: 'projects', route: { kind: 'projects' } },
   ];
-  if (route.kind === 'findings' || route.kind === 'report') {
+  if (route.kind === 'findings' || route.kind === 'plan' || route.kind === 'report') {
     const { id, analysisId } = route;
     tabs.push(
       { key: 'findings', route: { kind: 'findings', id, analysisId } },
+      { key: 'workflow', route: { kind: 'plan', id, analysisId } },
       { key: 'report', route: { kind: 'report', id, analysisId } },
     );
   }
@@ -47,7 +52,7 @@ function isActive(tab: Route, route: Route): boolean {
   return tab.kind === route.kind;
 }
 
-export function AppShell({ route, onNavigate, context, children }: Props): ReactNode {
+export function AppShell({ route, onNavigate, context, stage, children }: Props): ReactNode {
   const { t } = useTranslation();
   const { user, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -94,6 +99,27 @@ export function AppShell({ route, onNavigate, context, children }: Props): React
         <span className="right">{context ?? t(`roles.${user.role}`)}</span>
       </nav>
       <main className="content">{children}</main>
+      {stage !== undefined && (
+        <footer className="statusbar">
+          <div className="z">
+            <span className="avatar small" aria-hidden="true">
+              {initials(user.display_name)}
+            </span>
+            {user.username} · {t(`roles.${user.role}`)}
+          </div>
+          <div className="mid">
+            {t('statusbar.step', {
+              step: stageIndex(stage) + 1,
+              total: STAGES.length,
+              // Long-form names here (mockup status bars), short names in the stepper.
+              stage: t(`statusbar.stage.${STAGES[stageIndex(stage)] ?? 'register'}`),
+            })}
+          </div>
+          <div className="z">
+            <span className="mono">v{__APP_VERSION__}</span>
+          </div>
+        </footer>
+      )}
     </>
   );
 }

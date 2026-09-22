@@ -94,7 +94,20 @@
     },
     "workflow": {
       "failed": "The workflow action could not be completed.",
-      "justificationRequired": "Write a reason of at least 10 characters: it goes to the audit log."
+      "justificationRequired": "Write a reason of at least 10 characters: it goes to the audit log.",
+      "stageFinal": "The report is the last stage: there is nowhere to advance.",
+      "stageLocked": "That stage is already closed: its content cannot change.",
+      "testPlanNotFound": "There is no test plan yet.",
+      "testPlanEmpty": "Include at least one function in the plan.",
+      "testPlanFunctionUnknown": "One of the chosen functions is not in the analysis metrics. Reload the page.",
+      "gate": {
+        "closed": "The current stage does not meet its condition to close yet.",
+        "analysisNotDone": "The analysis has not finished yet.",
+        "triagePending": "Findings are still pending review: each one needs a verdict.",
+        "testPlanMissing": "The test plan is missing: at least one function, the coverage strictness and your rationale.",
+        "notBuilt": "This stage cannot be closed yet in this version of the platform."
+      },
+      "stageNotReached": "That stage has not started yet: the previous ones close first."
     }
   },
   "nav": {
@@ -102,7 +115,8 @@
     "home": "Home",
     "projects": "Projects",
     "findings": "Findings",
-    "report": "Report"
+    "report": "Report",
+    "workflow": "Workflow"
   },
   "stepper": {
     "label": "Process stages",
@@ -171,10 +185,12 @@
     "nextStep": {
       "codeTitle": "Next step: upload the code",
       "codeBody": "Upload a ZIP or paste the repository's HTTPS address. The analysis runs on its own and tells you when it is done.",
-      "doneTitle": "Findings reviewed",
-      "doneBody": "Edit and sign the report, or analyze a new version. The test plan comes in the next stage.",
       "triageTitle": "Next step: review the findings",
-      "triageBody": "Confirm or discard every finding with a written reason. When you finish, the test plan unlocks."
+      "triageBody": "Confirm or discard every finding with a written reason. When you finish, the test plan unlocks.",
+      "planTitle": "Next step: plan the tests",
+      "planBody": "The developer picks which functions to test and how strictly. The findings review is closed.",
+      "laterTitle": "Stage in progress",
+      "laterBody": "Follow the process from the Workflow tab. Every stage closes with a written reason."
     },
     "ingest": {
       "section": "2 · The code",
@@ -217,6 +233,9 @@
     "triage": {
       "pending": "{{count}} finding(s) to review",
       "done": "Every finding reviewed"
+    },
+    "stage": {
+      "startReview": "Start the findings review"
     }
   },
   "findings": {
@@ -241,7 +260,8 @@
       "pendingTitle": "{{count}} findings left to review",
       "pendingBody": "When you finish, the next step unlocks: planning the tests.",
       "doneTitle": "Review complete",
-      "doneBody": "Every finding has a verdict. You can edit and sign the report."
+      "doneBody": "Every finding has a verdict. Move on to the test plan, or edit and sign the report.",
+      "advance": "Move on to the test plan"
     },
     "filters": {
       "all": "All",
@@ -307,5 +327,75 @@
       "draft": "Draft",
       "signedBadge": "Signed"
     }
+  },
+  "statusbar": {
+    "step": "Step {{step}} of {{total}} · {{stage}}",
+    "stage": {
+      "register": "System registration",
+      "code": "Code",
+      "analysis": "Analysis and review",
+      "plan": "Test plan",
+      "design": "Case design",
+      "tests": "Writing tests",
+      "verification": "Verification",
+      "report": "Report"
+    }
+  },
+  "workflow": {
+    "advance": {
+      "reasonLabel": "Why are you closing this stage? It goes to the audit log",
+      "reasonPlaceholder": "E.g.: every finding has a verdict and the team reviewed the discarded ones.",
+      "reasonHint": "At least {{min}} characters.",
+      "cancel": "Cancel"
+    }
+  },
+  "plan": {
+    "title": "What are we going to test?",
+    "subtitle": "Functions ranked by risk: how complex each one is and whether it has security findings. Pick the ones that enter the plan.",
+    "rankingLabel": "Functions ranked by risk",
+    "noFunctions": "The analysis measured no functions (Lizard did not run or the code has no recognizable functions).",
+    "include": "Include",
+    "exclude": "Leave out",
+    "included": "In the plan",
+    "level": {
+      "high": "High risk",
+      "medium": "Medium risk",
+      "low": "Low risk"
+    },
+    "reason": {
+      "complexWithFindings": "Very complex ({{ccn}} possible paths) and with {{count}} security finding(s) in its file — an urgent candidate.",
+      "complex": "Very complex ({{ccn}} possible paths), no findings.",
+      "mediumWithFindings": "Medium complexity ({{ccn}} paths) and {{count}} security finding(s) in its file.",
+      "medium": "Medium complexity ({{ccn}} paths), no findings.",
+      "simpleWithFindings": "Simple ({{ccn}} paths), but with {{count}} security finding(s) in its file.",
+      "simple": "Simple ({{ccn}} paths), no findings. It can wait."
+    },
+    "criterion": {
+      "title": "How strict will the coverage be?",
+      "statements": "Statements — basic",
+      "decisions": "Decisions 100 % — recommended",
+      "paths": "Paths — exhaustive",
+      "statementsHint": "With \"Statements\" every line runs at least once. It is the minimum.",
+      "decisionsHint": "With \"Decisions\" every branch of the code is tested true and false. It is the plan's standard.",
+      "pathsHint": "With \"Paths\" every independent path is walked. The strictest; use it on critical functions."
+    },
+    "rationaleLabel": "Why this plan? In your own words",
+    "rationalePlaceholder": "E.g.: we start with validation because it concentrates the findings and every form uses it.",
+    "rationaleHint": "At least {{min}} characters. Your rationale goes into the report.",
+    "rationaleInReport": "Your rationale goes into the report.",
+    "save": "Save plan",
+    "saved": "Plan saved.",
+    "saveAndDesign": "Save plan and design the cases →",
+    "nextStep": {
+      "notYetTitle": "Not time to plan yet",
+      "notYetBody": "The findings review closes first. You can look at the ranking meanwhile.",
+      "emptyTitle": "Pick the functions that enter the plan",
+      "savedTitle": "Plan with {{count}} function(s)",
+      "developerBody": "Include the functions, choose the strictness and explain why. Saving and moving on opens the case design.",
+      "readerBody": "The developer builds the plan. Here you can see what they chose and why.",
+      "lockedTitle": "Plan closed",
+      "lockedBody": "The plan stage is closed: the case design works on this plan and it cannot change."
+    },
+    "incomplete": "Include at least one function and write your rationale ({{min}} characters or more)."
   }
 }

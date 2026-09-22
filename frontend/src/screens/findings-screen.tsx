@@ -14,11 +14,13 @@ import { ApiError } from '../api/client';
 import * as api from '../api/projects';
 import type { Analysis, Finding, Project, Severity, Verdict } from '../api/projects';
 import { useAuth } from '../auth/auth-context';
+import { AdvanceStage } from '../components/advance-stage';
 import { AppShell } from '../components/app-shell';
+import { stageIndex } from '../components/stages';
 import { SeverityBadge } from '../components/status-badge';
 import { Stepper } from '../components/stepper';
-import type { Route } from '../navigation/use-route';
 import { widthClass } from '../components/width-class';
+import type { Route } from '../navigation/use-route';
 
 const SEVERITIES: Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
 /** Mirrors backend/app/workflow/triage.py::MIN_JUSTIFICATION_CHARS — the server is the gate. */
@@ -280,7 +282,11 @@ export function FindingsScreen({ route, onNavigate }: Props): React.ReactNode {
   const total = findings?.length ?? 0;
   const reviewed = (findings ?? []).filter((finding) => finding.verdict !== null).length;
   const pending = total - reviewed;
-  const canTriage = user?.role === 'analyst';
+  // Mirror of the server rule: verdicts are the analyst's and lock once E3 is left.
+  const canTriage =
+    user?.role === 'analyst' &&
+    analysis !== null &&
+    stageIndex(analysis.stage) <= stageIndex('analysis');
 
   function applyVerdict(updated: Finding): void {
     setFindings((current) =>
@@ -295,8 +301,8 @@ export function FindingsScreen({ route, onNavigate }: Props): React.ReactNode {
   const fileOptions = unique((findings ?? []).map((finding) => finding.path)).sort();
 
   return (
-    <AppShell route={route} onNavigate={onNavigate} context={project?.name}>
-      <Stepper current={2} />
+    <AppShell route={route} onNavigate={onNavigate} context={project?.name} stage={analysis?.stage}>
+      {analysis !== null && <Stepper current={stageIndex(analysis.stage)} />}
       {errorKey !== null && (
         <p className="alert" role="alert">
           {t(errorKey)}
@@ -331,6 +337,22 @@ export function FindingsScreen({ route, onNavigate }: Props): React.ReactNode {
                 <div className={`pfill ${widthClass(reviewed, total)}`} />
               </div>
             </div>
+            {canTriage && analysis.stage === 'analysis' && (
+              <AdvanceStage
+                analysis={analysis}
+                label={t('findings.nextStep.advance')}
+                ready={pending === 0}
+                onAdvanced={setAnalysis}
+              />
+            )}
+            {canTriage && analysis.stage === 'code' && (
+              <AdvanceStage
+                analysis={analysis}
+                label={t('project.stage.startReview')}
+                ready={analysis.status === 'done'}
+                onAdvanced={setAnalysis}
+              />
+            )}
           </section>
           <div className="filters">
             <FilterSelect

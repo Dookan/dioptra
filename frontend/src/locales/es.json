@@ -94,7 +94,20 @@
     },
     "workflow": {
       "failed": "No se pudo completar la acción del flujo de trabajo.",
-      "justificationRequired": "Escribe una razón de al menos 10 caracteres: queda en la bitácora."
+      "justificationRequired": "Escribe una razón de al menos 10 caracteres: queda en la bitácora.",
+      "stageFinal": "El reporte es la última etapa: no hay a dónde avanzar.",
+      "stageLocked": "Esa etapa ya se cerró: su contenido no se puede cambiar.",
+      "testPlanNotFound": "Todavía no hay un plan de pruebas.",
+      "testPlanEmpty": "Incluye al menos una función en el plan.",
+      "testPlanFunctionUnknown": "Una de las funciones elegidas no está en las métricas del análisis. Recarga la página.",
+      "gate": {
+        "closed": "La etapa actual todavía no cumple su condición para cerrarse.",
+        "analysisNotDone": "El análisis todavía no terminó.",
+        "triagePending": "Faltan hallazgos por revisar: cada uno necesita un veredicto.",
+        "testPlanMissing": "Falta el plan de pruebas: al menos una función, la exigencia de cobertura y tu justificación.",
+        "notBuilt": "Esta etapa todavía no se puede cerrar en esta versión de la plataforma."
+      },
+      "stageNotReached": "Esa etapa todavía no empezó: primero se cierran las anteriores."
     }
   },
   "nav": {
@@ -102,7 +115,8 @@
     "home": "Inicio",
     "projects": "Proyectos",
     "findings": "Hallazgos",
-    "report": "Reporte"
+    "report": "Reporte",
+    "workflow": "Workflow"
   },
   "stepper": {
     "label": "Etapas del proceso",
@@ -171,10 +185,12 @@
     "nextStep": {
       "codeTitle": "Siguiente paso: sube el código",
       "codeBody": "Sube un ZIP o pega la dirección HTTPS del repositorio. El análisis corre solo y te avisa cuando termina.",
-      "doneTitle": "Hallazgos revisados",
-      "doneBody": "Edita y firma el reporte, o vuelve a analizar una versión nueva. El plan de pruebas llega en la próxima etapa.",
       "triageTitle": "Siguiente paso: revisa los hallazgos",
-      "triageBody": "Confirma o descarta cada hallazgo con una razón escrita. Cuando termines se desbloquea el plan de pruebas."
+      "triageBody": "Confirma o descarta cada hallazgo con una razón escrita. Cuando termines se desbloquea el plan de pruebas.",
+      "planTitle": "Siguiente paso: planificar las pruebas",
+      "planBody": "El programador elige qué funciones probar y con qué exigencia. La revisión de hallazgos ya está cerrada.",
+      "laterTitle": "Etapa en curso",
+      "laterBody": "Sigue el proceso desde la pestaña Workflow. Cada etapa se cierra con una razón escrita."
     },
     "ingest": {
       "section": "2 · El código",
@@ -217,6 +233,9 @@
     "triage": {
       "pending": "{{count}} hallazgo(s) sin revisar",
       "done": "Todos los hallazgos revisados"
+    },
+    "stage": {
+      "startReview": "Empezar la revisión de hallazgos"
     }
   },
   "findings": {
@@ -241,7 +260,8 @@
       "pendingTitle": "Te faltan {{count}} hallazgos por revisar",
       "pendingBody": "Cuando termines se desbloquea el siguiente paso: planificar las pruebas.",
       "doneTitle": "Revisión completa",
-      "doneBody": "Todos los hallazgos tienen veredicto. Puedes editar y firmar el reporte."
+      "doneBody": "Todos los hallazgos tienen veredicto. Pasa al plan de pruebas, o edita y firma el reporte.",
+      "advance": "Pasar al plan de pruebas"
     },
     "filters": {
       "all": "Todos",
@@ -307,5 +327,75 @@
       "draft": "Borrador",
       "signedBadge": "Firmada"
     }
+  },
+  "statusbar": {
+    "step": "Paso {{step}} de {{total}} · {{stage}}",
+    "stage": {
+      "register": "Registro del sistema",
+      "code": "Código",
+      "analysis": "Análisis y revisión",
+      "plan": "Plan de pruebas",
+      "design": "Diseño de casos",
+      "tests": "Escribiendo tests",
+      "verification": "Verificación",
+      "report": "Reporte"
+    }
+  },
+  "workflow": {
+    "advance": {
+      "reasonLabel": "¿Por qué cierras esta etapa? Queda en la bitácora",
+      "reasonPlaceholder": "Ej.: todos los hallazgos tienen veredicto y el equipo revisó los descartados.",
+      "reasonHint": "Al menos {{min}} caracteres.",
+      "cancel": "Cancelar"
+    }
+  },
+  "plan": {
+    "title": "¿Qué vamos a probar?",
+    "subtitle": "Ordenamos las funciones por riesgo: qué tan compleja es cada una y si tiene hallazgos de seguridad. Elige cuáles entran al plan.",
+    "rankingLabel": "Funciones ordenadas por riesgo",
+    "noFunctions": "El análisis no midió funciones (Lizard no corrió o el código no tiene funciones reconocibles).",
+    "include": "Incluir",
+    "exclude": "Dejar fuera",
+    "included": "En el plan",
+    "level": {
+      "high": "Riesgo alto",
+      "medium": "Riesgo medio",
+      "low": "Riesgo bajo"
+    },
+    "reason": {
+      "complexWithFindings": "Muy compleja ({{ccn}} caminos posibles) y con {{count}} hallazgo(s) de seguridad en su archivo — candidata urgente.",
+      "complex": "Muy compleja ({{ccn}} caminos posibles), sin hallazgos.",
+      "mediumWithFindings": "Complejidad media ({{ccn}} caminos) y {{count}} hallazgo(s) de seguridad en su archivo.",
+      "medium": "Complejidad media ({{ccn}} caminos), sin hallazgos.",
+      "simpleWithFindings": "Simple ({{ccn}} caminos), pero con {{count}} hallazgo(s) de seguridad en su archivo.",
+      "simple": "Simple ({{ccn}} caminos), sin hallazgos. Puede esperar."
+    },
+    "criterion": {
+      "title": "¿Qué tan exigente será la cobertura?",
+      "statements": "Sentencias — básica",
+      "decisions": "Decisiones 100 % — recomendada",
+      "paths": "Caminos — exhaustiva",
+      "statementsHint": "Con \"Sentencias\" cada línea se ejecuta al menos una vez. Es el mínimo.",
+      "decisionsHint": "Con \"Decisiones\" cada bifurcación del código se prueba en verdadero y en falso. Es el estándar del plan.",
+      "pathsHint": "Con \"Caminos\" se recorre cada camino independiente. Es la más exigente; úsala en funciones críticas."
+    },
+    "rationaleLabel": "¿Por qué este plan? Con tus palabras",
+    "rationalePlaceholder": "Ej.: empezamos por la validación porque concentra los hallazgos y la usan todos los formularios.",
+    "rationaleHint": "Al menos {{min}} caracteres. Tu justificación quedará en el reporte.",
+    "rationaleInReport": "Tu justificación quedará en el reporte.",
+    "save": "Guardar plan",
+    "saved": "Plan guardado.",
+    "saveAndDesign": "Guardar plan y diseñar los casos →",
+    "nextStep": {
+      "notYetTitle": "Todavía no toca planificar",
+      "notYetBody": "Primero se cierra la revisión de hallazgos. Puedes mirar el ranking mientras tanto.",
+      "emptyTitle": "Elige qué funciones entran al plan",
+      "savedTitle": "Plan con {{count}} función(es)",
+      "developerBody": "Incluye las funciones, elige la exigencia y explica por qué. Al guardar y avanzar se abre el diseño de casos.",
+      "readerBody": "El programador arma el plan. Aquí puedes ver qué eligió y por qué.",
+      "lockedTitle": "Plan cerrado",
+      "lockedBody": "La etapa de plan ya se cerró: el diseño de casos trabaja sobre este plan y no se puede cambiar."
+    },
+    "incomplete": "Incluye al menos una función y escribe tu justificación ({{min}} caracteres o más)."
   }
 }

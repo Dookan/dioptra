@@ -11,7 +11,9 @@ import { ApiError } from '../api/client';
 import * as api from '../api/projects';
 import type { Analysis, Project, ReportFormat, Severity } from '../api/projects';
 import { useAuth } from '../auth/auth-context';
+import { AdvanceStage } from '../components/advance-stage';
 import { AppShell } from '../components/app-shell';
+import { stageIndex } from '../components/stages';
 import { SeverityBadge, StatusBadge, ToolBadge } from '../components/status-badge';
 import { Stepper } from '../components/stepper';
 import type { Route } from '../navigation/use-route';
@@ -26,12 +28,19 @@ interface Props {
   onNavigate: (route: Route) => void;
 }
 
+/** Banner copy per stage index: code (E2), triage (E3), plan (E4) or later. */
+function stageKey(stage: number): 'code' | 'triage' | 'plan' | 'later' {
+  if (stage <= 1) return 'code';
+  if (stage === 2) return 'triage';
+  if (stage === 3) return 'plan';
+  return 'later';
+}
+
 function stageFor(analyses: Analysis[]): number {
-  // Registro is done once the project exists; Código once an analysis finished;
-  // Análisis once every finding of the latest finished analysis has a verdict.
-  const done = analyses.find((analysis) => analysis.status === 'done');
-  if (done === undefined) return 1;
-  return done.triage.complete && done.triage.total > 0 ? 3 : 2;
+  // The project's stage is the stage of its latest analysis (survey §5);
+  // before any analysis exists only Registro is done.
+  const latest = analyses[0];
+  return latest === undefined ? 1 : stageIndex(latest.stage);
 }
 
 function IngestCard({
@@ -192,11 +201,15 @@ function Downloads({ analysis }: { analysis: Analysis }): React.ReactNode {
 function AnalysisCard({
   analysis,
   onNavigate,
+  onChange,
 }: {
   analysis: Analysis;
   onNavigate: (route: Route) => void;
+  onChange: (analysis: Analysis) => void;
 }): React.ReactNode {
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
+  const canStartReview = user?.role === 'analyst' || user?.role === 'admin';
   const languages = Object.entries(analysis.languages);
   const total = SEVERITIES.reduce((sum, level) => sum + (analysis.finding_counts[level] ?? 0), 0);
   const when = new Date(analysis.created_at).toLocaleString(i18n.resolvedLanguage, {
@@ -208,6 +221,7 @@ function AnalysisCard({
     <li className="card">
       <div className="row first">
         <StatusBadge status={analysis.status} />
+        <span className="chip">{t(`stepper.${analysis.stage}`)}</span>
         <span className="mono">{analysis.source_ref}</span>
         <span className="sub">{when}</span>
       </div>
@@ -263,6 +277,16 @@ function AnalysisCard({
         </div>
       )}
       <Downloads analysis={analysis} />
+      {canStartReview && analysis.stage === 'code' && analysis.status === 'done' && (
+        <div className="actions">
+          <AdvanceStage
+            analysis={analysis}
+            label={t('project.stage.startReview')}
+            ready
+            onAdvanced={onChange}
+          />
+        </div>
+      )}
       {analysis.status === 'done' && (
         <div className="actions wrap">
           <button
@@ -349,20 +373,8 @@ export function ProjectScreen({ route, projectId, onNavigate }: Props): React.Re
           </div>
           <section className="nextstep">
             <div className="txt">
-              <b>
-                {stage === 1
-                  ? t('project.nextStep.codeTitle')
-                  : stage === 2
-                    ? t('project.nextStep.triageTitle')
-                    : t('project.nextStep.doneTitle')}
-              </b>
-              <div>
-                {stage === 1
-                  ? t('project.nextStep.codeBody')
-                  : stage === 2
-                    ? t('project.nextStep.triageBody')
-                    : t('project.nextStep.doneBody')}
-              </div>
+              <b>{t(`project.nextStep.${stageKey(stage)}Title`)}</b>
+              <div>{t(`project.nextStep.${stageKey(stage)}Body`)}</div>
             </div>
           </section>
           <div className="cols side">
@@ -398,7 +410,16 @@ export function ProjectScreen({ route, projectId, onNavigate }: Props): React.Re
             ) : (
               <ul className="list" aria-label={t('project.analyses.title')}>
                 {analyses.map((analysis) => (
-                  <AnalysisCard key={analysis.id} analysis={analysis} onNavigate={onNavigate} />
+                  <AnalysisCard
+                    key={analysis.id}
+                    analysis={analysis}
+                    onNavigate={onNavigate}
+                    onChange={(updated) => {
+                      setAnalyses((current) =>
+                        current.map((item) => (item.id === updated.id ? updated : item)),
+                      );
+                    }}
+                  />
                 ))}
               </ul>
             )}

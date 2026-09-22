@@ -29,7 +29,7 @@
   fail; a surviving mutant means the test does not prove what it claims.
 - **No-CDN norm**: factory rule — dependencies are served locally, both in
   this platform and in audited systems (violation → CWE-829 / A08 finding).
-- **Risk matrix**: E4 prioritization = complexity × findings × criticality.
+- **Risk matrix**: E4 prioritization = complexity × findings × criticality; in P3 `ccn × (1 + findings in the file) × weight of the worst finding` (`backend/app/workflow/risk.py`).
 - **SBOM**: software bill of materials — every direct and transitive
   component of the audited system with version, PURL and license, generated
   from lockfiles (metadata only) in CycloneDX 1.6, one per ingested version.

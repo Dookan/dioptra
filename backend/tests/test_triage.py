@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.analysis.models import Finding, Severity, Verdict
+from app.analysis.models import Finding, Severity, Stage, Verdict
 from app.audit.models import AuditLogEntry, AuditOutcome
 from app.auth.models import User
 from app.workflow.triage import triage_status
@@ -202,6 +202,33 @@ def test_developer_and_admin_cannot_triage(
     db.expire_all()
     stored = db.get(Finding, finding_id)
     assert stored is not None and stored.verdict is None
+
+
+def test_verdicts_are_locked_once_e3_is_left(
+    client: TestClient, analyst: User, db: Session
+) -> None:
+    analysis = seed_done_analysis(db, [make_finding(0)])
+    finding_id = analysis.findings[0].id
+    headers = login(client, analyst.username)
+    # Allowed at E2 and E3 (the review may start before the analyst "opens" it).
+    for stage in (Stage.CODE, Stage.ANALYSIS):
+        analysis.stage = stage
+        db.commit()
+        ok = _verdict(client, headers, finding_id, verdict="confirmed", justification=REASON)
+        assert ok.status_code == 200, stage
+    # Locked from E4 on: the plan and the brief are computed on these verdicts.
+    for stage in (Stage.PLAN, Stage.DESIGN, Stage.REPORT):
+        analysis.stage = stage
+        db.commit()
+        locked = _verdict(
+            client, headers, finding_id, verdict="false_positive", justification=REASON
+        )
+        assert locked.status_code == 409 and locked.json()["code"] == "stage_locked", stage
+    db.expire_all()
+    stored = db.get(Finding, finding_id)
+    assert stored is not None and stored.verdict is Verdict.CONFIRMED
+    rows = list(db.scalars(select(AuditLogEntry).where(AuditLogEntry.action.like("finding.%"))))
+    assert len(rows) == 2  # the two accepted verdicts, nothing for the refusals
 
 
 def test_unknown_finding_is_404(client: TestClient, analyst: User) -> None:

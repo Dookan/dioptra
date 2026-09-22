@@ -75,6 +75,17 @@ describe('locale files', () => {
       'errors.findings.notFound',
       'errors.workflow.failed',
       'errors.workflow.justificationRequired',
+      'errors.workflow.stageFinal',
+      'errors.workflow.stageLocked',
+      'errors.workflow.stageNotReached',
+      'errors.workflow.testPlanNotFound',
+      'errors.workflow.testPlanEmpty',
+      'errors.workflow.testPlanFunctionUnknown',
+      'errors.workflow.gate.closed',
+      'errors.workflow.gate.analysisNotDone',
+      'errors.workflow.gate.triagePending',
+      'errors.workflow.gate.testPlanMissing',
+      'errors.workflow.gate.notBuilt',
     ];
     expect(spanish).toEqual(expect.arrayContaining(backendKeys));
   });

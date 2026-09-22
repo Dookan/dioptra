@@ -45,6 +45,7 @@ const ANALYSIS = {
   source_ref: 'src.zip',
   status: 'done',
   failure_code: null,
+  stage: 'analysis',
   languages: { JavaScript: 3 },
   frameworks: [],
   lockfiles: [],
@@ -230,6 +231,101 @@ describe('findings screen', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       es.errors.workflow.justificationRequired,
     );
+  });
+
+  it('offers the next stage only when every finding has a verdict, and posts the reason', async () => {
+    const reviewed = finding('f-1', {
+      verdict: 'confirmed',
+      verdict_justification: 'Es real y afecta al formulario público.',
+      verdict_by_username: 'mmarin',
+      verdict_at: '2026-09-22T10:00:00Z',
+    });
+    const calls = renderFindings('analyst', [reviewed], {
+      [`/api/v1/analyses/${ANALYSIS_ID}/stage/advance`]: {
+        status: 200,
+        body: { ...ANALYSIS, stage: 'plan', triage: { ...ANALYSIS.triage, pending: 0, complete: true } },
+      },
+    });
+    const user = await signIn();
+
+    await user.click(await screen.findByRole('button', { name: es.findings.nextStep.advance }));
+    const reason = screen.getByLabelText(es.workflow.advance.reasonLabel);
+    const submit = screen.getByRole('button', { name: es.findings.nextStep.advance });
+    expect(submit).toBeDisabled();
+    await user.type(reason, 'Revisión completa con el equipo.');
+    await user.click(submit);
+
+    await waitFor(() => {
+      expect(bodyOf(calls, `/api/v1/analyses/${ANALYSIS_ID}/stage/advance`, 'POST')).toEqual({
+        justification: 'Revisión completa con el equipo.',
+      });
+    });
+    // The stepper follows the server's stage, and the status bar says where we are.
+    expect(await screen.findByRole('listitem', { current: 'step' })).toHaveTextContent(es.stepper.plan);
+    expect(
+      screen.getByText(fill(es.statusbar.step, { step: 4, total: 8, stage: es.statusbar.stage.plan })),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: es.findings.nextStep.advance })).not.toBeInTheDocument();
+  });
+
+  it('offers to start the review at the code stage, only once the pipeline is done', async () => {
+    renderFindings('analyst', [finding('f-1')], {
+      [`/api/v1/analyses/${ANALYSIS_ID}`]: { status: 200, body: { ...ANALYSIS, stage: 'code' } },
+    });
+    await signIn();
+    expect(await screen.findByRole('button', { name: es.project.stage.startReview })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: es.findings.nextStep.advance })).not.toBeInTheDocument();
+  });
+
+  it('keeps "start the review" disabled while the pipeline is still running', async () => {
+    renderFindings('analyst', [], {
+      [`/api/v1/analyses/${ANALYSIS_ID}`]: {
+        status: 200,
+        body: { ...ANALYSIS, stage: 'code', status: 'running' },
+      },
+    });
+    await signIn();
+    expect(await screen.findByRole('button', { name: es.project.stage.startReview })).toBeDisabled();
+  });
+
+  it('keeps the next stage disabled while a verdict is pending', async () => {
+    const reviewed = finding('f-2', {
+      verdict: 'confirmed',
+      verdict_justification: 'x',
+      verdict_by_username: 'mmarin',
+      verdict_at: '2026-09-22T10:00:00Z',
+    });
+    renderFindings('analyst', [finding('f-1'), reviewed]);
+    const user = await signIn();
+    const advance = await screen.findByRole('button', { name: es.findings.nextStep.advance });
+    expect(advance).toBeDisabled();
+    await user.click(advance);
+    expect(screen.queryByLabelText(es.workflow.advance.reasonLabel)).not.toBeInTheDocument();
+  });
+
+  it('shows the gate refusal in plain words when the server closes the door', async () => {
+    renderFindings('analyst', [finding('f-1', { verdict: 'confirmed', verdict_justification: 'x', verdict_by_username: 'mmarin', verdict_at: '2026-09-22T10:00:00Z' })], {
+      [`/api/v1/analyses/${ANALYSIS_ID}/stage/advance`]: {
+        status: 409,
+        body: { code: 'gate_closed', message_key: 'errors.workflow.gate.triagePending' },
+      },
+    });
+    const user = await signIn();
+    await user.click(await screen.findByRole('button', { name: es.findings.nextStep.advance }));
+    await user.type(screen.getByLabelText(es.workflow.advance.reasonLabel), 'Una razón suficiente.');
+    await user.click(screen.getByRole('button', { name: es.findings.nextStep.advance }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(es.errors.workflow.gate.triagePending);
+    expect(screen.getByRole('listitem', { current: 'step' })).toHaveTextContent(es.stepper.analysis);
+  });
+
+  it('hides the verdict form once the analysis has left the review stage', async () => {
+    renderFindings('analyst', [finding('f-1')], {
+      [`/api/v1/analyses/${ANALYSIS_ID}`]: { status: 200, body: { ...ANALYSIS, stage: 'plan' } },
+    });
+    await signIn();
+    expect(await screen.findByText(es.findings.what)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: es.findings.confirm })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(es.findings.justificationLabel)).not.toBeInTheDocument();
   });
 
   it('hides the verdict form from a developer', async () => {

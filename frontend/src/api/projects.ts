@@ -1,5 +1,5 @@
 /** Project, analysis and finding endpoints. Mirrors backend/app/projects/schemas.py. */
-import { apiDownload, apiFetch, apiUpload, type Download } from './client';
+import { ApiError, apiDownload, apiFetch, apiUpload, type Download } from './client';
 
 export type { Download };
 
@@ -35,6 +35,16 @@ export type AnalysisStatus = 'queued' | 'running' | 'done' | 'failed';
 export type ToolStatus = 'ran' | 'failed' | 'missing' | 'timeout';
 export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 export type Verdict = 'confirmed' | 'false_positive';
+export type Stage =
+  | 'register'
+  | 'code'
+  | 'analysis'
+  | 'plan'
+  | 'design'
+  | 'tests'
+  | 'verification'
+  | 'report';
+export type CoverageCriterion = 'statements' | 'decisions' | 'paths';
 
 /** Stage E3 progress; `complete` is computed by the server (the gate). */
 export interface Triage {
@@ -60,6 +70,8 @@ export interface Analysis {
   source_ref: string;
   status: AnalysisStatus;
   failure_code: string | null;
+  /** Workflow stage; only the server moves it (POST …/stage/advance). */
+  stage: Stage;
   languages: Record<string, number>;
   frameworks: string[];
   lockfiles: string[];
@@ -101,6 +113,35 @@ export interface Finding {
 }
 
 export type ReportFormat = 'pdf' | 'html' | 'md' | 'docx';
+
+export interface RiskRow {
+  path: string;
+  function: string;
+  line: number | null;
+  ccn: number;
+  nloc: number;
+  findings: number;
+  max_severity: Severity | null;
+  score: number;
+  level: 'high' | 'medium' | 'low';
+}
+
+export interface PlannedFunction {
+  path: string;
+  function: string;
+  line: number | null;
+  ccn?: number;
+}
+
+export interface TestPlan {
+  analysis_id: string;
+  criterion: CoverageCriterion;
+  rationale: string;
+  functions: PlannedFunction[];
+  created_by_username: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface ReportVersion {
   number: number;
@@ -182,6 +223,48 @@ export function postVerdict(
     method: 'POST',
     accessToken,
     body: { verdict, justification },
+  });
+}
+
+export function advanceStage(
+  accessToken: string,
+  analysisId: string,
+  justification: string,
+): Promise<Analysis> {
+  return apiFetch<Analysis>(`/analyses/${encodeURIComponent(analysisId)}/stage/advance`, {
+    method: 'POST',
+    accessToken,
+    body: { justification },
+  });
+}
+
+export function getRiskMatrix(accessToken: string, analysisId: string): Promise<RiskRow[]> {
+  return apiFetch<RiskRow[]>(`/analyses/${encodeURIComponent(analysisId)}/risk-matrix`, {
+    accessToken,
+  });
+}
+
+/** Resolves null when no plan exists yet (404 is a state here, not an error). */
+export async function getTestPlan(accessToken: string, analysisId: string): Promise<TestPlan | null> {
+  try {
+    return await apiFetch<TestPlan>(`/analyses/${encodeURIComponent(analysisId)}/test-plan`, {
+      accessToken,
+    });
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+export function saveTestPlan(
+  accessToken: string,
+  analysisId: string,
+  plan: { criterion: CoverageCriterion; rationale: string; functions: PlannedFunction[] },
+): Promise<TestPlan> {
+  return apiFetch<TestPlan>(`/analyses/${encodeURIComponent(analysisId)}/test-plan`, {
+    method: 'PUT',
+    accessToken,
+    body: plan,
   });
 }
 

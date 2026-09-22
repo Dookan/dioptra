@@ -13,10 +13,12 @@ from app.analysis.models import (
     Finding,
     Severity,
     SourceKind,
+    Stage,
     ToolCategory,
     ToolStatus,
     Verdict,
 )
+from app.workflow.models import CoverageCriterion
 
 
 class SystemProfileIn(BaseModel):
@@ -80,6 +82,8 @@ class AnalysisOut(BaseModel):
     source_ref: str
     status: AnalysisStatus
     failure_code: str | None
+    #: Workflow stage (E1–E8 by name); only ``POST …/stage/advance`` moves it.
+    stage: Stage
     languages: dict[str, int]
     frameworks: list[str]
     lockfiles: list[str]
@@ -140,6 +144,48 @@ def finding_out(finding: Finding) -> FindingOut:
     payload.impact = entry.impact
     payload.mitigation = list(entry.mitigation)
     return payload
+
+
+class JustificationIn(BaseModel):
+    """Body of every stage transition: the written reason, validated by the service."""
+
+    justification: str = Field(max_length=8000)
+
+
+class RiskRowOut(BaseModel):
+    path: str
+    function: str
+    line: int | None
+    ccn: int
+    nloc: int
+    findings: int
+    max_severity: Severity | None
+    score: int
+    level: str
+
+
+class PlannedFunctionIn(BaseModel):
+    path: str = Field(min_length=1, max_length=1024)
+    function: str = Field(min_length=1, max_length=200)
+    line: int | None = None
+
+
+class TestPlanIn(BaseModel):
+    criterion: CoverageCriterion = CoverageCriterion.DECISIONS
+    rationale: str = Field(max_length=8000)
+    functions: list[PlannedFunctionIn] = Field(max_length=200)
+
+
+class TestPlanOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    analysis_id: uuid.UUID
+    criterion: CoverageCriterion
+    rationale: str
+    functions: list[dict[str, Any]]
+    created_by_username: str
+    created_at: datetime
+    updated_at: datetime
 
 
 class VerdictIn(BaseModel):

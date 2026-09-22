@@ -46,7 +46,8 @@ the visual executive summary in P2; sections 7–10 in P5 (day 19).
   section overrides and the ids of the findings excluded by triage at signing
   time) and makes the row immutable by database trigger; a signed version
   keeps rendering exactly the finding set it was signed with — a verdict
-  revised afterwards is allowed and logged, and lands in the next version; later edits open the next
+  revised afterwards (possible only while the analysis is still at E3;
+  `stage_locked` once E4 is entered) is logged and lands in the next version; later edits open the next
   version and the "Control de versiones" table updates automatically. An
   export may name a version (`?version=N`); a snapshot never lists versions
   after its own.

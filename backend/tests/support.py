@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.analysis.models import (
     Analysis,
     AnalysisStatus,
+    CodeMetrics,
     Finding,
     Severity,
     SourceKind,
@@ -59,8 +60,21 @@ def make_finding(ordinal: int, **overrides: object) -> Finding:
     return Finding(**base)
 
 
-def seed_done_analysis(db: Session, findings: list[Finding]) -> Analysis:
-    """A project with one DONE analysis carrying ``findings`` and three RAN tools."""
+FUNCTIONS: list[dict[str, object]] = [
+    {"path": "src/file-0.js", "function": "validateForm", "line": 10, "nloc": 40, "ccn": 12},
+    {"path": "src/billing.js", "function": "calculateDiscount", "line": 20, "nloc": 18, "ccn": 5},
+    {"path": "src/utils.js", "function": "formatDate", "line": 3, "nloc": 6, "ccn": 2},
+]
+
+
+def seed_done_analysis(
+    db: Session,
+    findings: list[Finding],
+    *,
+    status: AnalysisStatus = AnalysisStatus.DONE,
+    functions: list[dict[str, object]] | None = None,
+) -> Analysis:
+    """A project with one analysis carrying ``findings``, three RAN tools and Lizard rows."""
     project = Project(name=f"proyecto-{uuid.uuid4().hex[:8]}")
     project.system = System(name="Sistema de prueba", framework="Express")
     db.add(project)
@@ -69,7 +83,7 @@ def seed_done_analysis(db: Session, findings: list[Finding]) -> Analysis:
         project_id=project.id,
         source_kind=SourceKind.ZIP,
         source_ref="src.zip",
-        status=AnalysisStatus.DONE,
+        status=status,
         languages={"JavaScript": 3},
         frameworks=["Express"],
         lockfiles=["package-lock.json"],
@@ -80,6 +94,9 @@ def seed_done_analysis(db: Session, findings: list[Finding]) -> Analysis:
         ToolRun(tool="gitleaks", category=ToolCategory.SECRET, status=ToolStatus.RAN),
         ToolRun(tool="osv-scanner", category=ToolCategory.SCA, status=ToolStatus.RAN),
     ]
+    analysis.metrics = CodeMetrics(
+        functions=FUNCTIONS if functions is None else functions, lines={}, commented_code_files=[]
+    )
     db.add(analysis)
     db.commit()
     return analysis

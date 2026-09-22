@@ -1,19 +1,38 @@
-"""Workflow endpoints. Phase 2: ``POST /api/v1/findings/{id}/verdict`` (E3 triage)."""
+"""Workflow endpoints.
+
+Phase 2: ``POST /api/v1/findings/{id}/verdict`` (E3 triage).
+Phase 3: ``POST /api/v1/analyses/{id}/stage/advance`` (the one transition),
+``GET …/risk-matrix`` and ``GET|PUT …/test-plan`` (E4).
+"""
 
 from __future__ import annotations
 
 import uuid
+from dataclasses import asdict
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
-from app.auth.deps import AnalystUser, client_ip
+from app.auth.deps import ActiveUser, AnalystUser, DeveloperUser, client_ip
 from app.db.session import get_db
-from app.projects.schemas import FindingOut, VerdictIn, finding_out
-from app.workflow import triage
+from app.ingest import service
+from app.projects.router import analysis_out
+from app.projects.schemas import (
+    AnalysisOut,
+    FindingOut,
+    JustificationIn,
+    RiskRowOut,
+    TestPlanIn,
+    TestPlanOut,
+    VerdictIn,
+    finding_out,
+)
+from app.workflow import stages, test_plan, triage
+from app.workflow.risk import risk_matrix
 
 router = APIRouter(prefix="/api/v1/findings", tags=["findings"])
+workflow_router = APIRouter(prefix="/api/v1/analyses/{analysis_id}", tags=["workflow"])
 
 DbSession = Annotated[Session, Depends(get_db)]
 
@@ -41,3 +60,57 @@ def post_verdict(
         source_ip=client_ip(request),
     )
     return finding_out(finding)
+
+
+@workflow_router.post("/stage/advance", response_model=AnalysisOut)
+def advance_stage(
+    analysis_id: uuid.UUID,
+    payload: JustificationIn,
+    request: Request,
+    user: ActiveUser,
+    db: DbSession,
+) -> AnalysisOut:
+    """Leave the current stage: the role AND the gate are checked here, never in the UI."""
+    analysis = service.get_analysis(db, analysis_id)
+    stages.advance(
+        db,
+        analysis=analysis,
+        actor=user,
+        justification=payload.justification,
+        source_ip=client_ip(request),
+    )
+    return analysis_out(analysis)
+
+
+@workflow_router.get("/risk-matrix", response_model=list[RiskRowOut])
+def get_risk_matrix(analysis_id: uuid.UUID, _user: ActiveUser, db: DbSession) -> list[RiskRowOut]:
+    analysis = service.get_analysis(db, analysis_id)
+    return [RiskRowOut(**asdict(row)) for row in risk_matrix(analysis)]
+
+
+@workflow_router.get("/test-plan", response_model=TestPlanOut)
+def get_test_plan(analysis_id: uuid.UUID, _user: ActiveUser, db: DbSession) -> TestPlanOut:
+    analysis = service.get_analysis(db, analysis_id)
+    return TestPlanOut.model_validate(test_plan.get_test_plan(analysis))
+
+
+@workflow_router.put("/test-plan", response_model=TestPlanOut)
+def put_test_plan(
+    analysis_id: uuid.UUID,
+    payload: TestPlanIn,
+    request: Request,
+    user: DeveloperUser,
+    db: DbSession,
+) -> TestPlanOut:
+    """Stage E4 (developer only): the plan is the gate's evidence, audit-logged."""
+    analysis = service.get_analysis(db, analysis_id)
+    plan = test_plan.save_test_plan(
+        db,
+        analysis=analysis,
+        actor=user,
+        criterion=payload.criterion,
+        rationale=payload.rationale,
+        functions=[item.model_dump() for item in payload.functions],
+        source_ip=client_ip(request),
+    )
+    return TestPlanOut.model_validate(plan)

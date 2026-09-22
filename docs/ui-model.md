@@ -1,6 +1,6 @@
 # UI model
 
-> **Status: IN_PROGRESS — tokens, both themes and i18n (P0), the projects screens (P1) and the findings / report screens (P2, 2026-09-22) are built; the workflow screens E4–E7 and Inventario are the target.** Visual anchor:
+> **Status: IN_PROGRESS — tokens, both themes and i18n (P0), the projects screens (P1), the findings / report screens (P2) and the E4 plan screen with the status bar (P3, 2026-09-22) are built; the E5–E7 screens and Inventario are the target.** Visual anchor:
 > @docs/mockups/index.html (10 screens, approved 2026-08-17).
 
 ## Principles (from the approved mockups)
@@ -44,8 +44,8 @@ Added to `docs/mockups/index.html` on 2026-08-28, same tokens and principles:
   separate list + E1 form because the home of screen 02 (cards with progress)
   needs P2/P3 data. Decide at P2 whether the cards fold back into Inicio.
 - **Status bar** (avatar · `mmarin · Analista` · "Paso N de 8" · version in
-  mono) of screens 02–11 is not in the shell yet; it lands with the first
-  workflow screen of P3, which is where "Paso N de 8" gets a meaning.
+  mono) of screens 02–11 — built in P3 (`app-shell.tsx`, shown whenever the
+  route names an analysis; the step is `analysis.stage`).
 - **Drop zone** of screen 03 "2 · El código" (`.drop`, dashed accent) is a
   native file input in P1; the buttons say what they do ("Subir y analizar" /
   "Clonar y analizar"). The drag-and-drop affordance is deferred to P2.
@@ -72,6 +72,29 @@ Added to `docs/mockups/index.html` on 2026-08-28, same tokens and principles:
 - Progress widths are stepped CSS classes (`w0` … `w100`,
   `frontend/src/components/width-class.ts`): the app's CSP is
   `style-src 'self'`, so inline styles never render.
+
+## Phase 3 screens (2026-09-22)
+
+- Route `#/projects/:id/analyses/:aid/plan` (screen 05 "Plan de pruebas");
+  the tabs bar gains **Workflow**, which opens the current workflow screen
+  (E4 in P3; E5–E7 as they land). The stepper everywhere now follows
+  `analysis.stage` from the server; nothing is hard-coded per screen.
+- **Closing a stage** is one component (`components/advance-stage.tsx`): a
+  primary button that stays visible but disabled while the gate looks closed
+  (principle 2), then asks for the written reason and calls
+  `POST …/stage/advance`. The server's refusal (`errors.workflow.gate.*`) is
+  shown in plain words. Buttons: "Empezar la revisión de hallazgos" (project
+  card, E2 → E3), "Pasar al plan de pruebas" (findings banner, E3 → E4),
+  "Guardar plan y diseñar los casos →" (plan screen, saves then E4 → E5).
+- The findings screen hides the verdict form once the analysis has left
+  E3 (the server refuses with `stage_locked`; the UI mirrors it).
+- The status bar uses the mockups' long-form stage names (`statusbar.stage.*`:
+  "Análisis y revisión", "Plan de pruebas", "Escribiendo tests"…) while the
+  stepper keeps the short names (`stepper.*`) — two vocabularies, as in the
+  anchor.
+- The plan screen's plain-words reason per function ("Muy compleja (12
+  caminos posibles) y con 1 hallazgo…") is i18n copy keyed on the server's
+  `ccn` / `findings` numbers; the ranking and the score are the server's.
 
 ## Tokens (frontend/src/theme/tokens.css — single source)
 

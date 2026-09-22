@@ -1,6 +1,6 @@
 # Roles and permissions
 
-> **Status: IN_PROGRESS — roles, sessions and admin-only accounts (P0, `backend/app/auth/`), the E1–E2 rows (P1) and the E3 triage / E8 edit-and-sign rows (P2, `backend/app/workflow/router.py`, `backend/app/reports/router.py`) are enforced; E4–E7 rows are the target.**
+> **Status: IN_PROGRESS — roles, sessions and admin-only accounts (P0, `backend/app/auth/`), the E1–E2 rows (P1), the E3 triage / E8 edit-and-sign rows (P2) and the E4 test-plan row plus the per-stage transition roles (P3, `backend/app/workflow/{router,stages}.py`) are enforced; E5–E7 rows are the target.**
 
 Usernames are initial + lastname, lowercase, no dots: `mmarin`, `cperez`,
 `amedina`. Roles are enforced on EVERY endpoint; the UI only mirrors them.
@@ -20,6 +20,7 @@ Usernames are initial + lastname, lowercase, no dots: `mmarin`, `cperez`,
 | Sign/lock a report version | — | ✓ | — |
 | Export report (PDF/DOCX/Markdown) | ✓ | ✓ | ✓ (may download; "view" never meant a screen-only copy — the developer needs the findings to plan tests) |
 | Read audit log | ✓ | own projects | own actions |
+| Close a stage (`POST …/stage/advance`) | E2 only | E2, E3 | E4–E7 |
 
 The software inventory (P5) has no rows yet: the work plan adds the module
 without a role matrix. The rows are written when P5 is designed

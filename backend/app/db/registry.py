@@ -13,6 +13,7 @@ from app.auth.models import RefreshToken, User
 from app.db.base import Base
 from app.projects.models import Project, System
 from app.reports.models import ReportVersion
+from app.workflow.models import TestPlan
 
 __all__ = [
     "Analysis",
@@ -26,6 +27,7 @@ __all__ = [
     "ReportVersion",
     "Sbom",
     "System",
+    "TestPlan",
     "ToolRun",
     "User",
 ]

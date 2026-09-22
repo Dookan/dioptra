@@ -42,6 +42,7 @@ const ANALYSIS = {
   source_ref: 'src.zip',
   status: 'done',
   failure_code: null,
+  stage: 'report',
   languages: {},
   frameworks: [],
   lockfiles: [],

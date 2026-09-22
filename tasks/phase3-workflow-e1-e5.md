@@ -1,7 +1,8 @@
 # Task: Phase 3 — Workflow E1–E5
 
-> **Status: DESIGN — deadline ◆ "P2+P3" 2026-09-11 (plan days 13–15); starts
-> the moment P2 closes.** Day 15 is on the critical path.
+> **Status: IN_PROGRESS — day 13 built 2026-09-22 (◆ deadline "P2+P3"
+> 2026-09-11, passed); survey `tasks/phase3-survey.md` ("go" by `mmarin`).**
+> Day 15 is on the critical path.
 
 ## Objective
 Bring the reconstruction workflow up to case design: the developer plans what
@@ -59,10 +60,10 @@ gates enforced by the API.
 - [ ] Mutation pass on `gates.py` and `brief.py` (phase-close)
 - [ ] No secrets in diff (Gitleaks clean); locale parity check green
 - [ ] `/precommit` returned `READY TO COMMIT` (including mockup fidelity)
-- [ ] `tasks/phase3-survey.md` written and signed off before the gate edits
+- [x] `tasks/phase3-survey.md` written and signed off before the gate edits (day 13; days 14–15 append their sections first)
 - [ ] Briefs produced for at least THREE real functions of the P1 project
       whose basis paths, counted by hand, match the platform's count (plan day 15)
-- [ ] The gate-skip suite proves every E1–E5 transition is rejected without its gate
+- [ ] The gate-skip suite proves every E1–E5 transition is rejected without its gate (E2–E4 proven in `backend/tests/test_gates.py`; E5's gate is day 15)
 - [ ] CLAUDE.md phase status + docs/development-phases.md: Phase 3 → DONE with date and commit
 
 ## Non-goals (explicit)
