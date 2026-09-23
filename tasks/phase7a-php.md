@@ -1,6 +1,7 @@
 # Task: Phase 7a — PHP / Laravel (language wave 2, first half)
 
-> **Status: DONE — 2026-09-23. Deliverables 1–6 built and verified END TO END,
+> **Status: DONE — 2026-09-23, commits `1b5795e` (the wave) and `48528d2` (the walk
+> and its two fixes). Deliverables 1–6 built and verified END TO END,
 > and the phase was closed by a WALK rather than by assertion: a real Laravel
 > application through E1–E6 and Dioptra's own PHP through E7, which found two
 > defects that were fixed before closing (see the Definition of Done).** Second cycle, after the
@@ -299,7 +300,7 @@ contingency created on 2026-09-22.
       function-scoped criterion, `docs/ui-model.md` the E4 search box and
       the count line, and the scope-change log both walk defects and the
       `GET …/risk-matrix` 1.x contract change. The closing commit hash is
-      recorded in the follow-up commit, as P5 did in `df80ebe`
+      `48528d2`, recorded here in the follow-up commit as P5 did in `df80ebe`
 
 ## Progress (2026-09-23)
 
