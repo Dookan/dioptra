@@ -120,7 +120,8 @@
       "testPlanFunctionTooComplex": "{{function}} ({{path}}, línea {{line}}) tiene más caminos de los que cabe diseñar en una sola función: déjala fuera del plan y pide que se divida.",
       "designNotApproved": "Esa función todavía no tiene sus casos aprobados, así que no hay archivo que preparar.",
       "testsUnparsable": "El archivo de tests tiene un error de sintaxis y no se puede leer.",
-      "testsTooLarge": "El archivo de tests es demasiado grande."
+      "testsTooLarge": "El archivo de tests es demasiado grande.",
+      "mutantUnknown": "Ese mutante no está entre los que sobrevivieron en la última ejecución de la función."
     },
     "ast": {
       "failed": "No se pudo analizar el código de esa función.",
@@ -609,7 +610,13 @@
     "advance": {
       "label": "Pasar al reporte →",
       "blocked": "Todavía hay funciones que no pasan la verificación."
-    }
+    },
+    "equivalentTitle": "Mutantes ya justificados como equivalentes: {{count}}",
+    "markEquivalent": "Marcar como equivalente",
+    "equivalentNote": "Un mutante equivalente es el que ningún test puede detectar porque el código sigue haciendo lo mismo (por ejemplo, cambiar un texto que solo se escribe en el registro). Escribe por qué; queda en la bitácora y en el reporte, y se descuenta en la próxima ejecución.",
+    "equivalentReasonLabel": "Por qué este mutante es equivalente",
+    "equivalentMarked": "Marcado. Vuelve a ejecutar y medir para que se descuente.",
+    "cancel": "Cancelar"
   },
   "inventory": {
     "title": "Inventario de software",
@@ -765,7 +772,8 @@
       "vulndb.sync.request": "pidió actualizar la base de vulnerabilidades",
       "vulndb.import.request": "importó un archivo de la base de vulnerabilidades",
       "vulndb.sync": "sincronizó la base de vulnerabilidades",
-      "vulndb.import": "cargó el archivo importado en la base de vulnerabilidades"
+      "vulndb.import": "cargó el archivo importado en la base de vulnerabilidades",
+      "verification.mutant.equivalent": "justificó un mutante como equivalente"
     },
     "systemActor": "Sistema"
   }

@@ -19,7 +19,10 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+_settings = get_settings()
+# Migrations run as the schema OWNER; requests run as the runtime role that
+# cannot alter the schema (docker/initdb/01-runtime-role.sql).
+config.set_main_option("sqlalchemy.url", _settings.migration_database_url or _settings.database_url)
 
 target_metadata = Base.metadata
 

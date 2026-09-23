@@ -138,12 +138,21 @@ def design_states(analysis: Analysis) -> list[dict[str, Any]]:
     return states
 
 
-def _require_design_stage(analysis: Analysis) -> None:
-    """E5 deliverables are written only AT E5: before it, not reached; after it, locked."""
+def _require_design_stage(analysis: Analysis, design: CaseDesign | None = None) -> None:
+    """E5 deliverables are written AT E5 — or at E7 for a function the loop reopened.
+
+    Before E5: not reached; after it: locked, EXCEPT while the analysis sits
+    at E7 and this function's design carries ``reopened_at`` (the E7 → E5
+    loop). Found by the P5 walk on the platform itself: without this arm a
+    reopened function could never be approved again and the gate stayed
+    closed forever (docs/workflow-gates.md → E7 re-audit rules).
+    """
     if analysis.stage is Stage.DESIGN:
         return
     if analysis.stage in (Stage.REGISTER, Stage.CODE, Stage.ANALYSIS, Stage.PLAN):
         raise StageNotReached(f"analysis {analysis.id} is at {analysis.stage.value}")
+    if analysis.stage is Stage.VERIFICATION and design is not None and design.reopened_at:
+        return
     raise StageLocked(f"analysis {analysis.id} is at {analysis.stage.value}")
 
 
@@ -184,8 +193,8 @@ def save_diagram_text(
     text: str,
     source_ip: str | None,
 ) -> CaseDesign:
-    """Store the developer's Mermaid text (only AT E5; empty text clears it)."""
-    _require_design_stage(analysis)
+    """Store the developer's Mermaid text (AT E5, or at E7 once reopened; empty text clears it)."""
+    _require_design_stage(analysis, get_design(db, analysis, ref))
     planned_function(analysis, ref)
     cleaned = strip_control_chars(text.replace("\r\n", "\n")).strip()[:MAX_DIAGRAM_TEXT_CHARS]
     design = _design_row(db, analysis, actor, ref)
@@ -228,7 +237,7 @@ def save_cases(
 
     Any earlier approval is cleared: it attested a different text.
     """
-    _require_design_stage(analysis)
+    _require_design_stage(analysis, get_design(db, analysis, ref))
     brief = brief_for(analysis, ref)
     cleaned = clean_cases(cases, brief)
     design = _design_row(db, analysis, actor, ref)
@@ -260,9 +269,9 @@ def approve_cases(
     cases against the live brief; the snapshot stored here is what P4 names
     the scaffold's cases from. ``gates.leave_design`` only needs the record.
     """
-    _require_design_stage(analysis)
-    brief = brief_for(analysis, ref)
     design = get_design(db, analysis, ref)
+    _require_design_stage(analysis, design)
+    brief = brief_for(analysis, ref)
     cases = list(design.cases) if design is not None else []
     missing = uncovered_items(brief, cases)
     if missing:

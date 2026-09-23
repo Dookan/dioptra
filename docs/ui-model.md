@@ -203,6 +203,14 @@ Radii: frames 14, cards 12, buttons 9, badges 5. Borders 1px hairline.
   screen is never the enforcement.
 - The copy says the stage does not move backwards ("La etapa no retrocede:
   sigues en Verificación"), because that is what the machine does.
+- P5: each surviving mutant carries the sandbox's text for it (the diff for
+  the first fifteen, the id for the rest) and, for the developer, a
+  "Marcar como equivalente" button that opens a written-reason field (ten
+  characters, the server's floor); the note under it says what an
+  equivalent mutant is in plain words and that it is discounted on the next
+  run. Mutants already excused are listed apart ("Mutantes ya justificados
+  como equivalentes: N"). The analyst and the admin see every result and
+  none of the three buttons.
 - Mutant text and the sandbox's stderr come from the audited code's own
   tooling: both render as React text nodes, the stderr inside a `.codeblock`.
 - The analyst and the admin see every result and neither button.
@@ -248,6 +256,10 @@ Radii: frames 14, cards 12, buttons 9, badges 5. Borders 1px hairline.
   semantic version of the audited system, the anchor's "v1.3" is
   illustrative; the "Usuarios" half of mockup 10 is not built (no endpoint,
   not in the plan's day table — `tasks/phase5-survey.md` §8).
+- **Reporte (E8)**, recorded deviation: mockup 09 lists "Inventario (SBOM y
+  CVE abiertos)" and "Anexos" among the sections; the built sections 7–10
+  are composed from workflow rows and have no analyst prose, so the editor's
+  list keeps only the six editable sections. Every export carries 7–10.
 - **Bitácora**: one panel, the Hoy / Semana / Todo `radio`s become the
   `since` parameter; each row is `time · actor · sentence` with the target
   and the written justification in `.sub`; the sentence is an i18n key per

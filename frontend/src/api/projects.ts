@@ -498,6 +498,8 @@ export interface VerificationRun extends PlannedFunction {
   };
   uncovered_items: string[];
   surviving_mutants: { id: string; line: string; mutant: string }[];
+  /** Survivors the developer excused as equivalent before this run. */
+  equivalent_mutants: { id: string; line: string; mutant: string }[];
   assertion_free_cases: string[];
   failed_cases: string[];
   detail: string | null;
@@ -532,6 +534,26 @@ export function reopenDesign(
     method: 'POST',
     accessToken,
     body: { justification },
+  });
+}
+
+export function markMutantEquivalent(
+  accessToken: string,
+  analysisId: string,
+  ref: PlannedFunction,
+  mutantId: string,
+  justification: string,
+): Promise<VerificationRun[]> {
+  return apiFetch<VerificationRun[]>(`/analyses/${encodeURIComponent(analysisId)}/mutants/equivalent`, {
+    method: 'POST',
+    accessToken,
+    body: {
+      path: ref.path,
+      function: ref.function,
+      line: ref.line,
+      mutant_id: mutantId,
+      justification,
+    },
   });
 }
 

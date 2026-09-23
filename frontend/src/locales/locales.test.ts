@@ -98,6 +98,7 @@ describe('locale files', () => {
       'errors.workflow.gate.testsNotWritten',
       'errors.workflow.gate.notVerified',
       'errors.workflow.gate.verificationFailed',
+      'errors.workflow.mutantUnknown',
       'errors.sandbox.failed',
       'errors.sandbox.unavailable',
       'errors.sandbox.timeout',

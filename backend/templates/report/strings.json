@@ -65,7 +65,16 @@
     "detection": "Detección",
     "path": "Ruta",
     "mitigation": "Mitigación",
-    "references": "Referencias"
+    "references": "Referencias",
+    "metrics": "MÉTRICAS DE CÓDIGO",
+    "test_debt": "DEUDA DE PRUEBAS",
+    "inventory": "INVENTARIO DE SOFTWARE",
+    "annexes": "ANEXOS",
+    "annex_asvs": "Anexo A — Lista de verificación ASVS",
+    "annex_diagrams": "Anexo B — Diagramas de flujo",
+    "annex_cases": "Anexo C — Pseudocódigo de los casos",
+    "annex_tests": "Anexo D — Código de las pruebas",
+    "annex_bom": "Anexo E — SBOM y CBOM"
   },
   "labels": {
     "field": "Campo",
@@ -111,7 +120,11 @@
     "findings_intro": "Hallazgos de vulnerabilidades",
     "dependencies_intro": "Hallazgos sobre paquetes y dependencias",
     "practices": "Errores y prácticas no adecuadas en el código",
-    "coverage_intro": "Cobertura de herramientas"
+    "coverage_intro": "Cobertura de herramientas",
+    "metrics": "Métricas de código",
+    "test_debt": "Deuda de pruebas",
+    "inventory": "Inventario",
+    "annexes": "Anexos (diagramas, tests, SBOM/CBOM)"
   },
   "version_baseline": {
     "description": "Informe generado automáticamente",
@@ -137,6 +150,238 @@
       "CVE abiertos",
       "Severidad máxima",
       "Versión más nueva conocida"
-    ]
+    ],
+    "intro": "Inventario de componentes de software del sistema (SBOM en formato CycloneDX 1.6), cruzado contra la copia local de las bases públicas de vulnerabilidades OSV y NVD (CVE.org). La plataforma no consulta servicios externos en vivo: la fecha de la copia local es la referencia de vigencia de esta sección.",
+    "no_sbom": "El análisis no produjo un inventario de componentes (el generador de SBOM no pudo ejecutarse; ver Cobertura de herramientas).",
+    "summary": "{components} componentes declarados. Licencias más frecuentes: {licenses}; sin licencia declarada: {unlicensed}.",
+    "not_correlated": "La correlación con la base de vulnerabilidades no estaba disponible al generar este documento.",
+    "vulndb_line": "Copia local de OSV + NVD del {date}.",
+    "vulndb_none": "Sin copia local de la base de vulnerabilidades al generar este documento.",
+    "open_title": "Componentes con vulnerabilidades abiertas",
+    "open_none": "Ningún componente del inventario tiene vulnerabilidades conocidas abiertas en la copia local.",
+    "not_affected_title": "Vulnerabilidades marcadas como «No aplica» por el analista",
+    "outdated_title": "Componentes fuera de versión",
+    "outdated_note": "«Fuera de versión» significa que la copia local conoce una versión más nueva del componente: la corregida en un aviso, o la que usa otro proyecto de la fábrica.",
+    "crypto_title": "Criptografía detectada (CBOM)",
+    "crypto_none": "No se detectó uso de criptografía en el código analizado.",
+    "weak": "algoritmo débil",
+    "labels": {
+      "component": "Componente",
+      "version": "Versión",
+      "cve": "CVE",
+      "cvss": "CVSS",
+      "severity": "Severidad",
+      "fixed_in": "Corregido en",
+      "vex": "Estado VEX",
+      "justification": "Justificación",
+      "newer": "Versión conocida",
+      "algorithm": "Algoritmo",
+      "primitive": "Tipo",
+      "location": "Ubicación"
+    },
+    "vex": {
+      "exploitable": "Aplica",
+      "not_affected": "No aplica",
+      "in_triage": "Sin revisar"
+    },
+    "primitive": {
+      "hash": "función de resumen",
+      "cipher": "cifrado",
+      "mac": "código de autenticación",
+      "signature": "firma",
+      "kdf": "derivación de clave",
+      "random": "aleatoriedad",
+      "protocol": "protocolo",
+      "certificate": "certificado"
+    }
+  },
+  "metrics": {
+    "intro": "Métricas estructurales del código analizado, obtenidas con Lizard (complejidad ciclomática por función) y cloc (líneas por lenguaje). La complejidad ciclomática de una función es el número de caminos independientes que la atraviesan: por encima de 10 la función es difícil de probar y propensa a errores.",
+    "summary": "Se midieron {functions} funciones; {complex} superan una complejidad ciclomática de 10. Archivos con código comentado: {commented}.",
+    "top_title": "Funciones de mayor complejidad",
+    "languages_title": "Líneas por lenguaje",
+    "duplication": "La duplicación de código no se mide en esta versión de la plataforma.",
+    "labels": {
+      "function": "Función",
+      "path": "Ruta",
+      "ccn": "Complejidad",
+      "nloc": "Líneas",
+      "language": "Lenguaje",
+      "files": "Archivos",
+      "code": "Código",
+      "comment": "Comentarios",
+      "blank": "En blanco"
+    },
+    "none": "El análisis no produjo métricas de código (la herramienta no pudo ejecutarse; ver Cobertura de herramientas)."
+  },
+  "test_debt": {
+    "intro": "La deuda de pruebas es la diferencia entre la cobertura que el sistema debería tener, según el plan de pruebas acordado, y la que efectivamente demostraron las pruebas escritas por el equipo de desarrollo. La plataforma no escribe pruebas: genera el esqueleto de cada archivo y mide lo que las pruebas del equipo ejercitan; después rompe el código a propósito (mutation testing) para verificar que las pruebas detectan errores de verdad.",
+    "no_plan": "El proyecto no cuenta todavía con un plan de pruebas: la deuda es total. Las funciones priorizadas en la matriz de riesgo no tienen casos diseñados ni pruebas escritas.",
+    "plan_line": "Plan de pruebas: {functions} funciones seleccionadas, criterio de cobertura «{criterion}», definido por {author}.",
+    "rationale_title": "Justificación del plan, en palabras del equipo",
+    "totals": "Casos aprobados en {approved} de {functions} funciones; pruebas escritas para {written}; verificación superada en {passed}. Cobertura media medida: {statements} de sentencias y {branches} de ramas. Mutantes que sobrevivieron: {survivors}; justificados como equivalentes por el equipo: {equivalent}.",
+    "table_title": "Estado por función",
+    "labels": {
+      "function": "Función",
+      "cases": "Casos",
+      "written": "Tests",
+      "statements": "Sentencias",
+      "branches": "Ramas",
+      "status": "Verificación",
+      "survivors": "Mutantes vivos",
+      "uncovered": "Ítems sin cubrir",
+      "yes": "Sí",
+      "no": "No",
+      "equivalent": "Equivalentes"
+    },
+    "criterion": {
+      "statements": "sentencias",
+      "decisions": "decisiones",
+      "paths": "caminos"
+    },
+    "status": {
+      "passed": "Superada",
+      "failed": "Rechazada",
+      "errored": "No pudo ejecutarse",
+      "none": "Sin ejecutar"
+    },
+    "stage_note": "Etapa actual del flujo de trabajo: {stage}."
+  },
+  "stages": {
+    "register": "Registro",
+    "code": "Código",
+    "analysis": "Análisis y revisión",
+    "plan": "Plan de pruebas",
+    "design": "Diseño de casos",
+    "tests": "Escritura de tests",
+    "verification": "Verificación",
+    "report": "Reporte"
+  },
+  "annexes": {
+    "asvs_intro": "Capítulos del estándar OWASP ASVS 4.0 relacionados con los hallazgos del informe, según la categoría OWASP Top 10:2021 de cada uno. Un capítulo con cero hallazgos no está verificado: simplemente ninguna herramienta reportó algo en él.",
+    "asvs_labels": {
+      "chapter": "Capítulo",
+      "title": "Título",
+      "findings": "Hallazgos relacionados"
+    },
+    "diagrams_intro": "Diagrama de flujo de cada función planificada, generado por la plataforma a partir del árbol de sintaxis del código (nunca a partir de una edición manual). El texto Mermaid equivalente se conserva como formato de intercambio.",
+    "diagram_unavailable": "El diagrama no pudo generarse al componer este documento (la fuente ya no está disponible o no pudo analizarse).",
+    "cases_intro": "Casos de prueba diseñados por el equipo de desarrollo, en sus propias palabras, con los ítems de la consigna que cada caso declara cubrir.",
+    "cases_none": "Sin casos diseñados.",
+    "approved": "aprobados",
+    "not_approved": "sin aprobar",
+    "tests_intro": "Archivos de prueba escritos por el equipo de desarrollo sobre el andamiaje generado por la plataforma. Se reproducen tal cual fueron guardados; la plataforma no escribió ninguna aserción.",
+    "tests_none": "Sin archivos de prueba guardados.",
+    "truncated": "(archivo truncado en este anexo)",
+    "bom_intro": "El SBOM y el CBOM del sistema se emiten como documentos CycloneDX 1.6 (JSON) desde el panel de inventario de la plataforma; son los artefactos de registro. Este anexo resume su contenido.",
+    "bom_line": "SBOM: {components} componentes, generado con {generator}, CycloneDX {spec}.",
+    "cbom_line": "CBOM: {algorithms} algoritmos distintos detectados, {weak} débiles.",
+    "none": "Sin anexos: el flujo de trabajo no llegó a la etapa de diseño de casos y el análisis no produjo inventario."
+  },
+  "asvs": {
+    "chapters": [
+      {
+        "id": "V1",
+        "title": "Arquitectura, diseño y modelado de amenazas"
+      },
+      {
+        "id": "V2",
+        "title": "Autenticación"
+      },
+      {
+        "id": "V3",
+        "title": "Gestión de sesiones"
+      },
+      {
+        "id": "V4",
+        "title": "Control de acceso"
+      },
+      {
+        "id": "V5",
+        "title": "Validación, saneamiento y codificación"
+      },
+      {
+        "id": "V6",
+        "title": "Criptografía almacenada"
+      },
+      {
+        "id": "V7",
+        "title": "Manejo de errores y registro"
+      },
+      {
+        "id": "V8",
+        "title": "Protección de datos"
+      },
+      {
+        "id": "V9",
+        "title": "Comunicaciones"
+      },
+      {
+        "id": "V10",
+        "title": "Código malicioso"
+      },
+      {
+        "id": "V11",
+        "title": "Lógica de negocio"
+      },
+      {
+        "id": "V12",
+        "title": "Archivos y recursos"
+      },
+      {
+        "id": "V13",
+        "title": "API y servicios web"
+      },
+      {
+        "id": "V14",
+        "title": "Configuración"
+      }
+    ],
+    "owasp_to_chapters": {
+      "A01:2021": [
+        "V4"
+      ],
+      "A02:2021": [
+        "V6",
+        "V9"
+      ],
+      "A03:2021": [
+        "V5"
+      ],
+      "A04:2021": [
+        "V1",
+        "V11"
+      ],
+      "A05:2021": [
+        "V14"
+      ],
+      "A06:2021": [
+        "V14"
+      ],
+      "A07:2021": [
+        "V2",
+        "V3"
+      ],
+      "A08:2021": [
+        "V10",
+        "V14"
+      ],
+      "A09:2021": [
+        "V7"
+      ],
+      "A10:2021": [
+        "V12",
+        "V13"
+      ]
+    }
+  },
+  "diagram": {
+    "start": "Inicio",
+    "end": "Fin",
+    "true": "sí",
+    "false": "no",
+    "loop": "repite",
+    "except": "excepción",
+    "default": "por defecto"
   }
 }

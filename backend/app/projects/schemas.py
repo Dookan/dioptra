@@ -300,12 +300,19 @@ class VerificationRunOut(BaseModel):
     coverage: dict[str, Any]
     uncovered_items: list[str]
     surviving_mutants: list[dict[str, str]]
+    #: Survivors the developer excused with a written reason before this run.
+    equivalent_mutants: list[dict[str, str]] = []
     assertion_free_cases: list[str]
     failed_cases: list[str]
     detail: str | None
     duration_ms: int
     created_by_username: str
     created_at: datetime
+
+
+class EquivalentMutantIn(PlannedFunctionIn):
+    mutant_id: str = Field(min_length=1, max_length=200)
+    justification: str = Field(max_length=8000)
 
 
 class VerdictIn(BaseModel):

@@ -151,6 +151,164 @@ Existe código comentado en los siguientes archivos del sistema:
 | {{ run.tool | md }} | {{ run.category }} | {{ run.status_label }} | {{ run.detail | md }} |
 {% endfor %}
 
+## MÉTRICAS DE CÓDIGO
+
+{{ strings.metrics.intro | md }}
+
+{% if metrics.functions_measured %}
+{{ strings.metrics.summary.format(functions=metrics.functions_measured, complex=metrics.complex_functions, commented=metrics.commented_files) | md }}
+
+| {{ strings.metrics.labels.ccn }} | {{ strings.metrics.labels.nloc }} | {{ strings.metrics.labels.function }} | {{ strings.metrics.labels.path }} |
+|---|---|---|---|
+{% for f in metrics.top %}
+| {{ f.ccn }} | {{ f.nloc }} | {{ f.function | md }} | `{{ f.path | md }}{% if f.line %}:{{ f.line }}{% endif %}` |
+{% endfor %}
+
+{{ strings.metrics.duplication | md }}
+{% else %}
+{{ strings.metrics.none | md }}
+{% endif %}
+
+## DEUDA DE PRUEBAS
+
+{{ strings.test_debt.intro | md }}
+
+{{ strings.test_debt.stage_note.format(stage=stage_label) | md }}
+
+{% if test_debt.plan %}
+{{ strings.test_debt.plan_line.format(functions=test_debt.totals.functions, criterion=test_debt.plan.criterion_label, author=test_debt.plan.created_by) | md }}
+
+{{ test_debt.plan.rationale | md }}
+
+| {{ strings.test_debt.labels.function }} | {{ strings.test_debt.labels.cases }} | {{ strings.test_debt.labels.written }} | {{ strings.test_debt.labels.statements }} | {{ strings.test_debt.labels.branches }} | {{ strings.test_debt.labels.status }} | {{ strings.test_debt.labels.survivors }} |
+|---|---|---|---|---|---|---|
+{% for f in test_debt.functions %}
+| `{{ f.path | md }}` · {{ f.function | md }} | {{ f.cases }} | {{ strings.test_debt.labels.yes if f.written else strings.test_debt.labels.no }} | {{ (f.statement_percent ~ ' %') if f.statement_percent is not none else 'N/A' }} | {{ (f.branch_percent ~ ' %') if f.branch_percent is not none else 'N/A' }} | {{ f.status_label }} | {{ f.survivors }} |
+{% endfor %}
+{% else %}
+{{ strings.test_debt.no_plan | md }}
+{% endif %}
+
+## INVENTARIO DE SOFTWARE
+
+{{ strings.inventory.intro | md }}
+
+{% if inventory %}
+{{ strings.inventory.summary.format(components=inventory.components, licenses=(inventory.licenses | map(attribute='name') | join(', ') or 'N/A'), unlicensed=inventory.unlicensed) | md }}
+
+{% if inventory.correlated %}
+{{ (strings.inventory.vulndb_line.format(date=inventory.vulndb_last_update) if inventory.vulndb_last_update else strings.inventory.vulndb_none) | md }}
+
+**{{ strings.inventory.open_title }}**
+
+{% if inventory.open %}
+| {{ strings.inventory.labels.component }} | {{ strings.inventory.labels.version }} | {{ strings.inventory.labels.cve }} | {{ strings.inventory.labels.severity }} | {{ strings.inventory.labels.fixed_in }} | {{ strings.inventory.labels.vex }} |
+|---|---|---|---|---|---|
+{% for row in inventory.open %}
+| {{ row.component | md }} | `{{ row.version | md }}` | {{ row.cve | md }} | {{ row.severity_label }} | `{{ row.fixed_in | md }}` | {{ row.vex_label }} |
+{% endfor %}
+{% else %}
+{{ strings.inventory.open_none | md }}
+{% endif %}
+{% if inventory.not_affected %}
+
+**{{ strings.inventory.not_affected_title }}**
+
+{% for row in inventory.not_affected %}
+- {{ row.component | md }} {{ row.version | md }} — {{ row.cve | md }}: {{ row.justification | md }}
+{% endfor %}
+{% endif %}
+{% if inventory.outdated %}
+
+**{{ strings.inventory.outdated_title }}**
+
+{% for row in inventory.outdated %}
+- {{ row.component | md }} `{{ row.version | md }}` → `{{ row.newer | md }}`
+{% endfor %}
+{% endif %}
+
+**{{ strings.inventory.crypto_title }}**
+
+{% for row in inventory.crypto %}
+- `{{ row.algorithm | md }}` — {{ row.primitive | md }} · `{{ row.location | md }}`{% if row.weak %} — {{ strings.inventory.weak }}{% endif %}
+{% else %}
+{{ strings.inventory.crypto_none | md }}
+{% endfor %}
+{% else %}
+{{ strings.inventory.not_correlated | md }}
+{% endif %}
+{% else %}
+{{ strings.inventory.no_sbom | md }}
+{% endif %}
+
+## ANEXOS
+
+### {{ strings.headings.annex_asvs }}
+
+{{ strings.annexes.asvs_intro | md }}
+
+| {{ strings.annexes.asvs_labels.chapter }} | {{ strings.annexes.asvs_labels.title }} | {{ strings.annexes.asvs_labels.findings }} |
+|---|---|---|
+{% for row in annexes.asvs %}
+| {{ row.chapter }} | {{ row.title }} | {{ row.findings }} |
+{% endfor %}
+
+### {{ strings.headings.annex_diagrams }}
+
+{{ strings.annexes.diagrams_intro | md }}
+
+{% for d in annexes.diagrams %}
+**`{{ d.path | md }}` · {{ d.function | md }}**
+
+{% if d.mermaid %}
+{{ d.mermaid | fence }}
+{% else %}
+{{ strings.annexes.diagram_unavailable | md }}
+{% endif %}
+
+{% else %}
+{{ strings.annexes.cases_none | md }}
+{% endfor %}
+### {{ strings.headings.annex_cases }}
+
+{{ strings.annexes.cases_intro | md }}
+
+{% for group in annexes.cases %}
+**`{{ group.path | md }}` · {{ group.function | md }}** ({{ strings.annexes.approved if group.approved else strings.annexes.not_approved }})
+
+{% for case in group.cases %}
+- **{{ case.id }}** — {{ case.title | md }}{% if case.covers %} [{{ case.covers | join(', ') | md }}]{% endif %}
+{% endfor %}
+
+{% else %}
+{{ strings.annexes.cases_none | md }}
+{% endfor %}
+### {{ strings.headings.annex_tests }}
+
+{{ strings.annexes.tests_intro | md }}
+
+{% for t in annexes.tests %}
+**`{{ t.filename | md }}`**
+
+{{ t.content | fence }}
+{% if t.truncated %}
+
+{{ strings.annexes.truncated | md }}
+{% endif %}
+
+{% else %}
+{{ strings.annexes.tests_none | md }}
+{% endfor %}
+### {{ strings.headings.annex_bom }}
+
+{{ strings.annexes.bom_intro | md }}
+
+{% if annexes.sbom %}
+{{ strings.annexes.bom_line.format(components=annexes.sbom.components, generator=annexes.sbom.generator, spec=annexes.sbom.spec_version) | md }}
+{% else %}
+{{ strings.inventory.no_sbom | md }}
+{% endif %}
+
 ---
 
 Autor: {{ author }}

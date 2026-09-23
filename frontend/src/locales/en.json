@@ -120,7 +120,8 @@
       "testPlanFunctionTooComplex": "{{function}} ({{path}}, line {{line}}) has more paths than one function's design can hold: leave it out of the plan and ask for it to be split.",
       "designNotApproved": "That function's cases are not approved yet, so there is no file to prepare.",
       "testsUnparsable": "The test file has a syntax error and cannot be read.",
-      "testsTooLarge": "The test file is too large."
+      "testsTooLarge": "The test file is too large.",
+      "mutantUnknown": "That mutant is not among the survivors of the function's latest run."
     },
     "ast": {
       "failed": "That function's code could not be analyzed.",
@@ -609,7 +610,13 @@
     "advance": {
       "label": "Go to the report →",
       "blocked": "Some functions still do not pass verification."
-    }
+    },
+    "equivalentTitle": "Mutants already justified as equivalent: {{count}}",
+    "markEquivalent": "Mark as equivalent",
+    "equivalentNote": "An equivalent mutant is one no test can detect because the code still does the same thing (changing a text that is only written to the log, for example). Write why; it is recorded in the audit log and the report, and discounted on the next run.",
+    "equivalentReasonLabel": "Why this mutant is equivalent",
+    "equivalentMarked": "Marked. Run and measure again so it is discounted.",
+    "cancel": "Cancel"
   },
   "inventory": {
     "title": "Software inventory",
@@ -765,7 +772,8 @@
       "vulndb.sync.request": "requested a vulnerability-database update",
       "vulndb.import.request": "imported a vulnerability-database file",
       "vulndb.sync": "synchronised the vulnerability database",
-      "vulndb.import": "loaded the imported file into the vulnerability database"
+      "vulndb.import": "loaded the imported file into the vulnerability database",
+      "verification.mutant.equivalent": "justified a mutant as equivalent"
     },
     "systemActor": "System"
   }

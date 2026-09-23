@@ -651,3 +651,247 @@ def test_reopening_the_design_is_only_possible_at_e7(
     db.expire_all()
     stale = db.get(Analysis, analysis.id)
     assert stale is not None and stale.case_designs[0].reopened_at is None
+
+
+def test_a_reopened_function_can_be_redesigned_reapproved_and_rewritten_at_e7(
+    db: Session, developer: User, tmp_path: Path
+) -> None:
+    """The whole loop, in order: reopen → cases → approval → test file → a pass closes it.
+
+    Found by the P5 walk of the platform on itself: `approve_cases` refused a
+    reopened function with `stage_locked`, so the gate could never reopen.
+    """
+    from app.workflow import authoring, design  # noqa: PLC0415
+    from app.workflow.design import FunctionRef  # noqa: PLC0415
+    from app.workflow.errors import StageLocked  # noqa: PLC0415
+
+    analysis = _analysis(db, tmp_path)
+    ref = FunctionRef(path=str(WIDTH["path"]), function=str(WIDTH["function"]), line=3)
+    _run(db, analysis, developer, _result(survivors=1))
+    with pytest.raises(StageLocked):
+        design.approve_cases(db, analysis=analysis, actor=developer, ref=ref, source_ip=None)
+
+    verify.reopen_design(
+        db,
+        analysis=analysis,
+        actor=developer,
+        justification="Rediseñar el caso del mutante.",
+        source_ip=None,
+    )
+    db.commit()
+    # Approval re-checks the LIVE brief of the real fixture: one case per item.
+    live = design.brief_for(analysis, ref)
+    cases = [{"title": f"Caso para {item.id}", "covers": [item.id]} for item in live.items]
+    while len(cases) < live.min_cases:
+        cases.append({"title": f"Caso extra {len(cases) + 1}", "covers": []})
+    design.save_cases(db, analysis=analysis, actor=developer, ref=ref, cases=cases, source_ip=None)
+    approved = design.approve_cases(db, analysis=analysis, actor=developer, ref=ref, source_ip=None)
+    assert approved.approved_at is not None
+    assert approved.reopened_at is not None, "approval alone must not close the loop"
+    authoring.save_tests(
+        db, analysis=analysis, actor=developer, ref=ref, content=WRITTEN, source_ip=None
+    )
+    db.commit()
+    assert gates.leave_verification(analysis).open is False
+
+    passed = _run(db, analysis, developer, _result())
+    assert passed.status is VerificationStatus.PASSED
+    db.expire_all()
+    analysis = db.get(Analysis, analysis.id)  # type: ignore[assignment]
+    assert analysis.case_designs[0].reopened_at is None, "a pass closes the loop"
+    assert gates.leave_verification(analysis).open is True
+    with pytest.raises(StageLocked):
+        design.save_cases(
+            db, analysis=analysis, actor=developer, ref=ref, cases=cases, source_ip=None
+        )
+
+
+def test_an_equivalent_mutant_is_excused_with_a_reason_and_discounted_on_the_next_run(
+    client: TestClient, db: Session, developer: User, analyst: User, tmp_path: Path
+) -> None:
+    """The developer judges a survivor equivalent; the NEXT run stops counting it."""
+    from app.workflow.models import EquivalentMutant  # noqa: PLC0415
+
+    analysis = _analysis(db, tmp_path)
+    first = _run(db, analysis, developer, _result(survivors=2))
+    assert first.status is VerificationStatus.FAILED
+    url = f"/api/v1/analyses/{analysis.id}/mutants/equivalent"
+    body = {
+        **WIDTH,
+        "mutant_id": "0",
+        "justification": "Cambia el nombre del codec a mayúsculas: Python lo acepta igual.",
+    }
+
+    assert client.post(url, json=body, headers=login(client, analyst.username)).status_code == 403
+    unknown = client.post(
+        url, json={**body, "mutant_id": "99"}, headers=login(client, developer.username)
+    )
+    assert unknown.status_code == 404 and unknown.json()["code"] == "mutant_unknown"
+    short = client.post(
+        url, json={**body, "justification": "corto"}, headers=login(client, developer.username)
+    )
+    assert short.status_code == 422 and short.json()["code"] == "justification_required"
+
+    marked = client.post(url, json=body, headers=login(client, developer.username))
+    assert marked.status_code == 200, marked.text
+    row = db.scalars(select(EquivalentMutant)).one()
+    assert (row.mutant_id, row.created_by_username) == ("0", "cperez")
+    assert row.mutant == "ConditionalExpression: false"
+    entry = db.scalars(
+        select(AuditLogEntry).where(AuditLogEntry.action == "verification.mutant.equivalent")
+    ).one()
+    assert entry.justification is not None and "codec" in entry.justification
+    # Marking twice is idempotent, and the latest run row is untouched (immutable history).
+    assert client.post(url, json=body, headers=login(client, developer.username)).status_code == 200
+    db.expire_all()
+    analysis = db.get(Analysis, analysis.id)  # type: ignore[assignment]
+    assert (
+        len(verify.latest_runs(analysis)[(WIDTH["path"], WIDTH["function"], 3)].surviving_mutants)
+        == 2
+    )
+    assert gates.leave_verification(analysis).open is False
+
+    # The next run: one real survivor left → still failed, the excused one recorded apart.
+    second = _run(db, analysis, developer, _result(survivors=2))
+    assert second.status is VerificationStatus.FAILED
+    assert [m["id"] for m in second.surviving_mutants] == ["1"]
+    assert [m["id"] for m in second.equivalent_mutants] == ["0"]
+    # Excuse the other one too: the third run passes and the gate opens.
+    client.post(url, json={**body, "mutant_id": "1"}, headers=login(client, developer.username))
+    third = _run(db, analysis, developer, _result(survivors=2))
+    assert third.status is VerificationStatus.PASSED
+    assert [m["id"] for m in third.equivalent_mutants] == ["0", "1"]
+    db.expire_all()
+    analysis = db.get(Analysis, analysis.id)  # type: ignore[assignment]
+    assert gates.leave_verification(analysis).open is True
+    listing = client.get(
+        f"/api/v1/analyses/{analysis.id}/verification", headers=login(client, developer.username)
+    )
+    assert listing.json()[0]["equivalent_mutants"][0]["id"] == "0"
+
+
+def test_an_excusal_binds_to_the_mutants_text_not_only_its_id(
+    db: Session, developer: User, tmp_path: Path
+) -> None:
+    """Ids are index-based: a renumbered mutant under an excused id is a real survivor again."""
+    from app.workflow.models import EquivalentMutant  # noqa: PLC0415
+
+    analysis = _analysis(db, tmp_path)
+    _run(db, analysis, developer, _result(survivors=1))
+    from app.workflow.design import FunctionRef  # noqa: PLC0415
+
+    ref = FunctionRef(path=str(WIDTH["path"]), function=str(WIDTH["function"]), line=3)
+    verify.mark_equivalent(
+        db,
+        analysis=analysis,
+        actor=developer,
+        ref=ref,
+        mutant_id="0",
+        justification="Cambia solo el texto del registro.",
+        source_ip=None,
+    )
+    db.commit()
+    stored = db.scalars(select(EquivalentMutant)).one()
+    assert stored.mutant == "ConditionalExpression: false"
+    # Same id, same text → excused; same id, different text → NOT excused.
+    same = _run(db, analysis, developer, _result(survivors=1))
+    assert same.status is VerificationStatus.PASSED and [
+        m["id"] for m in same.equivalent_mutants
+    ] == ["0"]
+    stored.mutant = "a different mutant now lives under id 0"
+    db.commit()
+    changed = _run(db, analysis, developer, _result(survivors=1))
+    assert changed.status is VerificationStatus.FAILED
+    assert [m["id"] for m in changed.surviving_mutants] == [
+        "0"
+    ] and changed.equivalent_mutants == []
+
+
+def test_the_loop_guards_the_adversary_found_unpinned(
+    client: TestClient, db: Session, developer: User, tmp_path: Path
+) -> None:
+    """Diagram text at E7 only once reopened; a failed run keeps the flag; the mark's stage."""
+    from app.workflow import design  # noqa: PLC0415
+    from app.workflow.design import FunctionRef  # noqa: PLC0415
+    from app.workflow.errors import StageLocked, StageNotReached  # noqa: PLC0415
+    from app.workflow.models import EquivalentMutant  # noqa: PLC0415
+
+    analysis = _analysis(db, tmp_path)
+    ref = FunctionRef(path=str(WIDTH["path"]), function=str(WIDTH["function"]), line=3)
+    url = f"/api/v1/analyses/{analysis.id}/mutants/equivalent"
+    body = {**WIDTH, "mutant_id": "0", "justification": "Nunca se ejecutó todavía."}
+    # A function that was never verified has no survivor to excuse.
+    never = client.post(url, json=body, headers=login(client, developer.username))
+    assert never.status_code == 404 and never.json()["code"] == "mutant_unknown"
+
+    _run(db, analysis, developer, _result(survivors=1))
+    with pytest.raises(StageLocked):
+        design.save_diagram_text(
+            db, analysis=analysis, actor=developer, ref=ref, text="flowchart TD", source_ip=None
+        )
+    verify.reopen_design(
+        db, analysis=analysis, actor=developer, justification="Rediseñar el caso.", source_ip=None
+    )
+    db.commit()
+    row = design.save_diagram_text(
+        db, analysis=analysis, actor=developer, ref=ref, text="flowchart TD", source_ip=None
+    )
+    assert row.reopened_at is not None
+    # A run that FAILS after the reopen keeps the function reopened (an
+    # unapproved function is ERRORED, so approve again first).
+    live = design.brief_for(analysis, ref)
+    cases = [{"title": f"Caso para {item.id}", "covers": [item.id]} for item in live.items]
+    while len(cases) < live.min_cases:
+        cases.append({"title": f"Caso extra {len(cases) + 1}", "covers": []})
+    design.save_cases(db, analysis=analysis, actor=developer, ref=ref, cases=cases, source_ip=None)
+    design.approve_cases(db, analysis=analysis, actor=developer, ref=ref, source_ip=None)
+    db.commit()
+    failed = _run(db, analysis, developer, _result(survivors=1))
+    assert failed.status is VerificationStatus.FAILED
+    db.expire_all()
+    analysis = db.get(Analysis, analysis.id)  # type: ignore[assignment]
+    assert analysis.case_designs[0].reopened_at is not None
+
+    # An excusal of ANOTHER function never reaches this one.
+    db.add(
+        EquivalentMutant(
+            analysis_id=analysis.id,
+            path=str(WIDTH["path"]),
+            function="anotherFunction",
+            line=3,
+            mutant_id="0",
+            mutant="ConditionalExpression: false",
+            justification="Es de otra función.",
+            created_by_username="cperez",
+        )
+    )
+    db.commit()
+    run = _run(db, analysis, developer, _result(survivors=1))
+    assert run.status is VerificationStatus.FAILED
+    assert [m["id"] for m in run.surviving_mutants] == ["0"] and run.equivalent_mutants == []
+
+    # The mark is an E7 action: refused after E8 and before E7.
+    analysis.stage = Stage.REPORT
+    db.commit()
+    with pytest.raises(StageLocked):
+        verify.mark_equivalent(
+            db,
+            analysis=analysis,
+            actor=developer,
+            ref=ref,
+            mutant_id="0",
+            justification="Cambia solo el texto del registro.",
+            source_ip=None,
+        )
+    analysis.stage = Stage.TESTS
+    db.commit()
+    with pytest.raises(StageNotReached):
+        verify.mark_equivalent(
+            db,
+            analysis=analysis,
+            actor=developer,
+            ref=ref,
+            mutant_id="0",
+            justification="Cambia solo el texto del registro.",
+            source_ip=None,
+        )

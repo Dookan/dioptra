@@ -14,7 +14,7 @@ from app.db.base import Base
 from app.inventory.models import CryptoAsset, VulnDbSync, Vulnerability, VulnerabilityPackage
 from app.projects.models import Project, System
 from app.reports.models import ReportVersion
-from app.workflow.models import CaseDesign, TestPlan
+from app.workflow.models import CaseDesign, EquivalentMutant, TestPlan
 
 __all__ = [
     "Analysis",
@@ -23,6 +23,7 @@ __all__ = [
     "Base",
     "CodeMetrics",
     "CryptoAsset",
+    "EquivalentMutant",
     "Finding",
     "Project",
     "RawToolOutput",

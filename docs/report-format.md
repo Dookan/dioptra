@@ -1,6 +1,6 @@
 # Report format
 
-> **Status: IN_PROGRESS — sections 1–6 plus "Hallazgos sobre paquetes", "Errores y prácticas" and "Cobertura de herramientas" built 2026-09-21 (`backend/app/reports/`, `backend/templates/report/`); versioning, signing and the editable sections built 2026-09-22 (`backend/app/reports/{versions,router}.py`, `frontend/src/screens/report-screen.tsx`); PDF fidelity is a first structural pass, see the scope-change log.** Anchor: the institution's
+> **Status: IN_PROGRESS — sections 1–6 plus "Hallazgos sobre paquetes", "Errores y prácticas" and "Cobertura de herramientas" built 2026-09-21 (`backend/app/reports/`, `backend/templates/report/`); versioning, signing and the editable sections built 2026-09-22 (`backend/app/reports/{versions,router}.py`, `frontend/src/screens/report-screen.tsx`); sections 7–10 (Métricas de código, Deuda de pruebas, Inventario de software, Anexos A–E) built 2026-09-22 (`backend/app/reports/{closure,svg}.py`, every format); PDF fidelity is a first structural pass, see the scope-change log.** Anchor: the institution's
 > manual white-box reports on the MINCYT form systems, in
 > `/home/user/Desktop/UTD/CAJA-BLANCA/*.pdf` (structure is authoritative; the
 > platform must reproduce it indistinguishably — the P1 success criterion,
@@ -16,19 +16,40 @@
 5. Control de versiones (auto-filled from the report versions: number, areas changed, change description, delivery date = signature date, `N/A` for a draft)
 6. Hallazgos — per finding: title, severity, CWE, OWASP code, description,
    impact, detection (path:line + escaped snippet), mitigation, references
-7. **New:** Métricas de código (complexity, critical functions, duplication)
-8. **New:** Deuda de pruebas (coverage before/after, tests written, basis
-   paths covered, mutation score)
-9. **New (P5):** Inventario — SBOM summary of the analyzed version, open CVEs
-   per component with VEX status, outdated components
-10. **New:** Anexos — ASVS checklist, flow diagrams, pseudocode, test code,
-    SBOM/CBOM attached (CycloneDX JSON) — flow diagrams as SVG produced
-    server-side from the AST, never from the browser (`docs/threat-model.md`
-    → row Flow diagrams)
+7. **Métricas de código** (P5, built): functions measured, the ten most
+   complex (Lizard `ccn`, `nloc`), lines by language (cloc), files with
+   commented-out code; duplication is stated as not measured in v1.0.0 (no
+   tool in the authority table).
+8. **Deuda de pruebas** (P5, built): the current workflow stage, the E4 plan
+   (criterion, author, the team's own rationale), and per planned function
+   the cases designed, whether a test file exists, statement and branch
+   percentages from the LATEST verification run, the run's verdict by name,
+   the brief items left uncovered and the mutants that survived; totals
+   underneath. No plan → "la deuda es total".
+9. **Inventario de software** (P5, built): component count and licences from
+   the stored SBOM; when the render has the analysis' session, the
+   correlation against the local mirror — open CVEs with VEX state, the
+   analyst's "No aplica" justifications, outdated components, the CBOM
+   rows — and the local copy's date. No SBOM → said in one sentence.
+10. **Anexos** (P5, built) — A: the fourteen ASVS 4.0 chapters with the
+    number of report findings whose OWASP category maps to each (static
+    map in `strings.json`, "cero hallazgos no es verificado"); B: one flow
+    diagram per designed function as inline SVG produced SERVER-SIDE from
+    the AST layout (`reports/svg.py`, escaped labels, presentation
+    attributes only, never the browser's picture — `docs/threat-model.md`
+    → Flow diagrams) with the Mermaid interchange text under it (DOCX
+    carries the Mermaid text only); C: the developer's cases per function
+    with the brief items each declares; D: the stored test files verbatim,
+    capped at 40 000 characters; E: the SBOM and CBOM summary with the note
+    that the CycloneDX JSON documents are exported from the inventory panel
+    — a PDF cannot carry an attachment WeasyPrint would embed faithfully.
 11. Footer authorship: **Moises Marin**
 
 Delivery per phase: sections 1–6 in P1 (day 9, PDF + Markdown + basic DOCX);
-the visual executive summary in P2; sections 7–10 in P5 (day 19).
+the visual executive summary in P2; sections 7–10 in P5 (day 19, built
+2026-09-22). Sections 7–10 are COMPOSED, not editable: they carry no prose
+of the analyst's, so they are absent from the editor's section list
+(recorded deviation from mockup 09, `docs/ui-model.md` → Phase 5 screens).
 
 ## Behavior
 
@@ -50,7 +71,13 @@ the visual executive summary in P2; sections 7–10 in P5 (day 19).
   `stage_locked` once E4 is entered) is logged and lands in the next version; later edits open the next
   version and the "Control de versiones" table updates automatically. An
   export may name a version (`?version=N`); a snapshot never lists versions
-  after its own.
+  after its own. **Recorded limit (P5)**: sections 7–10 are composed LIVE
+  from the workflow rows and the mirror — a signed version freezes its prose
+  and its finding set, not the test-debt and inventory numbers, so the same
+  signed version exported after a later verification run or a mirror sync
+  can show different section 8/9 content. Snapshotting 7–10 into the
+  version row is a 1.x decision for `mmarin`; until then the signature
+  attests sections 1–6.
 - Triage feeds the report: a finding the analyst marked "No aplica" (false
   positive) leaves every format and the executive-summary counts; a pending
   finding stays, so an untriaged analysis still exports in full.

@@ -29,8 +29,17 @@ function keyOf(ref: PlannedFunction): string {
   return `${ref.path}::${ref.function}::${String(ref.line ?? '')}`;
 }
 
-function RunCard({ run }: { run: VerificationRun }): React.ReactNode {
+interface RunCardProps {
+  run: VerificationRun;
+  /** The developer at E7; `undefined` renders the card read-only. Resolves true when the server accepted. */
+  onMarkEquivalent?: (mutantId: string, justification: string) => Promise<boolean>;
+  busy?: boolean;
+}
+
+function RunCard({ run, onMarkEquivalent, busy = false }: RunCardProps): React.ReactNode {
   const { t } = useTranslation();
+  const [marking, setMarking] = useState<string | null>(null);
+  const [why, setWhy] = useState('');
   const passed = run.status === 'passed';
   return (
     <li className="caserow">
@@ -80,6 +89,74 @@ function RunCard({ run }: { run: VerificationRun }): React.ReactNode {
           </p>
           <ul className="caselist">
             {run.surviving_mutants.slice(0, 20).map((mutant) => (
+              <li key={mutant.id}>
+                <span className="mono sub">
+                  {mutant.line === '' ? '' : `${t('verify.line')} ${mutant.line} · `}
+                  {mutant.mutant}
+                </span>
+                {onMarkEquivalent !== undefined && marking !== mutant.id && (
+                  <>
+                    {' '}
+                    <button
+                      type="button"
+                      className="btn ghost small"
+                      onClick={() => {
+                        setMarking(mutant.id);
+                        setWhy('');
+                      }}
+                    >
+                      {t('verify.markEquivalent')}
+                    </button>
+                  </>
+                )}
+                {onMarkEquivalent !== undefined && marking === mutant.id && (
+                  <div className="field">
+                    <p className="hint">{t('verify.equivalentNote')}</p>
+                    <label htmlFor={`eq-${mutant.id}`}>{t('verify.equivalentReasonLabel')}</label>
+                    <textarea
+                      id={`eq-${mutant.id}`}
+                      className="input textarea"
+                      value={why}
+                      onChange={(event) => {
+                        setWhy(event.target.value);
+                      }}
+                    />
+                    <div className="actions">
+                      <button
+                        type="button"
+                        className="btn"
+                        disabled={busy || why.trim().length < 10}
+                        onClick={() => {
+                          void onMarkEquivalent(mutant.id, why).then((accepted) => {
+                            // A refusal keeps the form open with the typed reason.
+                            if (accepted) setMarking(null);
+                          });
+                        }}
+                      >
+                        {t('verify.markEquivalent')}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn ghost"
+                        onClick={() => {
+                          setMarking(null);
+                        }}
+                      >
+                        {t('verify.cancel')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {run.equivalent_mutants.length > 0 && (
+        <>
+          <p className="sub">{t('verify.equivalentTitle', { count: run.equivalent_mutants.length })}</p>
+          <ul className="caselist">
+            {run.equivalent_mutants.slice(0, 20).map((mutant) => (
               <li key={mutant.id} className="mono sub">
                 {mutant.line === '' ? '' : `${t('verify.line')} ${mutant.line} · `}
                 {mutant.mutant}
@@ -140,8 +217,9 @@ export function VerificationScreen({ route, onNavigate }: Props): React.ReactNod
   const allPassed = functions.length > 0 && functions.every((f) => byKey.get(keyOf(f))?.status === 'passed');
   const anyFailed = runs.some((run) => run.status !== 'passed');
 
-  async function act(action: () => Promise<unknown>, noticeKey: string): Promise<void> {
-    if (accessToken === null) return;
+  /** Runs an action and reloads; resolves true only when the server accepted it. */
+  async function act(action: () => Promise<unknown>, noticeKey: string): Promise<boolean> {
+    if (accessToken === null) return false;
     setBusy(true);
     setErrorKey(null);
     setNotice(null);
@@ -149,8 +227,10 @@ export function VerificationScreen({ route, onNavigate }: Props): React.ReactNod
       await action();
       await load(accessToken);
       setNotice(noticeKey);
+      return true;
     } catch (error) {
       setErrorKey(error instanceof ApiError ? error.messageKey : 'errors.internal');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -205,7 +285,27 @@ export function VerificationScreen({ route, onNavigate }: Props): React.ReactNod
               ) : (
                 <ul className="caselist">
                   {runs.map((run) => (
-                    <RunCard key={keyOf(run)} run={run} />
+                    <RunCard
+                      key={keyOf(run)}
+                      run={run}
+                      busy={busy}
+                      onMarkEquivalent={
+                        canRun
+                          ? (mutantId, justification) =>
+                              act(
+                                () =>
+                                  api.markMutantEquivalent(
+                                    accessToken ?? '',
+                                    route.analysisId,
+                                    run,
+                                    mutantId,
+                                    justification,
+                                  ),
+                                'verify.equivalentMarked',
+                              )
+                          : undefined
+                      }
+                    />
                   ))}
                 </ul>
               )}

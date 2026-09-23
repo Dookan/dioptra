@@ -194,6 +194,9 @@ class VerificationRun(Base):
     uncovered_items: Mapped[list[str]] = mapped_column(JSON, default=list)
     #: ``[{id, line, mutant}]`` — the exact mutant the developer is shown.
     surviving_mutants: Mapped[list[dict[str, str]]] = mapped_column(JSON, default=list)
+    #: ``[{id, line, mutant}]`` — survivors excused as equivalent BEFORE this run
+    #: (``EquivalentMutant``); shown in the report beside the real survivors.
+    equivalent_mutants: Mapped[list[dict[str, str]]] = mapped_column(JSON, default=list)
     assertion_free_cases: Mapped[list[str]] = mapped_column(JSON, default=list)
     failed_cases: Mapped[list[str]] = mapped_column(JSON, default=list)
     #: Tail of the sandbox's stderr, bounded; audited output, rendered as text.
@@ -201,3 +204,44 @@ class VerificationRun(Base):
     duration_ms: Mapped[int] = mapped_column(Integer, default=0)
     created_by_username: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
+
+
+class EquivalentMutant(Base):
+    """A surviving mutant the developer judged EQUIVALENT, with a written reason (P5).
+
+    Some mutants cannot be killed by any test — ``"ascii"`` → ``"ASCII"`` is
+    the same codec, ``ensure_ascii=None`` is ``False`` — and a gate that
+    demands zero survivors would then close forever. The developer marks the
+    mutant with a justification (audit row ``verification.mutant.equivalent``)
+    and the NEXT run excludes it, recording it on the run so the report shows
+    what was excused and why. Found by the P5 walk of the platform on itself.
+    """
+
+    __tablename__ = "equivalent_mutants"
+
+    id: Mapped[uuid.UUID] = mapped_column(default=uuid.uuid4, primary_key=True)
+    analysis_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("analyses.id", ondelete="CASCADE"), index=True
+    )
+    path: Mapped[str] = mapped_column(String(1024))
+    function: Mapped[str] = mapped_column(String(200))
+    line: Mapped[int | None] = mapped_column(Integer, default=None)
+    #: The mutant id as the sandbox reported it (``text.x_slug__mutmut_14``, a Stryker id).
+    mutant_id: Mapped[str] = mapped_column(String(200))
+    #: The mutant text at the time of the mark, so the report can show it.
+    mutant: Mapped[str] = mapped_column(String(400), default="")
+    justification: Mapped[str] = mapped_column(Text)
+    created_by_username: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "analysis_id",
+            "path",
+            "function",
+            "line",
+            "mutant_id",
+            name="uq_equivalent_mutant",
+            postgresql_nulls_not_distinct=True,
+        ),
+    )

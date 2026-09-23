@@ -120,6 +120,13 @@ only_mutate = [
     "app/workflow/test_plan.py",
     "app/workflow/verify.py",
     "app/sandbox/results.py",
+    # P5 close: correlation, VEX and the audit read (CLAUDE.md → Tests).
+    "app/inventory/correlation.py",
+    "app/inventory/versions.py",
+    "app/inventory/importers.py",
+    "app/inventory/documents.py",
+    "app/inventory/sync.py",
+    "app/audit/router.py",
 ]
 pytest_add_cli_args_test_selection = [
     "tests/test_gates.py",
@@ -130,4 +137,10 @@ pytest_add_cli_args_test_selection = [
     "tests/test_verify.py",
     "tests/test_sandbox.py",
     "tests/test_tests_api.py",
+    "tests/test_inventory_versions.py",
+    "tests/test_inventory_import.py",
+    "tests/test_inventory_api.py",
+    "tests/test_inventory_documents.py",
+    "tests/test_inventory_hardening.py",
+    "tests/test_audit_api.py",
 ]

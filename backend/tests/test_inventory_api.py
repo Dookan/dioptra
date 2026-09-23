@@ -687,3 +687,79 @@ def test_the_scheduled_job_skips_a_fresh_mirror_and_records_a_disabled_sync(
     sync.run_sync_job("mmarin")
     runs = list(db.scalars(select(VulnDbSync).order_by(VulnDbSync.started_at)))
     assert runs[-1].status is SyncStatus.SKIPPED
+
+
+def test_verdicts_match_case_insensitively_and_through_references(
+    db: Session, tmp_path: Path
+) -> None:
+    """The finding may spell the package or the alias differently from the SBOM."""
+    _mirror(db, tmp_path, [osv_record(LODASH_GHSA, aliases=["cve-2020-8203"])])
+    analysis = seed_done_analysis(
+        db,
+        [
+            # Package spelled with capitals, advisory id unknown, but a reference URL ends
+            # with the CVE: the verdict must still reach the lodash match.
+            make_finding(
+                0,
+                category=ToolCategory.SCA,
+                tools=["osv-scanner"],
+                rule_id="advisory",
+                cwe=1395,
+                advisory={"id": "", "package": "Lodash", "version": "4.17.15", "fixed": None},
+                references=["https://nvd.nist.gov/vuln/detail/CVE-2020-8203"],
+                verdict=Verdict.CONFIRMED,
+                verdict_justification="Aplica: la ruta vulnerable se usa en producción",
+                verdict_by_username="mmarin",
+            ),
+            # A non-SCA finding that happens to carry the same id must never feed the VEX.
+            make_finding(
+                1,
+                rule_id=LODASH_GHSA,
+                verdict=Verdict.FALSE_POSITIVE,
+                verdict_justification="x" * 12,
+            ),
+        ],
+    )
+    attach_sbom(
+        db,
+        analysis,
+        [
+            component("lodash", "4.17.15", "pkg:npm/lodash@4.17.15"),
+            component("express", "4.19.2", "pkg:npm/express@4.19.2"),
+        ],
+    )
+    inventory = service.inventory_of(db, analysis)
+    assert [m.component.name for m in inventory.matches] == ["lodash"]
+    assert inventory.matches[0].vex_state == VEX_EXPLOITABLE
+    assert inventory.matches[0].justification == "Aplica: la ruta vulnerable se usa en producción"
+
+
+def test_every_component_is_correlated_not_only_the_first(db: Session, tmp_path: Path) -> None:
+    """Loops over components and candidates must not stop after one element."""
+    _mirror(
+        db,
+        tmp_path,
+        [
+            osv_record(LODASH_GHSA),
+            osv_record("GHSA-lodash-2", fixed="4.17.21", aliases=["CVE-2021-23337"]),
+            osv_record("GHSA-express-1", name="express", fixed="4.20.0", aliases=["CVE-2024-1"]),
+        ],
+    )
+    analysis = seed_done_analysis(db, [])
+    attach_sbom(
+        db,
+        analysis,
+        [
+            component("weird", "latest", "pkg:npm/lodash@latest"),
+            component("lodash", "4.17.15", "pkg:npm/lodash@4.17.15"),
+            component("express", "4.19.2", "pkg:npm/express@4.19.2"),
+        ],
+    )
+    inventory = service.inventory_of(db, analysis)
+    found = sorted((m.component.name, m.vulnerability_id) for m in inventory.matches)
+    assert found == [
+        ("express", "GHSA-express-1"),
+        ("lodash", "GHSA-lodash-2"),
+        ("lodash", LODASH_GHSA),
+    ]
+    assert [c.name for c in inventory.uncomparable] == ["weird"]

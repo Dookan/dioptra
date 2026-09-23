@@ -24,9 +24,13 @@ Project lead: **Moises Marin** (`mmarin`).
 
 ## Status
 
-Phase 0 (foundations) is done (2026-08-18): authentication, roles, audit
-trail, themes, i18n and the CI gates. Phase 1 (audit MVP) is in progress since
-2026-09-21: project registration (E1), ZIP / git ingest into a per-analysis
+Phases 0–5 are built (2026-09-22): authentication, roles, audit trail,
+themes, i18n and the CI gates (P0); the audit pipeline and the institutional
+report (P1); findings triage and the versioned report editor (P2); the
+workflow E1–E5 with deterministic briefs (P3); scaffolds, the sandbox and the
+mutation re-audit (P4); the software inventory with the local OSV + NVD
+mirror, the audit-log screen, the report's closing sections and annexes, the
+self-audit and the hardening of the last day (P5). Phase 1 in detail: project registration (E1), ZIP / git ingest into a per-analysis
 jail (E2), the analysis pipeline in ephemeral containers (Semgrep with our own
 rules, Gitleaks, OSV-Scanner offline, Syft SBOM, Lizard, cloc), SARIF
 normalization with CWE → OWASP and CVSS 3.1, and the institutional report as
@@ -41,12 +45,15 @@ the plan's own contingency: v1.0.0 ships JS/TS + Python.
 
 ```bash
 cp .env.example .env
-# fill DIOPTRA_JWT_SECRET (32+ chars) and POSTGRES_PASSWORD:  openssl rand -base64 48
+# fill DIOPTRA_JWT_SECRET (32+ chars), POSTGRES_PASSWORD and DIOPTRA_APP_DB_PASSWORD:  openssl rand -base64 48
+# (Compose interpolates them at load time, so even `docker compose build` wants the .env)
 docker compose -f docker/docker-compose.yml up --build
 ```
 
 The UI is on <http://localhost:8080>. The API runs behind the same origin at
-`/api/v1`; migrations run automatically before the server accepts requests.
+`/api/v1`; the one-shot `migrate` service applies the migrations as the schema
+owner before the API starts, and the API and the worker connect as the
+restricted `dioptra_app` role.
 
 ### Seed accounts (development only)
 
@@ -65,6 +72,18 @@ docker compose -f docker/docker-compose.yml exec api python -m app.seed
 | `cperez` | developer | test plan, case design, writes the tests |
 
 Usernames are initial + lastname, lowercase, no dots.
+
+### Development in one command
+
+```bash
+scripts/dev.sh          # API with hot reload on :8000, Vite on http://localhost:5173
+scripts/dev.sh seed     # also creates the three seed accounts
+```
+
+It uses (or starts) the `dioptra-dev-pg` PostgreSQL container on 127.0.0.1:55432,
+runs the queue inline, keeps the vulnerability sync off and prints the seed
+accounts at the end. `scripts/self_audit.py` runs the committed tree through
+the platform's own pipeline (the plan's last-day self-audit).
 
 ### Analysis tools (phase 1)
 

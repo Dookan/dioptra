@@ -168,15 +168,31 @@ and each one is shown to the developer BY NAME, never as a score:
    was fully taken — a half-taken branch covers neither side.
 4. **Mutation.** Stryker (JS/TS) / mutmut (Python) over the module under test.
    A surviving mutant rejects the gate, and the developer is shown the exact
-   mutant with its line.
+   mutant with its diff. **Equivalent mutants** (P5, found by the walk of the
+   platform on itself): some mutants no test can kill — `"ascii"` → `"ASCII"`
+   is the same codec, `ensure_ascii=None` is `False` — and a zero-tolerance
+   gate would then close forever. The developer may excuse ONE survivor of the
+   function's latest run with a written reason (`POST …/mutants/equivalent`,
+   developer only, audit row `verification.mutant.equivalent`, the same
+   ten-character floor as every verdict); it takes effect on the NEXT run —
+   the run rows stay immutable and the gate a row predicate, so the
+   developer re-runs to prove it — and the run records what was excused so
+   the report shows it beside the real survivors. An excusal names the mutant
+   by id AND by its text at the time of the mark: ids are index-based, so a
+   tool bump that renumbers them makes the excused mutant a real survivor
+   again rather than silently excusing a different one. The judgement is a
+   person's and it is on the record, exactly like a triage verdict.
 
 The loop back to E5 is an explicit action, `POST …/reopen-design` (developer,
 written reason, audited) — **not** a backwards stage move: the machine stays
 monotonic. It clears the approval of the functions whose latest run failed and
 sets `CaseDesign.reopened_at`, which is what lets E5's and E6's writers accept
-those functions again while the analysis sits at E7. Approving again clears
-the flag; until every planned function has a PASSED latest run, the gate stays
-closed.
+those functions again while the analysis sits at E7 — the cases, their
+approval AND the test file, in that order. The flag is cleared by the next
+PASSED run of that function (not by the approval: the developer still has to
+rewrite the tests after re-approving — a defect the P5 walk on the platform
+itself found and fixed, 2026-09-22); until every planned function has a
+PASSED latest run, the gate stays closed.
 
 The run itself happens in the WORKER, never in a request: it starts
 containers, and only the worker holds the Docker socket. The handler enqueues

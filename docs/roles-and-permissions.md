@@ -15,7 +15,7 @@ Usernames are initial + lastname, lowercase, no dots: `mmarin`, `cperez`,
 | Build test plan, choose coverage criterion (E4) | view | view | ✓ |
 | Design cases: diagram text, cases, approval (E5) | view | view | ✓ |
 | Write tests (E6): store the test file | view | view | ✓ |
-| Run verification, see mutants (E7) | view | view | ✓ (runs it, and reopens the design of what failed) |
+| Run verification, see mutants (E7) | view | view | ✓ (runs it, reopens the design of what failed, and excuses a surviving mutant as equivalent with a written reason) |
 | Edit report sections (E8) | — | ✓ | — |
 | Sign/lock a report version | — | ✓ | — |
 | Export report (PDF/DOCX/Markdown) | ✓ | ✓ | ✓ (may download; "view" never meant a screen-only copy — the developer needs the findings to plan tests) |

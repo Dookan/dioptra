@@ -81,6 +81,7 @@ const FAILED_RUN = {
   coverage: { statement_percent: 80, branch_percent: 50 },
   uncovered_items: ['R2', 'F1'],
   surviving_mutants: [{ id: '3', line: '11', mutant: `ConditionalExpression: ${HOSTILE}` }],
+  equivalent_mutants: [],
   assertion_free_cases: ['C3'],
   failed_cases: [],
   detail: null,
@@ -162,11 +163,72 @@ describe('verification screen', () => {
     expect(JSON.parse(String(posted?.[1]?.body)).justification).toContain('mutante');
   });
 
+  it('lets the developer excuse a surviving mutant behind a written reason', async () => {
+    const EQUIVALENT_URL = `/api/v1/analyses/${ANALYSIS_ID}/mutants/equivalent`;
+    const calls = renderVerify('developer', {
+      [EQUIVALENT_URL]: { status: 200, body: [{ ...FAILED_RUN, surviving_mutants: [], equivalent_mutants: FAILED_RUN.surviving_mutants }] },
+    });
+    const user = await signIn('cperez');
+    await user.click(await screen.findByRole('button', { name: es.verify.markEquivalent }));
+    const confirm = screen.getAllByRole('button', { name: es.verify.markEquivalent })[0] as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+    await user.type(
+      screen.getByLabelText(es.verify.equivalentReasonLabel),
+      'Cambia el codec a mayúsculas: Python lo acepta igual.',
+    );
+    await user.click(screen.getAllByRole('button', { name: es.verify.markEquivalent })[0] as HTMLElement);
+    await waitFor(() => {
+      expect(screen.getByText(es.verify.equivalentMarked)).toBeTruthy();
+    });
+    const posted = (calls.mock.calls as unknown as [RequestInfo | URL, RequestInit | undefined][]).find(
+      ([url, init]) => String(url) === EQUIVALENT_URL && init?.method === 'POST',
+    );
+    const body = JSON.parse(String(posted?.[1]?.body)) as { mutant_id: string; justification: string; function: string };
+    expect(body.mutant_id).toBe('3');
+    expect(body.function).toBe('validateForm');
+    expect(body.justification).toContain('codec');
+  });
+
+  it('keeps the reason on screen when the server refuses the excusal', async () => {
+    const EQUIVALENT_URL = `/api/v1/analyses/${ANALYSIS_ID}/mutants/equivalent`;
+    renderVerify('developer', {
+      [EQUIVALENT_URL]: {
+        status: 422,
+        body: { code: 'justification_required', message_key: 'errors.workflow.justificationRequired' },
+      },
+    });
+    const user = await signIn('cperez');
+    await user.click(await screen.findByRole('button', { name: es.verify.markEquivalent }));
+    await user.type(
+      screen.getByLabelText(es.verify.equivalentReasonLabel),
+      'Cambia el codec a mayúsculas: Python lo acepta igual.',
+    );
+    await user.click(screen.getAllByRole('button', { name: es.verify.markEquivalent })[0] as HTMLElement);
+    expect(await screen.findByRole('alert')).toBeTruthy();
+    expect(
+      (screen.getByLabelText(es.verify.equivalentReasonLabel) as HTMLTextAreaElement).value,
+    ).toContain('codec');
+    expect(screen.queryByText(es.verify.equivalentMarked)).toBeNull();
+  });
+
+  it('lists the mutants already excused, with their line', async () => {
+    renderVerify('developer', {
+      [VERIFICATION_URL]: {
+        status: 200,
+        body: [{ ...FAILED_RUN, equivalent_mutants: [{ id: '9', line: '12', mutant: 'BooleanLiteral: true' }] }],
+      },
+    });
+    await signIn('cperez');
+    expect(await screen.findByText(es.verify.equivalentTitle.replace('{{count}}', '1'))).toBeTruthy();
+    expect(screen.getByText('línea 12 · BooleanLiteral: true')).toBeTruthy();
+  });
+
   it('gives the analyst the result without the buttons', async () => {
     renderVerify('analyst');
     await signIn('mmarin');
     expect(await screen.findByText(es.verify.readOnly)).toBeTruthy();
     expect(screen.queryByRole('button', { name: es.verify.run })).toBeNull();
     expect(screen.queryByRole('button', { name: es.verify.reopen })).toBeNull();
+    expect(screen.queryByRole('button', { name: es.verify.markEquivalent })).toBeNull();
   });
 });

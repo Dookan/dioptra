@@ -1,7 +1,8 @@
 # Standards mapping
 
-> **Status: IN_PROGRESS — P0 controls implemented 2026-08-17; the rest grow
-> with their phase.**
+> **Status: COMPLETE for v1.0.0 (2026-09-22) — the control table below grew
+> with each phase; the chapter-by-chapter ASVS L2 checklist at the end is the
+> plan's day-20 deliverable.**
 > Format: OWASP ASVS 4.0.3 control → requirement → implementation pointer.
 > The platform targets ASVS **L2** for itself.
 
@@ -22,8 +23,35 @@
 | V1.14 Configuration architecture | Untrusted code executes only inside a hardened, isolated sandbox | one ephemeral container per verification attempt: `--network none --read-only --cap-drop ALL --security-opt no-new-privileges`, non-root, memory = memory-swap, `--cpus`, `--pids-limit`, a 120 s timeout that kills the NAMED container, exactly one writable mount (the per-attempt directory), no Docker socket, nothing of the audited project installed, and only three declared result files read back capped and parsed as data — `backend/app/sandbox/`, `docker/sandbox.Dockerfile`; nine escape probes run with the shipped argv and all negative (`docs/threat-model.md` → Sandbox escape tests) — IMPLEMENTED (P4) |
 | V14.4 HTTP security headers | Hardening headers on every response | `SECURITY_HEADERS` middleware + `docker/nginx.conf` — IMPLEMENTED (P0) |
 
-The plan's last day (2026-09-18) completes this table into the full ASVS L2
-checklist, alongside the platform's self-audit through its own pipeline.
+## ASVS 4.0.3 Level 2 checklist (P5 day 20)
+
+One row per chapter, for the PLATFORM itself. Status: **implemented** (a
+control above or a named module enforces it, with tests), **partial** (some
+requirements of the chapter apply and are met, others are out of scope for
+an on-premise, admin-provisioned tool and are named), **n/a** (the chapter
+does not apply to this system, with the reason). Nothing here is claimed
+without a pointer.
+
+| Chapter | Status | Where, and what is left |
+|---|---|---|
+| V1 Architecture, design and threat modeling | implemented | `docs/architecture.md`, `docs/threat-model.md` (STRIDE per surface, residuals with revisit triggers), the plan-first survey gate for every sensitive slice (`tasks/phase*-survey.md`), `docs/analysis-pipeline.md` for the trust boundaries around audited code |
+| V2 Authentication | implemented | Argon2id with rehash, lockout with capped backoff, admin-only provisioning, forced password change on first login — `backend/app/auth/{passwords,service}.py`, `tests/test_auth_*.py`, `tests/test_passwords.py`. Left: no MFA (V2.8) — on-premise, LAN-only, three known users; revisit if exposed beyond the factory LAN (threat model residual) |
+| V3 Session management | implemented | 15-min JWT, rotating refresh with family revocation on reuse, logout and password change revoke everything, HttpOnly/Secure/SameSite refresh cookie, `password_changed_at` cutoff — `backend/app/auth/{tokens,service,deps,router}.py`, `tests/test_auth_sessions.py`, `tests/test_token_cutoff.py` |
+| V4 Access control | implemented | deny by default per endpoint (`require_roles`), stale-role tokens refused, every stage transition checks the role then the gate on the server, inventory and audit-log scoping — `backend/app/auth/deps.py`, `backend/app/workflow/stages.py`, `backend/app/inventory/router.py`, `backend/app/audit/router.py`, `tests/test_authz.py`, `tests/test_gates.py` |
+| V5 Validation, sanitization and encoding | implemented | pydantic models with caps on every body, hostile input escaped at every render (Jinja2 autoescape, Markdown escaping, React text nodes, DOCX text runs, neutralised CSV), control characters stripped from stored text, the scaffold escapes at its boundary — `backend/app/reports/engine.py`, `backend/app/workflow/scaffold/text.py`, `backend/app/inventory/documents.py`, `frontend/src/screens/*` |
+| V6 Stored cryptography | implemented | Argon2id for passwords, HS256 JWT with a ≥32-char operator secret the process refuses to boot without, no other secret at rest — `backend/app/core/config.py`, `backend/app/auth/tokens.py`. Left: key rotation is an operator procedure (rotate `DIOPTRA_JWT_SECRET`, every session ends), not automated |
+| V7 Error handling and logging | implemented | `{code, message_key}` on every error, no stack trace or driver message to a client, append-only audit log enforced by triggers AND an owner/runtime role split so the connecting role cannot drop them, every sensitive action with actor and justification, the trail readable per role — `backend/app/core/errors.py`, `backend/app/main.py`, `backend/app/audit/`, `docker/initdb/01-runtime-role.sql`, CI `migrations` job |
+| V8 Data protection | partial | No secrets in logs (`--redact` on Gitleaks, no token in any log line), report versions immutable once signed, the audited code held in a per-analysis jail removed with the analysis. Left: encryption at rest of the PostgreSQL volume is the operator's (disk-level), and there is no data-retention schedule for old analyses — an archive endpoint is 1.x work |
+| V9 Communication | partial | HTTPS is terminated in front of nginx by the operator (the refresh cookie refuses to boot insecure in prod); the mirror sync is HTTPS-only with certificate verification and no redirects; every analysis and sandbox container runs with `--network none`. Left: TLS termination itself is outside the Compose stack (`docker/nginx.conf` speaks plain HTTP to the operator's proxy) |
+| V10 Malicious code | implemented | no external code at runtime (CSP `default-src 'self'`, `scripts/no_cdn_check.py`), pinned lockfiles, the free-licence gate, Gitleaks on ourselves, the audited code executed only in the E7 sandbox with every escape probe negative and attributable — `docs/threat-model.md` → Sandbox escape tests |
+| V11 Business logic | implemented | the E1–E8 gates are server-side and monotonic, every transition needs a written reason, the E7 → E5 loop never moves the stage backwards, a signed report freezes its finding set — `backend/app/workflow/{stages,gates,verify}.py`, `backend/app/reports/versions.py`, `tests/test_gates.py` |
+| V12 Files and resources | implemented | ZIP ingest with size, entry, ratio and zip-slip guards and a jail; the vulnerability dump spooled by the API under a byte cap and parsed only by the worker with entry-name-free reading; sandbox result files read back capped and parsed as data; downloads with sanitised names — `backend/app/ingest/archive.py`, `backend/app/inventory/{sync,importers}.py`, `backend/app/sandbox/results.py` |
+| V13 API and web services | implemented | JSON-only API under `/api/v1`, bearer tokens, validation errors that never echo the body, CORS off in prod (same origin), security headers on every response, `/api/docs` disabled in prod — `backend/app/main.py`, `docker/nginx.conf` |
+| V14 Configuration | implemented | every setting from the environment with the `DIOPTRA_` prefix, secrets never defaulted, non-root containers with read-only roots and `no-new-privileges`, only the worker holds the Docker socket, dependency currency and vulnerability jobs in CI, the licence gate also run inside the sandbox image — `backend/app/core/config.py`, `docker/docker-compose.yml`, `scripts/ci.sh` |
+
+**Self-audit** (plan, day 20): the platform's own repository is run through
+its own pipeline; the result and the justification of every high finding are
+recorded in `tasks/phase5-closure.md` → Definition of Done.
 
 Standards applied to AUDITED systems (the product's output, not this table):
 OWASP Top 10:2021 + API Top 10, CWE, CVSS 3.1, ISO/IEC 25010, ISO/IEC/IEEE

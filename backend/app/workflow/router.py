@@ -29,6 +29,7 @@ from app.projects.schemas import (
     DesignStateOut,
     DiagramOut,
     DiagramTextIn,
+    EquivalentMutantIn,
     FindingOut,
     JustificationIn,
     PlannedFunctionIn,
@@ -298,6 +299,34 @@ def post_reopen_design(
         db,
         analysis=analysis,
         actor=user,
+        justification=payload.justification,
+        source_ip=client_ip(request),
+    )
+    latest = verify.latest_runs(analysis)
+    return [VerificationRunOut.model_validate(run) for run in latest.values()]
+
+
+@workflow_router.post("/mutants/equivalent", response_model=list[VerificationRunOut])
+def post_equivalent_mutant(
+    analysis_id: uuid.UUID,
+    payload: EquivalentMutantIn,
+    request: Request,
+    user: DeveloperUser,
+    db: DbSession,
+) -> list[VerificationRunOut]:
+    """Stage E7 (developer only): excuse a surviving mutant as equivalent, with a reason.
+
+    Takes effect on the next run — the developer re-runs to prove the
+    verdict, and the run row records what was excused.
+    """
+    analysis = service.get_analysis(db, analysis_id)
+    ref = design.FunctionRef(path=payload.path, function=payload.function, line=payload.line)
+    verify.mark_equivalent(
+        db,
+        analysis=analysis,
+        actor=user,
+        ref=ref,
+        mutant_id=payload.mutant_id,
         justification=payload.justification,
         source_ip=client_ip(request),
     )

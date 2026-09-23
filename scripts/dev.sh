@@ -15,7 +15,7 @@ cd "$(dirname "$0")/.."
 
 PG_CONTAINER="${DIOPTRA_DEV_PG:-dioptra-dev-pg}"
 PG_PORT="${DIOPTRA_DEV_PG_PORT:-55432}"
-DATA="${DIOPTRA_DEV_DATA:-/tmp/dioptra-dev}"
+DATA="${DIOPTRA_DEV_DATA:-$HOME/.cache/dioptra-dev}"
 
 if [ ! -f .env ]; then
   echo "no .env: cp .env.example .env and fill DIOPTRA_JWT_SECRET (32+ chars)" >&2

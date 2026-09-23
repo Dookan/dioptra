@@ -28,6 +28,10 @@
 - **Gate**: server-side precondition between stages. See docs/workflow-gates.md.
 - **Mutation testing**: deliberately breaking the code to check the tests
   fail; a surviving mutant means the test does not prove what it claims.
+- **Equivalent mutant**: a mutant no test can kill because the mutated code
+  behaves identically. The developer excuses it with a written, audited
+  reason and the next verification run stops counting it
+  (`backend/app/workflow/verify.py::mark_equivalent`).
 - **No-CDN norm**: factory rule — dependencies are served locally, both in
   this platform and in audited systems (violation → CWE-829 / A08 finding).
 - **Risk matrix**: E4 prioritization = complexity × findings × criticality; in P3 `ccn × (1 + findings in the file) × weight of the worst finding` (`backend/app/workflow/risk.py`).

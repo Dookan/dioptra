@@ -134,3 +134,12 @@ table.distribution .fill.medium { background: #96660A; }
 .fill.w90 { width: 90%; }
 .fill.w95 { width: 95%; }
 .fill.w100 { width: 100%; }
+
+/* Sections 7–10 (P5): wider tables for the debt and inventory rows, the annex
+   diagrams scaled to the text block. The SVG is produced server-side from the
+   AST layout with presentation attributes only. */
+table.debt, table.inventory { width: 17.5cm; font-size: 10pt; }
+table.debt th, table.debt td, table.inventory th, table.inventory td { font-size: 10pt; padding: 0.1cm; }
+td.count { text-align: center; }
+.diagram { margin: 0 0 0.3cm; page-break-inside: avoid; }
+.diagram svg { max-width: 17.5cm; height: auto; display: block; }

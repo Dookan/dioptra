@@ -81,6 +81,14 @@ class TestPlanNotFound(WorkflowError):
     message_key = "errors.workflow.testPlanNotFound"
 
 
+class MutantUnknown(WorkflowError):
+    """The mutant is not among the survivors of the function's latest run."""
+
+    status_code = 404
+    code = "mutant_unknown"
+    message_key = "errors.workflow.mutantUnknown"
+
+
 class TestPlanEmpty(WorkflowError):
     code = "test_plan_empty"
     message_key = "errors.workflow.testPlanEmpty"

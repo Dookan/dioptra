@@ -59,6 +59,7 @@ const KNOWN_ACTIONS = new Set([
   'tests.save',
   'verification.run',
   'verification.reopen',
+  'verification.mutant.equivalent',
   'vulndb.sync.request',
   'vulndb.import.request',
   'vulndb.sync',

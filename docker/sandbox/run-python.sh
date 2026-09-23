@@ -61,12 +61,41 @@ try:
     ).stdout
 except Exception:
     listing = ""
+import time
+
+# `mutmut show` costs ~2 s per survivor and the whole attempt has a 120 s
+# budget: a weak first suite on a 40-mutant module would otherwise time out
+# and show NOTHING. So the diff travels for the first survivors only, within
+# a wall-clock budget; the rest keep their id, which is all an equivalent
+# mark needs (precommit panel, P5 day 20).
+SHOW_LIMIT = 15
+SHOW_BUDGET_SECONDS = 30.0
+show_started = time.monotonic()
+shown_count = 0
 for line in listing.splitlines():
     match = re.match(r"^(?P<name>\S+?):\s*(?P<verdict>[a-z_ ]+)$", line.strip())
     if match is None or match.group("verdict").strip() == "killed":
         continue
+    name = match.group("name")[:200]
+    # The developer has to JUDGE a survivor (kill it, or excuse it as
+    # equivalent with a reason), so the mutant's own diff travels with its
+    # id — bounded, and parsed as data upstream. `mutmut show` is best effort.
+    diff = ""
+    try:
+        if shown_count >= SHOW_LIMIT or time.monotonic() - show_started > SHOW_BUDGET_SECONDS:
+            raise TimeoutError("show budget spent")
+        shown_count += 1
+        shown = subprocess.run(
+            ["mutmut", "show", name], capture_output=True, text=True, timeout=30, check=False
+        ).stdout
+        changed = [
+            l for l in shown.splitlines() if l[:1] in "+-" and not l.startswith(("+++", "---"))
+        ]
+        diff = " ".join(" ".join(l.split()) for l in changed)
+    except Exception:
+        diff = ""
     survived.append(
-        {"id": match.group("name")[:200], "line": "", "mutant": line.strip()[:400]}
+        {"id": name, "line": "", "mutant": (diff or line.strip())[:400]}
     )
 
 # Best effort only: mutmut prints its totals on a progress line. The gate uses

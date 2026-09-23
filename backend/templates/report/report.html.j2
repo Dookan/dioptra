@@ -177,5 +177,180 @@
 </table>
 {% endif %}
 
+
+{# ---- Sections 7–10 (P5): composed from the workflow's own rows ------------ #}
+<h2 class="break">MÉTRICAS DE CÓDIGO</h2>
+<p>{{ strings.metrics.intro }}</p>
+{% if metrics.functions_measured %}
+<p>{{ strings.metrics.summary.format(functions=metrics.functions_measured, complex=metrics.complex_functions, commented=metrics.commented_files) }}</p>
+<h4>{{ strings.metrics.top_title }}</h4>
+<table class="four">
+  <colgroup><col class="a"><col class="b"><col class="c"><col class="d"></colgroup>
+  <thead><tr><th>{{ strings.metrics.labels.ccn }}</th><th>{{ strings.metrics.labels.nloc }}</th><th>{{ strings.metrics.labels.function }}</th><th>{{ strings.metrics.labels.path }}</th></tr></thead>
+  <tbody>
+  {% for f in metrics.top %}
+    <tr><td class="count">{{ f.ccn }}</td><td class="count">{{ f.nloc }}</td><td>{{ f.function }}</td><td class="route">{{ f.path }}{% if f.line %}:{{ f.line }}{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if metrics.languages %}
+<h4>{{ strings.metrics.languages_title }}</h4>
+<table class="four">
+  <thead><tr><th>{{ strings.metrics.labels.language }}</th><th>{{ strings.metrics.labels.files }}</th><th>{{ strings.metrics.labels.code }}</th><th>{{ strings.metrics.labels.comment }}</th></tr></thead>
+  <tbody>
+  {% for row in metrics.languages %}
+    <tr><td>{{ row.language }}</td><td class="count">{{ row.files }}</td><td class="count">{{ row.code }}</td><td class="count">{{ row.comment }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+<p>{{ strings.metrics.duplication }}</p>
+{% else %}
+<p>{{ strings.metrics.none }}</p>
+{% endif %}
+
+<h2>DEUDA DE PRUEBAS</h2>
+<p>{{ strings.test_debt.intro }}</p>
+<p>{{ strings.test_debt.stage_note.format(stage=stage_label) }}</p>
+{% if test_debt.plan %}
+<p>{{ strings.test_debt.plan_line.format(functions=test_debt.totals.functions, criterion=test_debt.plan.criterion_label, author=test_debt.plan.created_by) }}</p>
+<h4>{{ strings.test_debt.rationale_title }}</h4>
+<p>{{ test_debt.plan.rationale }}</p>
+<p>{{ strings.test_debt.totals.format(approved=test_debt.totals.approved, functions=test_debt.totals.functions, written=test_debt.totals.written, passed=test_debt.totals.passed, statements=(test_debt.totals.statement_percent ~ ' %' if test_debt.totals.statement_percent is not none else 'N/A'), branches=(test_debt.totals.branch_percent ~ ' %' if test_debt.totals.branch_percent is not none else 'N/A'), survivors=test_debt.totals.survivors, equivalent=test_debt.totals.equivalent) }}</p>
+<h4>{{ strings.test_debt.table_title }}</h4>
+<table class="debt">
+  <thead><tr><th>{{ strings.test_debt.labels.function }}</th><th>{{ strings.test_debt.labels.cases }}</th><th>{{ strings.test_debt.labels.written }}</th><th>{{ strings.test_debt.labels.statements }}</th><th>{{ strings.test_debt.labels.branches }}</th><th>{{ strings.test_debt.labels.status }}</th><th>{{ strings.test_debt.labels.survivors }}</th></tr></thead>
+  <tbody>
+  {% for f in test_debt.functions %}
+    <tr><td><span class="route">{{ f.path }}</span> · {{ f.function }}</td><td class="count">{{ f.cases }}</td><td class="count">{{ strings.test_debt.labels.yes if f.written else strings.test_debt.labels.no }}</td><td class="count">{{ (f.statement_percent ~ ' %') if f.statement_percent is not none else 'N/A' }}</td><td class="count">{{ (f.branch_percent ~ ' %') if f.branch_percent is not none else 'N/A' }}</td><td>{{ f.status_label }}{% if f.uncovered %} ({{ strings.test_debt.labels.uncovered }}: {{ f.uncovered | join(', ') }}){% endif %}</td><td class="count">{{ f.survivors }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>{{ strings.test_debt.no_plan }}</p>
+{% endif %}
+
+<h2>INVENTARIO DE SOFTWARE</h2>
+<p>{{ strings.inventory.intro }}</p>
+{% if inventory %}
+<p>{{ strings.inventory.summary.format(components=inventory.components, licenses=(inventory.licenses | map(attribute='name') | join(', ') or 'N/A'), unlicensed=inventory.unlicensed) }}</p>
+{% if inventory.correlated %}
+<p>{{ strings.inventory.vulndb_line.format(date=inventory.vulndb_last_update) if inventory.vulndb_last_update else strings.inventory.vulndb_none }}</p>
+<h4>{{ strings.inventory.open_title }}</h4>
+{% if inventory.open %}
+<table class="inventory">
+  <thead><tr><th>{{ strings.inventory.labels.component }}</th><th>{{ strings.inventory.labels.version }}</th><th>{{ strings.inventory.labels.cve }}</th><th>{{ strings.inventory.labels.severity }}</th><th>{{ strings.inventory.labels.fixed_in }}</th><th>{{ strings.inventory.labels.vex }}</th></tr></thead>
+  <tbody>
+  {% for row in inventory.open %}
+    <tr><td>{{ row.component }}</td><td class="route">{{ row.version }}</td><td>{{ row.cve }}</td><td>{{ row.severity_label }}{% if row.score is not none %} ({{ row.score }}){% endif %}</td><td class="route">{{ row.fixed_in }}</td><td>{{ row.vex_label }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>{{ strings.inventory.open_none }}</p>
+{% endif %}
+{% if inventory.not_affected %}
+<h4>{{ strings.inventory.not_affected_title }}</h4>
+<table class="inventory">
+  <thead><tr><th>{{ strings.inventory.labels.component }}</th><th>{{ strings.inventory.labels.cve }}</th><th>{{ strings.inventory.labels.justification }}</th></tr></thead>
+  <tbody>
+  {% for row in inventory.not_affected %}
+    <tr><td>{{ row.component }} {{ row.version }}</td><td>{{ row.cve }}</td><td>{{ row.justification }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% if inventory.outdated %}
+<h4>{{ strings.inventory.outdated_title }}</h4>
+<p>{{ strings.inventory.outdated_note }}</p>
+<table class="inventory">
+  <thead><tr><th>{{ strings.inventory.labels.component }}</th><th>{{ strings.inventory.labels.version }}</th><th>{{ strings.inventory.labels.newer }}</th></tr></thead>
+  <tbody>
+  {% for row in inventory.outdated %}
+    <tr><td>{{ row.component }}</td><td class="route">{{ row.version }}</td><td class="route">{{ row.newer }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+<h4>{{ strings.inventory.crypto_title }}</h4>
+{% if inventory.crypto %}
+<table class="inventory">
+  <thead><tr><th>{{ strings.inventory.labels.algorithm }}</th><th>{{ strings.inventory.labels.primitive }}</th><th>{{ strings.inventory.labels.location }}</th></tr></thead>
+  <tbody>
+  {% for row in inventory.crypto %}
+    <tr><td>{{ row.algorithm }}{% if row.weak %} — {{ strings.inventory.weak }}{% endif %}</td><td>{{ row.primitive }}</td><td class="route">{{ row.location }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>{{ strings.inventory.crypto_none }}</p>
+{% endif %}
+{% else %}
+<p>{{ strings.inventory.not_correlated }}</p>
+{% endif %}
+{% else %}
+<p>{{ strings.inventory.no_sbom }}</p>
+{% endif %}
+
+<h2 class="break">ANEXOS</h2>
+<h3>{{ strings.headings.annex_asvs }}</h3>
+<p>{{ strings.annexes.asvs_intro }}</p>
+<table class="four">
+  <thead><tr><th>{{ strings.annexes.asvs_labels.chapter }}</th><th>{{ strings.annexes.asvs_labels.title }}</th><th>{{ strings.annexes.asvs_labels.findings }}</th></tr></thead>
+  <tbody>
+  {% for row in annexes.asvs %}
+    <tr><td>{{ row.chapter }}</td><td>{{ row.title }}</td><td class="count">{{ row.findings }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h3>{{ strings.headings.annex_diagrams }}</h3>
+<p>{{ strings.annexes.diagrams_intro }}</p>
+{% for d in annexes.diagrams %}
+<h4><span class="route">{{ d.path }}</span> · {{ d.function }}</h4>
+{% if d.svg %}
+<div class="diagram">{{ d.svg }}</div>
+{{ d.mermaid | pre }}
+{% else %}
+<p>{{ strings.annexes.diagram_unavailable }}</p>
+{% endif %}
+{% else %}
+<p>{{ strings.annexes.cases_none }}</p>
+{% endfor %}
+
+<h3>{{ strings.headings.annex_cases }}</h3>
+<p>{{ strings.annexes.cases_intro }}</p>
+{% for group in annexes.cases %}
+<h4><span class="route">{{ group.path }}</span> · {{ group.function }} ({{ strings.annexes.approved if group.approved else strings.annexes.not_approved }})</h4>
+<ul>
+{% for case in group.cases %}
+  <li><b>{{ case.id }}</b> — {{ case.title }}{% if case.covers %} [{{ case.covers | join(', ') }}]{% endif %}</li>
+{% endfor %}
+</ul>
+{% else %}
+<p>{{ strings.annexes.cases_none }}</p>
+{% endfor %}
+
+<h3>{{ strings.headings.annex_tests }}</h3>
+<p>{{ strings.annexes.tests_intro }}</p>
+{% for t in annexes.tests %}
+<h4><span class="route">{{ t.filename }}</span></h4>
+{{ t.content | pre }}
+{% if t.truncated %}<p>{{ strings.annexes.truncated }}</p>{% endif %}
+{% else %}
+<p>{{ strings.annexes.tests_none }}</p>
+{% endfor %}
+
+<h3>{{ strings.headings.annex_bom }}</h3>
+<p>{{ strings.annexes.bom_intro }}</p>
+{% if annexes.sbom %}
+<p>{{ strings.annexes.bom_line.format(components=annexes.sbom.components, generator=annexes.sbom.generator, spec=annexes.sbom.spec_version) }}</p>
+{% else %}
+<p>{{ strings.inventory.no_sbom }}</p>
+{% endif %}
+{% if inventory and inventory.correlated %}
+<p>{{ strings.annexes.cbom_line.format(algorithms=(inventory.crypto | map(attribute='algorithm') | unique | list | length), weak=(inventory.crypto | selectattr('weak') | list | length)) }}</p>
+{% endif %}
+
 </body>
 </html>

@@ -29,6 +29,9 @@ class Settings(BaseSettings):
 
     env: Literal["dev", "test", "prod"] = "prod"
     database_url: str = "postgresql+psycopg://dioptra:dioptra@localhost:5432/dioptra"
+    #: The OWNER's URL, used by Alembic only (P5 day 20). Unset → the runtime
+    #: URL migrates too (development, the test suite, a single-role deployment).
+    migration_database_url: str | None = None
 
     jwt_secret: SecretStr
     jwt_algorithm: Literal["HS256", "HS384", "HS512"] = "HS256"

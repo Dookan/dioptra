@@ -23,6 +23,7 @@ from app.analysis.models import (
 )
 from app.core.clock import utc_now
 from app.projects.models import Project
+from app.reports.closure import closure_context, stage_of
 from app.reports.strings import report_strings
 
 if TYPE_CHECKING:
@@ -337,4 +338,9 @@ def build_context(
         "commented_code_files": commented_files,
         "tool_runs": tool_runs,
         "sbom_component_count": analysis.sbom.component_count if analysis.sbom else None,
+        # Sections 7–10 (P5): computed from the workflow's own rows.
+        **closure_context(analysis, ordered),
+        "stage_label": _S["stages"].get(stage_of(analysis), stage_of(analysis)),
+        # The institution's prose for sections 7–10, so the templates hold no copy.
+        "strings": _S,
     }

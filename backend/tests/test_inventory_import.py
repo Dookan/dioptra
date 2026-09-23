@@ -299,3 +299,75 @@ def test_an_empty_feed_is_refused_not_imported_as_ok(db: Session, tmp_path: Path
     empty.write_bytes(b"")
     with pytest.raises(DumpInvalid):
         importers.import_dump(db, empty, kind=importers.NVD_JSON, max_bytes=MAX)
+
+
+def test_shaping_reads_every_field_and_tolerates_what_is_missing() -> None:
+    """The record shapers, field by field (mutation pass, P5 close)."""
+    from app.inventory.importers import shape_nvd, shape_osv  # noqa: PLC0415
+
+    nvd = shape_nvd(nvd_item("cve-2020-8203", modified="2024-02-01T00:00:00.000"))
+    assert nvd is not None
+    assert nvd.id == "CVE-2020-8203", "upper-cased"
+    assert nvd.published_at is not None and nvd.published_at.year == 2020
+    assert nvd.modified_at is not None and nvd.modified_at.month == 2
+    assert nvd.summary == "Prototype pollution in lodash before 4.17.19.", (
+        "the English text, not the Spanish"
+    )
+    assert nvd.withdrawn is False and nvd.packages == [] and nvd.aliases == []
+    # CVSS 3.0 only, with a vector but no baseScore: the score comes from the vector.
+    v30 = nvd_item("CVE-2021-1")
+    v30["cve"]["metrics"] = {
+        "cvssMetricV30": [
+            {"cvssData": {"vectorString": "CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}}
+        ]
+    }
+    shaped = shape_nvd(v30)
+    assert shaped is not None and shaped.score == 9.8 and shaped.severity is Severity.CRITICAL
+    # No metrics at all: no score, no severity, still stored.
+    bare = nvd_item("CVE-2021-2")
+    del bare["cve"]["metrics"]
+    del bare["cve"]["descriptions"]
+    shaped = shape_nvd(bare)
+    assert shaped is not None and shaped.score is None and shaped.summary is None
+    assert shape_nvd({"cve": {"id": "GHSA-not-a-cve"}}) is None
+    assert shape_nvd({"cve": "junk"}) is None
+    assert shape_nvd(42) is None
+
+    osv = shape_osv(
+        {
+            "id": "GHSA-x",
+            "modified": "not a date",
+            "published": "2020-01-01T00:00:00Z",
+            "details": "long details",
+            "severity": [
+                {"type": "CVSS_V2", "score": "x"},
+                {"type": "CVSS_V3", "score": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"},
+            ],
+            "affected": [
+                "junk",
+                {"package": "junk"},
+                {"package": {"ecosystem": "npm"}},
+                {
+                    "package": {"ecosystem": "PyPI", "name": "Flask_Login"},
+                    "versions": ["1", 2, None, "3"],
+                    "ranges": [
+                        "junk",
+                        {"type": "GIT", "events": [{"introduced": "abc"}, "junk", {"nothing": 1}]},
+                    ],
+                },
+            ],
+        }
+    )
+    assert osv is not None
+    assert osv.modified_at is None and osv.published_at is not None
+    assert osv.summary == "long details", "details fall back for a missing summary"
+    assert osv.score == 9.8, "the first CVSS_V3 entry wins over CVSS_V2"
+    assert osv.packages == [
+        {
+            "ecosystem": "PyPI",
+            "name": "flask-login",
+            "versions": ["1", "3"],
+            "ranges": [{"type": "GIT", "events": [{"introduced": "abc"}]}],
+        }
+    ]
+    assert shape_osv({"id": ""}) is None and shape_osv([]) is None

@@ -20,7 +20,7 @@ from __future__ import annotations
 import io
 import logging
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -36,6 +36,7 @@ from app.reports.context import build_context
 from app.reports.errors import ForbiddenAssetFetch, ReportRenderError
 from app.reports.models import ReportVersion
 from app.reports.strings import report_strings
+from app.workflow.triage import strip_control_chars
 
 logger = logging.getLogger("dioptra.reports")
 
@@ -231,7 +232,236 @@ def _docx_table(document: Any, headers: list[str], rows: list[list[str]]) -> Non
     for row in rows:
         cells = table.add_row().cells
         for index, value in enumerate(row):
-            cells[index].text = value
+            cells[index].text = strip_control_chars(str(value))
+
+
+def _na(value: object, suffix: str = "") -> str:
+    return "N/A" if value is None else f"{value}{suffix}"
+
+
+def _docx_closure(doc: Any, context: dict[str, Any], strings: dict[str, Any]) -> None:
+    """Sections 7–10 as headings, paragraphs and tables (text runs only)."""
+
+    def add(text: object = "", **kwargs: Any) -> Any:
+        return doc.add_paragraph(strip_control_chars(str(text)), **kwargs)
+
+    heading = strings["headings"]
+    metrics, debt, inventory, annexes = (
+        context["metrics"],
+        context["test_debt"],
+        context["inventory"],
+        context["annexes"],
+    )
+    sm, sd, si, sa = (
+        strings["metrics"],
+        strings["test_debt"],
+        strings["inventory"],
+        strings["annexes"],
+    )
+
+    doc.add_heading(heading["metrics"], level=1)
+    add(sm["intro"])
+    if metrics["functions_measured"]:
+        add(
+            sm["summary"].format(
+                functions=metrics["functions_measured"],
+                complex=metrics["complex_functions"],
+                commented=metrics["commented_files"],
+            )
+        )
+        _docx_table(
+            doc,
+            [
+                sm["labels"]["ccn"],
+                sm["labels"]["nloc"],
+                sm["labels"]["function"],
+                sm["labels"]["path"],
+            ],
+            [[str(f["ccn"]), str(f["nloc"]), f["function"], f["path"]] for f in metrics["top"]],
+        )
+        add(sm["duplication"])
+    else:
+        add(sm["none"])
+
+    doc.add_heading(heading["test_debt"], level=1)
+    add(sd["intro"])
+    add(sd["stage_note"].format(stage=context["stage_label"]))
+    if debt["plan"]:
+        totals = debt["totals"]
+        add(
+            sd["plan_line"].format(
+                functions=totals["functions"],
+                criterion=debt["plan"]["criterion_label"],
+                author=debt["plan"]["created_by"],
+            )
+        )
+        add(debt["plan"]["rationale"])
+        add(
+            sd["totals"].format(
+                approved=totals["approved"],
+                functions=totals["functions"],
+                written=totals["written"],
+                passed=totals["passed"],
+                statements=_na(totals["statement_percent"], " %"),
+                branches=_na(totals["branch_percent"], " %"),
+                survivors=totals["survivors"],
+                equivalent=totals["equivalent"],
+            )
+        )
+        lbl = sd["labels"]
+        _docx_table(
+            doc,
+            [
+                lbl["function"],
+                lbl["cases"],
+                lbl["written"],
+                lbl["statements"],
+                lbl["branches"],
+                lbl["status"],
+                lbl["survivors"],
+            ],
+            [
+                [
+                    f"{f['path']} · {f['function']}",
+                    str(f["cases"]),
+                    lbl["yes"] if f["written"] else lbl["no"],
+                    _na(f["statement_percent"], " %"),
+                    _na(f["branch_percent"], " %"),
+                    f["status_label"],
+                    str(f["survivors"]),
+                ]
+                for f in debt["functions"]
+            ],
+        )
+    else:
+        add(sd["no_plan"])
+
+    doc.add_heading(heading["inventory"], level=1)
+    add(si["intro"])
+    if inventory is None:
+        add(si["no_sbom"])
+    else:
+        add(
+            si["summary"].format(
+                components=inventory["components"],
+                licenses=", ".join(row["name"] for row in inventory["licenses"]) or "N/A",
+                unlicensed=inventory["unlicensed"],
+            )
+        )
+        if not inventory["correlated"]:
+            add(si["not_correlated"])
+        else:
+            add(
+                si["vulndb_line"].format(date=inventory["vulndb_last_update"])
+                if inventory["vulndb_last_update"]
+                else si["vulndb_none"]
+            )
+            doc.add_heading(si["open_title"], level=2)
+            lbl = si["labels"]
+            if inventory["open"]:
+                _docx_table(
+                    doc,
+                    [
+                        lbl["component"],
+                        lbl["version"],
+                        lbl["cve"],
+                        lbl["severity"],
+                        lbl["fixed_in"],
+                        lbl["vex"],
+                    ],
+                    [
+                        [
+                            r["component"],
+                            r["version"],
+                            r["cve"],
+                            r["severity_label"],
+                            r["fixed_in"],
+                            r["vex_label"],
+                        ]
+                        for r in inventory["open"]
+                    ],
+                )
+            else:
+                add(si["open_none"])
+            if inventory["not_affected"]:
+                doc.add_heading(si["not_affected_title"], level=2)
+                for r in inventory["not_affected"]:
+                    add(
+                        f"{r['component']} {r['version']} — {r['cve']}: {r['justification']}",
+                        style="List Bullet",
+                    )
+            if inventory["outdated"]:
+                doc.add_heading(si["outdated_title"], level=2)
+                add(si["outdated_note"])
+                _docx_table(
+                    doc,
+                    [lbl["component"], lbl["version"], lbl["newer"]],
+                    [[r["component"], r["version"], r["newer"]] for r in inventory["outdated"]],
+                )
+            doc.add_heading(si["crypto_title"], level=2)
+            if inventory["crypto"]:
+                _docx_table(
+                    doc,
+                    [lbl["algorithm"], lbl["primitive"], lbl["location"]],
+                    [
+                        [
+                            r["algorithm"] + (f" — {si['weak']}" if r["weak"] else ""),
+                            r["primitive"],
+                            r["location"],
+                        ]
+                        for r in inventory["crypto"]
+                    ],
+                )
+            else:
+                add(si["crypto_none"])
+
+    doc.add_heading(heading["annexes"], level=1)
+    doc.add_heading(heading["annex_asvs"], level=2)
+    add(sa["asvs_intro"])
+    _docx_table(
+        doc,
+        [sa["asvs_labels"]["chapter"], sa["asvs_labels"]["title"], sa["asvs_labels"]["findings"]],
+        [[r["chapter"], r["title"], str(r["findings"])] for r in annexes["asvs"]],
+    )
+    doc.add_heading(heading["annex_diagrams"], level=2)
+    add(sa["diagrams_intro"])
+    for d in annexes["diagrams"]:
+        doc.add_heading(f"{d['path']} · {d['function']}", level=3)
+        # DOCX carries no SVG channel here: the Mermaid interchange text is the diagram.
+        add(d["mermaid"] if d["mermaid"] else sa["diagram_unavailable"], style="No Spacing")
+    if not annexes["diagrams"]:
+        add(sa["cases_none"])
+    doc.add_heading(heading["annex_cases"], level=2)
+    add(sa["cases_intro"])
+    for group in annexes["cases"]:
+        state = sa["approved"] if group["approved"] else sa["not_approved"]
+        doc.add_heading(f"{group['path']} · {group['function']} ({state})", level=3)
+        for case in group["cases"]:
+            covers = f" [{', '.join(case['covers'])}]" if case["covers"] else ""
+            add(f"{case['id']} — {case['title']}{covers}", style="List Bullet")
+    if not annexes["cases"]:
+        add(sa["cases_none"])
+    doc.add_heading(heading["annex_tests"], level=2)
+    add(sa["tests_intro"])
+    for t in annexes["tests"]:
+        doc.add_heading(t["filename"], level=3)
+        add(t["content"], style="No Spacing")
+        if t["truncated"]:
+            add(sa["truncated"])
+    if not annexes["tests"]:
+        add(sa["tests_none"])
+    doc.add_heading(heading["annex_bom"], level=2)
+    add(sa["bom_intro"])
+    if annexes["sbom"]:
+        add(
+            sa["bom_line"].format(
+                components=annexes["sbom"]["components"],
+                generator=annexes["sbom"]["generator"],
+                spec=annexes["sbom"]["spec_version"],
+            )
+        )
+    else:
+        add(si["no_sbom"])
 
 
 def render_docx(
@@ -256,7 +486,12 @@ def render_docx(
     heading = strings["headings"]
     label = strings["labels"]
     doc = Document()
-    add: Callable[..., Any] = doc.add_paragraph
+
+    def add(text: object = "", **kwargs: Any) -> Any:
+        # python-docx raises on XML-incompatible control characters, and the
+        # audited tree can put one anywhere (a path, a component name).
+        return doc.add_paragraph(strip_control_chars(str(text)), **kwargs)
+
     doc.add_heading(strings["cover_title"], level=0)
     add(context["system"]["name"])
     add(context["period"])
@@ -368,6 +603,7 @@ def render_docx(
         [label["tool"], label["category"], label["status"], label["detail"]],
         [[r["tool"], r["category"], r["status_label"], r["detail"]] for r in context["tool_runs"]],
     )
+    _docx_closure(doc, context, strings)
     add(f"{label['author_prefix']} {context['author']}")
 
     buffer = io.BytesIO()

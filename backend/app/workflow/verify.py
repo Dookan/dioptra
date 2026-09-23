@@ -18,9 +18,10 @@ This runs in the WORKER, never in a request: it starts containers.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.analysis.models import Analysis, Stage
@@ -34,6 +35,7 @@ from app.workflow import authoring
 from app.workflow.ast.errors import AstError
 from app.workflow.design import FunctionRef, get_design
 from app.workflow.errors import (
+    MutantUnknown,
     StageLocked,
     StageNotReached,
     TestPlanEmpty,
@@ -48,6 +50,7 @@ from app.workflow.models import (
     REASON_SANDBOX_ERROR,
     REASON_TESTS_FAILED,
     CoverageCriterion,
+    EquivalentMutant,
     VerificationRun,
     VerificationStatus,
 )
@@ -72,6 +75,8 @@ class Outcome:
     failed_cases: list[str]
     detail: str | None
     duration_ms: int
+    #: Survivors excused as equivalent BEFORE this run (shown, never counted).
+    equivalent_mutants: list[dict[str, str]] = field(default_factory=list)
 
 
 def _errored(detail: str | None, *, duration_ms: int = 0) -> Outcome:
@@ -141,8 +146,14 @@ def verify_function(
     scaffold: ScaffoldFile,
     content: str,
     criterion: CoverageCriterion,
+    equivalent: dict[str, str] | None = None,
 ) -> Outcome:
-    """One sandbox attempt. Never raises for a test's behaviour — only records it."""
+    """One sandbox attempt. Never raises for a test's behaviour — only records it.
+
+    ``equivalent`` maps mutant ids the developer already excused (with a
+    written reason, audited) to their text: those survivors are reported
+    beside the verdict but never close the gate.
+    """
     attempt = None
     try:
         attempt = workspace.build_attempt(
@@ -200,6 +211,23 @@ def verify_function(
         if not coverage.covers_line(line)
     ]
 
+    # An excusal names a mutant by id AND by the text it had when the
+    # developer judged it: mutant ids are index-based, so a tool bump can
+    # renumber them and a mark would otherwise excuse a DIFFERENT survivor.
+    # A changed text is a real survivor again, shown to the developer.
+    excused = equivalent or {}
+
+    def _is_excused(m: dict[str, str]) -> bool:
+        stored = excused.get(m.get("id", ""))
+        return stored is not None and stored == m.get("mutant", "")
+
+    survivors = [m for m in mutation.survived if not _is_excused(m)]
+    excused_now = [
+        {"id": m.get("id", ""), "line": m.get("line", ""), "mutant": m.get("mutant", "")}
+        for m in mutation.survived
+        if _is_excused(m)
+    ]
+
     reasons: list[str] = []
     if failed:
         reasons.append(REASON_TESTS_FAILED)
@@ -209,7 +237,7 @@ def verify_function(
         reasons.append(REASON_COVERAGE_SHORT)
     if uncovered:
         reasons.append(REASON_BRIEF_UNCOVERED)
-    if mutation.survived:
+    if survivors:
         reasons.append(REASON_MUTANT_SURVIVED)
 
     return Outcome(
@@ -217,11 +245,12 @@ def verify_function(
         reasons=reasons,
         coverage=coverage,
         uncovered_items=uncovered,
-        surviving_mutants=mutation.survived,
+        surviving_mutants=survivors,
         assertion_free=assertion_free,
         failed_cases=failed,
         detail=detail,
         duration_ms=duration,
+        equivalent_mutants=excused_now,
     )
 
 
@@ -279,6 +308,7 @@ def run_verification(
                     scaffold=scaffold,
                     content=stored.content,
                     criterion=criterion,
+                    equivalent=equivalent_mutants_of(db, analysis, ref),
                 )
         runs.append(_record(db, analysis=analysis, actor=actor, ref=ref, outcome=outcome))
 
@@ -298,6 +328,13 @@ def run_verification(
 def _record(
     db: Session, *, analysis: Analysis, actor: User, ref: FunctionRef, outcome: Outcome
 ) -> VerificationRun:
+    if outcome.status is VerificationStatus.PASSED:
+        # A pass closes the E7 → E5 loop for this function: its design and
+        # tests are locked again (approval alone must NOT clear the flag —
+        # the developer still has to rewrite the tests after re-approving).
+        for design in analysis.case_designs:
+            if (design.path, design.function, design.line) == (ref.path, ref.function, ref.line):
+                design.reopened_at = None
     run = VerificationRun(
         analysis_id=analysis.id,
         path=ref.path,
@@ -308,6 +345,7 @@ def _record(
         coverage=outcome.coverage.as_dict(),
         uncovered_items=list(outcome.uncovered_items),
         surviving_mutants=list(outcome.surviving_mutants),
+        equivalent_mutants=list(outcome.equivalent_mutants),
         assertion_free_cases=list(outcome.assertion_free),
         failed_cases=list(outcome.failed_cases),
         detail=outcome.detail,
@@ -370,3 +408,78 @@ def reopen_design(
     )
     db.flush()
     return reopened
+
+
+def equivalent_mutants_of(db: Session, analysis: Analysis, ref: FunctionRef) -> dict[str, str]:
+    """``{mutant id: text}`` the developer excused for this function."""
+    rows = db.scalars(
+        select(EquivalentMutant).where(
+            EquivalentMutant.analysis_id == analysis.id,
+            EquivalentMutant.path == ref.path,
+            EquivalentMutant.function == ref.function,
+            EquivalentMutant.line == ref.line,
+        )
+    )
+    return {row.mutant_id: row.mutant for row in rows}
+
+
+def mark_equivalent(
+    db: Session,
+    *,
+    analysis: Analysis,
+    actor: User,
+    ref: FunctionRef,
+    mutant_id: str,
+    justification: str,
+    source_ip: str | None,
+) -> EquivalentMutant:
+    """Excuse one surviving mutant of the function's LATEST run, with a written reason.
+
+    Some mutants no test can kill (a codec name's case, ``None`` for
+    ``False``). Like a triage verdict, the judgement is a person's, it is
+    justified in writing and it is audited (``verification.mutant.equivalent``).
+    It takes effect on the NEXT run — the run rows stay immutable and the
+    gate stays a row predicate — so the developer re-runs to prove it.
+    """
+    reason = clean_justification(justification)
+    _require_verification_stage(analysis)
+    latest = latest_runs(analysis).get((ref.path, ref.function, ref.line))
+    if latest is None:
+        raise MutantUnknown(f"{ref.function}: never verified"[:200])
+    survivor = next((m for m in latest.surviving_mutants if m.get("id") == mutant_id), None)
+    if survivor is None:
+        raise MutantUnknown(f"{ref.function}: {mutant_id}"[:200])
+    existing = db.scalars(
+        select(EquivalentMutant).where(
+            EquivalentMutant.analysis_id == analysis.id,
+            EquivalentMutant.path == ref.path,
+            EquivalentMutant.function == ref.function,
+            EquivalentMutant.line == ref.line,
+            EquivalentMutant.mutant_id == mutant_id,
+        )
+    ).first()
+    if existing is not None:
+        return existing
+    row = EquivalentMutant(
+        analysis_id=analysis.id,
+        path=ref.path,
+        function=ref.function,
+        line=ref.line,
+        mutant_id=mutant_id[:200],
+        mutant=str(survivor.get("mutant", ""))[:400],
+        justification=reason,
+        created_by_username=actor.username,
+    )
+    db.add(row)
+    audit.record(
+        db,
+        actor_username=actor.username,
+        actor_id=actor.id,
+        actor_role=actor.role.value,
+        action="verification.mutant.equivalent",
+        target=f"analysis:{analysis.id}:{ref.path}:{ref.line}:{ref.function}:{mutant_id}"[:255],
+        justification=reason,
+        source_ip=source_ip,
+    )
+    db.flush()
+    return row

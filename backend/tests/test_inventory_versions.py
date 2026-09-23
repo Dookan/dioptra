@@ -41,7 +41,9 @@ def test_equivalent_spellings_compare_equal(same: tuple[str, str]) -> None:
     assert not _v(right) < _v(left)
 
 
-@pytest.mark.parametrize("junk", ["", "latest", "^1.2.3", "*", "git+https://x", None, 42, "abc"])
+@pytest.mark.parametrize(
+    "junk", ["", "latest", "^1.2.3", "*", "git+https://x", None, 42, "abc", "v", "V", "1:", "+1"]
+)
 def test_unparsable_versions_are_none_never_guessed(junk: object) -> None:
     assert versions.parse(junk) is None
 

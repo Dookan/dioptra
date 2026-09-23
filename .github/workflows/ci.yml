@@ -135,6 +135,26 @@ jobs:
         env:
           PGURL: postgresql://dioptra:ci-only-password@localhost:5432/dioptra
 
+      - name: The runtime role cannot defeat the append-only triggers
+        # docker/initdb/01-runtime-role.sql is what Compose runs on first init;
+        # apply it here and prove `dioptra_app` can write rows but not drop
+        # the trigger that protects them (P5 day 20, threat model residual).
+        run: |
+          set -euo pipefail
+          DIOPTRA_APP_DB_PASSWORD=ci-app-password POSTGRES_USER=dioptra POSTGRES_DB=dioptra \
+            psql "$PGURL" -v ON_ERROR_STOP=1 -f docker/initdb/01-runtime-role.sql
+          APPURL="postgresql://dioptra_app:ci-app-password@localhost:5432/dioptra"
+          psql "$APPURL" -v ON_ERROR_STOP=1 -c "INSERT INTO audit_log (id, occurred_at, actor_username, action, outcome) VALUES (gen_random_uuid(), now(), 'app', 'ci.probe', 'OK');"
+          for stmt in "DROP TRIGGER audit_log_append_only ON audit_log" "ALTER TABLE audit_log DISABLE TRIGGER ALL" "DROP TABLE audit_log"; do
+            if psql "$APPURL" -v ON_ERROR_STOP=1 -c "$stmt"; then
+              echo "::error::dioptra_app was allowed '$stmt' — the role split is broken"
+              exit 1
+            fi
+            echo "refused as expected: $stmt"
+          done
+        env:
+          PGURL: postgresql://dioptra:ci-only-password@localhost:5432/dioptra
+
   dependency-vulnerabilities:
     # BLOCKING. A known-vulnerable dependency is a security defect, not a
     # freshness nit, so this one fails the build. Kept out of the advisory job
