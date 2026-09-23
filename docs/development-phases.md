@@ -1,6 +1,6 @@
 # Development phases
 
-> **Status: P0 DONE (2026-08-18); P1 IN_PROGRESS since 2026-09-21; P2 DONE (2026-09-22, `5f13ee1`); P3 DONE (2026-09-22, `80c0a3f`, closed in `37cd6cc`); P4 DONE (2026-09-22, `576993f`, `2b9680d`); P5 built 2026-09-22 — inventory, report sections 7–10, role split, self-audit, the E1–E8 walk on the platform itself; PHP/Java cut to a second cycle; v1.0.0 tag pending the closing commit.** Phase status summary
+> **Status: P0 DONE (2026-08-18); P1 IN_PROGRESS since 2026-09-21; P2 DONE (2026-09-22, `5f13ee1`); P3 DONE (2026-09-22, `80c0a3f`, closed in `37cd6cc`); P4 DONE (2026-09-22, `576993f`, `2b9680d`); P5 DONE (2026-09-23, `280ec5b`, `b801f70`; tagged v1.0.0 on the closing commit) — inventory, report sections 7–10, role split, self-audit, the E1–E8 walk on the platform itself; PHP/Java cut to a second cycle.** Phase status summary
 > also lives in CLAUDE.md → Current phase status; keep both in sync.
 >
 > This file distills the work plan (`docs/work-plan-reference.html`, v1.0,

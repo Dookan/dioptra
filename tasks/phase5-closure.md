@@ -1,8 +1,8 @@
 # Task: Phase 5 — Cierre (inventory, wave 2, self-audit, release)
 
-> **Status: IN_PROGRESS — started 2026-09-22, the moment P4 closed. Deadline
-> ◆ "Release" 2026-09-18 (plan days 18–20), passed.** Tag v1.0.0 when the
-> Definition of Done below is met. Day 20 is the buffer. Survey
+> **Status: DONE — closed 2026-09-23; day 18 in commit `280ec5b`, days 19–20 in
+> `b801f70`, hashes and the tag `v1.0.0` in the closing commit. Deadline
+> ◆ "Release" 2026-09-18 (plan days 18–20), passed.** Day 20 was the buffer. Survey
 > `tasks/phase5-survey.md` written and signed off 2026-09-22 (under `mmarin`'s
 > "bueno hagamos lo necesario para cerrar"); day 18 BUILT 2026-09-22;
 > **PHP/Java cut to a second cycle** (survey §9).
@@ -176,7 +176,7 @@ is never cut.
       attributable as recorded in `docs/threat-model.md`
 - [x] Self-audit executed 2026-09-22 (`scripts/self_audit.py`, tree at `e2238c6`, every tool RAN): 94 findings — 3 high, 5 medium, 86 info. The three highs are `hardcoded-secret-assignment` on our own rule fixtures (`rules/semgrep/tests/hardcoded-secrets/positive.*`) and on the sandbox test's exfiltration canary: discarded with a written justification each. The 86 infos are the rule fixtures (`positive.*` files exist to make the rules fire), the suite's fixed test secrets, three `RegExp` in a frontend test and three `Markup(...)` calls in `reports/engine.py` that wrap already-escaped values — all discarded with a justification. The 5 mediums are real: CVE-2026-82417 / 82562 / 8723 on `qs` 6.15.1 in the sandbox image's lockfile and CVE-2026-84373 on `vitest` / `@vitest/mocker` 4.1.10 in the frontend's — confirmed as dependency debt for 1.x with the justification that neither is served to a user (dev and sandbox trees), and carried in the inventory with their VEX state. **No high finding is open.**
 - [x] ASVS L2 checklist complete in docs/standards-mapping.md (chapter table V1–V14, 2026-09-22); final threat model (every row built, the `DROP TRIGGER` residual resolved by the role split with its remaining scope named)
-- [ ] `v1.0.0` tagged on 2026-09-18; CLAUDE.md phase status +
+- [x] `v1.0.0` tagged 2026-09-23 (plan date 2026-09-18, passed); CLAUDE.md phase status +
       docs/development-phases.md: Phase 5 → DONE with date and commit
 
 ## Non-goals (explicit)
