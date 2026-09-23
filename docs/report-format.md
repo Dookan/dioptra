@@ -12,7 +12,10 @@
 1. Cover (institutional header, system name, date)
 2. Introducción
 3. Resumen ejecutivo — with severity/OWASP distribution tables and bars (P2, pure CSS in the PDF, tokens in the UI)
-4. Detalles del sistema (name, framework, DB, developer, install date)
+4. Detalles del sistema (name, framework, DB, developer, install date — a
+   real `date` column since migration 0011 (2026-09-23): the browser's date
+   input hands over ISO, the API refuses text and a future date, and the
+   report formats it with `%d/%m/%Y` like every other date; `N/A` when unset)
 5. Control de versiones (auto-filled from the report versions: number, areas changed, change description, delivery date = signature date, `N/A` for a draft)
 6. Hallazgos — per finding: title, severity, CWE, OWASP code, description,
    impact, detection (path:line + escaped snippet), mitigation, references
@@ -77,7 +80,12 @@ of the analyst's, so they are absent from the editor's section list
   signed version exported after a later verification run or a mirror sync
   can show different section 8/9 content. Snapshotting 7–10 into the
   version row is a 1.x decision for `mmarin`; until then the signature
-  attests sections 1–6.
+  attests the prose and the finding set of sections 1–6. **Section 4 is the
+  one composed part of them**: "Detalles del sistema" renders the `systems`
+  row as it is at export time, so a change to that row — an edit, or migration
+  `0011` nulling a free-text installation date — shows through in an
+  already-signed version. The hash covers the version number, the section
+  overrides and the excluded finding ids, never the system profile.
 - Triage feeds the report: a finding the analyst marked "No aplica" (false
   positive) leaves every format and the executive-summary counts; a pending
   finding stays, so an untriaged analysis still exports in full.

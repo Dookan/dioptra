@@ -13,6 +13,18 @@
     "submitting": "Entrando…",
     "noAccount": "¿No tienes cuenta? Pídele acceso a tu administrador."
   },
+  "password": {
+    "show": "Mostrar la contraseña",
+    "hide": "Ocultar la contraseña"
+  },
+  "datePicker": {
+    "placeholder": "Elige una fecha",
+    "dialog": "Calendario",
+    "prevMonth": "Mes anterior",
+    "nextMonth": "Mes siguiente",
+    "today": "Hoy",
+    "clear": "Borrar la fecha"
+  },
   "passwordChange": {
     "title": "Cambia tu contraseña",
     "reason": "Esta cuenta usa una contraseña inicial. Elige una nueva para continuar.",
@@ -72,6 +84,7 @@
       "repoUnreachable": "No se pudo acceder al repositorio."
     },
     "projects": {
+      "installedAtInFuture": "La fecha de instalación no puede ser posterior a hoy.",
       "notFound": "El proyecto no existe."
     },
     "analysis": {
@@ -226,6 +239,8 @@
     "nextStep": {
       "codeTitle": "Siguiente paso: sube el código",
       "codeBody": "Sube un ZIP o pega la dirección HTTPS del repositorio. El análisis corre solo y te avisa cuando termina.",
+      "codeDeveloperTitle": "Siguiente paso: esperar el análisis",
+      "codeDeveloperBody": "Un analista sube el código y lanza el análisis. Cuando termine podrás planificar las pruebas.",
       "triageTitle": "Siguiente paso: revisa los hallazgos",
       "triageBody": "Confirma o descarta cada hallazgo con una razón escrita. Cuando termines se desbloquea el plan de pruebas.",
       "planTitle": "Siguiente paso: planificar las pruebas",
@@ -236,6 +251,7 @@
     "ingest": {
       "section": "2 · El código",
       "intro": "El código se analiza en un entorno aislado, sin acceso a internet. No se ejecuta nada del sistema.",
+      "waiting": "Un analista sube el código de este sistema y lanza el análisis. Aquí verás las versiones analizadas en cuanto existan.",
       "zipLabel": "Archivo ZIP con el código",
       "uploadSubmit": "Subir y analizar",
       "duration": "Suele tardar unos minutos.",

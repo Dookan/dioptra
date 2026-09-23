@@ -10,12 +10,19 @@ import * as api from '../api/projects';
 import type { Analysis, Project } from '../api/projects';
 import { useAuth } from '../auth/auth-context';
 import { AppShell } from '../components/app-shell';
+import { DatePicker } from '../components/date-picker';
 import { StatusBadge } from '../components/status-badge';
 import type { Route } from '../navigation/use-route';
 
 interface Props {
   route: Route;
   onNavigate: (route: Route) => void;
+}
+
+/** Today, ISO, from LOCAL calendar parts: an installation cannot be in the future. */
+function todayIso(): string {
+  const now = new Date();
+  return `${String(now.getFullYear())}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
 function Field({
@@ -125,12 +132,18 @@ function RegisterForm({
         <Field id={ids.framework} label={t('projects.form.framework')} value={framework} onChange={setFramework} />
         <Field id={ids.database} label={t('projects.form.database')} value={database} onChange={setDatabase} />
         <Field id={ids.developer} label={t('projects.form.developer')} value={developer} onChange={setDeveloper} />
-        <Field
-          id={ids.installedAt}
-          label={t('projects.form.installedAt')}
-          value={installedAt}
-          onChange={setInstalledAt}
-        />
+        <div className="field">
+          <label id={`${ids.installedAt}-label`} htmlFor={ids.installedAt}>
+            {t('projects.form.installedAt')}
+          </label>
+          <DatePicker
+            id={ids.installedAt}
+            labelledBy={`${ids.installedAt}-label`}
+            value={installedAt}
+            onChange={setInstalledAt}
+            max={todayIso()}
+          />
+        </div>
       </div>
       <Field id={ids.description} label={t('projects.form.description')} value={description} onChange={setDescription} />
       <div className="actions">

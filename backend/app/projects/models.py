@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import ForeignKey, String, Text, Uuid
+from sqlalchemy import Date, ForeignKey, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.clock import utc_now
@@ -50,7 +50,7 @@ class System(Base):
     framework: Mapped[str | None] = mapped_column(String(120), default=None)
     database: Mapped[str | None] = mapped_column(String(120), default=None)
     developer: Mapped[str | None] = mapped_column(String(200), default=None)
-    installed_at: Mapped[str | None] = mapped_column(String(40), default=None)
+    installed_at: Mapped[date | None] = mapped_column(Date, default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now, onupdate=utc_now)
 

@@ -31,8 +31,15 @@ if ! docker ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
   docker run -d --name "$PG_CONTAINER" -p "127.0.0.1:$PG_PORT:5432" \
     -e POSTGRES_USER=dioptra -e "POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD in .env}" \
     -e POSTGRES_DB=dioptra postgres:18-alpine >/dev/null
-  sleep 3
 fi
+# A fresh container initialises the cluster on a temporary server that listens
+# on the Unix socket only; TCP readiness is the signal that init has finished.
+for _ in $(seq 1 60); do
+  if docker exec "$PG_CONTAINER" pg_isready -h 127.0.0.1 -U dioptra -d dioptra >/dev/null 2>&1; then break; fi
+  sleep 1
+done
+docker exec "$PG_CONTAINER" pg_isready -h 127.0.0.1 -U dioptra -d dioptra >/dev/null 2>&1 \
+  || { echo "$PG_CONTAINER did not become ready in 60 s: docker logs $PG_CONTAINER" >&2; exit 1; }
 # The container's own password wins: it may predate the current .env.
 PG_PASSWORD="$(docker inspect "$PG_CONTAINER" --format '{{range .Config.Env}}{{println .}}{{end}}' \
   | sed -n 's/^POSTGRES_PASSWORD=//p' | head -1)"

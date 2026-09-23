@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import uuid
 import zipfile
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.analysis.models import Analysis, AnalysisStatus, ToolStatus
 from app.audit.models import AuditLogEntry
 from app.auth.models import User
+from app.core.clock import utc_now
 from tests.conftest import SEED_PASSWORD
 
 
@@ -82,6 +84,52 @@ def test_analyst_registers_and_ingests_a_zip(
 
     actions = {entry.action for entry in db.query(AuditLogEntry).all()}
     assert {"project.create", "analysis.ingest.zip"} <= actions
+
+
+def test_installation_date_is_a_date_never_text(client: TestClient, analyst: User) -> None:
+    """ISO in, ISO out; free text and a future date are refused by the server."""
+    headers = login(client, analyst.username)
+    system = {"name": "sistema", "installed_at": "2024-03-05"}
+    created = client.post(
+        "/api/v1/projects", json={"name": "p-date", "system": system}, headers=headers
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["system"]["installed_at"] == "2024-03-05"
+    fetched = client.get(f"/api/v1/projects/{created.json()['id']}", headers=headers)
+    assert fetched.json()["system"]["installed_at"] == "2024-03-05"
+
+    for text in ("05/03/2024", "marzo 2024", "2024-13-01", "ayer"):
+        refused = client.post(
+            "/api/v1/projects",
+            json={"name": "p-text", "system": {"name": "s", "installed_at": text}},
+            headers=headers,
+        )
+        assert refused.status_code == 422, text
+        assert refused.json()["code"] == "validation_failed"
+
+    tomorrow = (utc_now() + timedelta(days=1)).date().isoformat()
+    future = client.post(
+        "/api/v1/projects",
+        json={"name": "p-future", "system": {"name": "s", "installed_at": tomorrow}},
+        headers=headers,
+    )
+    assert future.status_code == 422
+    assert future.json() == {
+        "code": "installed_at_in_future",
+        "message_key": "errors.projects.installedAtInFuture",
+    }
+    today = utc_now().date().isoformat()
+    accepted = client.post(
+        "/api/v1/projects",
+        json={"name": "p-today", "system": {"name": "s", "installed_at": today}},
+        headers=headers,
+    )
+    assert accepted.status_code == 201, "today itself is allowed"
+    # Nothing without a date was touched: an omitted date is still null.
+    omitted = client.post(
+        "/api/v1/projects", json={"name": "p-none", "system": {"name": "s"}}, headers=headers
+    )
+    assert omitted.status_code == 201 and omitted.json()["system"]["installed_at"] is None
 
 
 def test_developer_cannot_register_or_ingest(client: TestClient, developer: User) -> None:

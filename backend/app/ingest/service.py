@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shutil
 import uuid
+from datetime import date
 from pathlib import Path
 from typing import BinaryIO
 
@@ -59,7 +60,7 @@ def create_project(
     framework: str | None,
     database: str | None,
     developer: str | None,
-    installed_at: str | None,
+    installed_at: date | None,
     source_ip: str | None,
 ) -> Project:
     """Stage E1: register the project and its system profile."""

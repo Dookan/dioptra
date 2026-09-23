@@ -35,6 +35,11 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    // Pin a POSITIVE UTC offset. Date code that builds an ISO day through
+    // `toISOString()` is correct at a negative offset and wrong at a positive
+    // one, so a machine in the Americas cannot fail it — the calendar picker's
+    // "ISO from local calendar parts" claim was unfalsifiable until this line.
+    env: { TZ: 'Europe/Madrid' },
     setupFiles: ['./src/test/setup.ts'],
     css: true,
     coverage: {

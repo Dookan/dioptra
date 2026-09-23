@@ -171,6 +171,19 @@ def _hostile_analysis() -> Analysis:
 # --- context -----------------------------------------------------------------
 
 
+def test_installation_date_prints_in_the_reports_own_format() -> None:
+    """The date is stored as a date and formatted at render, like every other date."""
+    from datetime import date  # noqa: PLC0415
+
+    project = _project()
+    assert project.system is not None
+    project.system.installed_at = date(2024, 3, 5)
+    ctx = build_context(
+        _hostile_analysis(), project, generated_at=datetime(2026, 6, 15, tzinfo=UTC)
+    )
+    assert ctx["system"]["installed_at"] == "05/03/2024"
+
+
 def test_context_defaults_and_counts() -> None:
     analysis = _hostile_analysis()
     ctx = build_context(analysis, _project(), generated_at=datetime(2026, 6, 15, tzinfo=UTC))

@@ -11,10 +11,12 @@ from sqlalchemy.orm import Session
 from app.analysis.models import Analysis, Severity
 from app.auth.deps import ActiveUser, client_ip, require_roles
 from app.auth.models import Role, User
+from app.core.clock import utc_now
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.ingest import service
 from app.ingest.errors import ZipTooLarge
+from app.projects.errors import InstalledAtInFuture
 from app.projects.schemas import (
     AnalysisOut,
     GitIngestRequest,
@@ -56,6 +58,9 @@ def analysis_out(analysis: Analysis) -> AnalysisOut:
 def create_project(
     payload: ProjectCreate, request: Request, user: IngestUser, db: DbSession
 ) -> ProjectOut:
+    installed_at = payload.system.installed_at
+    if installed_at is not None and installed_at > utc_now().date():
+        raise InstalledAtInFuture(f"installed_at={installed_at.isoformat()}")
     project = service.create_project(
         db,
         actor=user,

@@ -160,4 +160,90 @@ describe('login screen', () => {
 
     expect(await screen.findByLabelText(es.login.password)).toHaveAttribute('type', 'password');
   });
+
+  it('reveals and hides the typed password on screen only', async () => {
+    const calls = renderApp({ '/api/v1/auth/login': SESSION });
+    const user = userEvent.setup();
+    const field = await screen.findByLabelText(es.login.password);
+    await user.type(field, 'correct-horse-battery-staple');
+
+    const toggle = screen.getByRole('button', { name: es.password.show });
+    await user.click(toggle);
+
+    // Revealing changes how the browser paints the field, nothing else.
+    expect(field).toHaveAttribute('type', 'text');
+    expect(field).toHaveValue('correct-horse-battery-staple');
+    // The accessible name IS the state cue: it now offers to hide.
+    expect(screen.getByRole('button', { name: es.password.hide })).toBeInTheDocument();
+    expect(calls.mock.calls.filter(([path]) => String(path) === '/api/v1/auth/login')).toHaveLength(0);
+
+    await user.click(screen.getByRole('button', { name: es.password.hide }));
+    expect(field).toHaveAttribute('type', 'password');
+  });
+
+  it('sends what was typed WHILE revealed, unchanged', async () => {
+    // Every other reveal test types masked and then reveals. This is the other
+    // ordering: a mutant that mangles input typed while revealed survives them.
+    const calls = renderApp({ '/api/v1/auth/login': SESSION });
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText(es.login.username), 'mmarin');
+    await user.click(screen.getByRole('button', { name: es.password.show }));
+    const secret = '  Mixed CASE p@ss  ';
+    await user.type(screen.getByLabelText(es.login.password), secret);
+    await user.click(screen.getByRole('button', { name: es.login.submit }));
+
+    await waitFor(() => {
+      const loginCalls = calls.mock.calls.filter(([path]) => String(path) === '/api/v1/auth/login');
+      expect(loginCalls).toHaveLength(1);
+      const init = (loginCalls[0] as unknown as [string, RequestInit])[1];
+      expect(JSON.parse(String(init.body))).toEqual({ username: 'mmarin', password: secret });
+    });
+  });
+
+  it('sends the same request whether the password is shown or hidden, and re-masks on submit', async () => {
+    const calls = renderApp({ '/api/v1/auth/login': SESSION });
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText(es.login.username), 'mmarin');
+    const field = screen.getByLabelText(es.login.password);
+    await user.type(field, 'correct-horse-battery-staple');
+    await user.click(screen.getByRole('button', { name: es.password.show }));
+    expect(field).toHaveAttribute('type', 'text');
+
+    await user.click(screen.getByRole('button', { name: es.login.submit }));
+
+    await waitFor(() => {
+      const loginCalls = calls.mock.calls.filter(([path]) => String(path) === '/api/v1/auth/login');
+      expect(loginCalls).toHaveLength(1);
+      const init = (loginCalls[0] as unknown as [string, RequestInit])[1];
+      // The body is the JSON the masked form has always sent: a POST, the
+      // credentials as fields, nothing in the URL or the headers.
+      expect(init.method).toBe('POST');
+      expect(JSON.parse(String(init.body))).toEqual({
+        username: 'mmarin',
+        password: 'correct-horse-battery-staple',
+      });
+    });
+    expect(await screen.findByText(es.home.greeting.replace('{{name}}', 'Moises Marin'))).toBeInTheDocument();
+  });
+
+  it('masks the field again when a wrong password is submitted while revealed', async () => {
+    renderApp({
+      '/api/v1/auth/login': {
+        status: 401,
+        body: { code: 'invalid_credentials', message_key: 'errors.auth.invalidCredentials' },
+      },
+    });
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText(es.login.username), 'mmarin');
+    const field = screen.getByLabelText(es.login.password);
+    await user.type(field, 'wrong-password');
+    await user.click(screen.getByRole('button', { name: es.password.show }));
+
+    await user.click(screen.getByRole('button', { name: es.login.submit }));
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(field).toHaveAttribute('type', 'password');
+    expect(field).toHaveValue('');
+    expect(screen.getByRole('button', { name: es.password.show })).toBeInTheDocument();
+  });
 });

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -31,7 +31,12 @@ class SystemProfileIn(BaseModel):
     framework: str | None = Field(default=None, max_length=120)
     database: str | None = Field(default=None, max_length=120)
     developer: str | None = Field(default=None, max_length=200)
-    installed_at: str | None = Field(default=None, max_length=40)
+    # A DATE, not text: the browser's date input hands over ISO `YYYY-MM-DD`,
+    # pydantic refuses free text, and every render formats it itself
+    # (`%d/%m/%Y` in the report, the locale in the UI). No time zone can move
+    # a plain date by a day. Being in the future is a DOMAIN refusal (typed,
+    # with its own message) rather than a generic validation error.
+    installed_at: date | None = None
 
 
 class ProjectCreate(BaseModel):

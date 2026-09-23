@@ -95,6 +95,45 @@ describe('auth provider', () => {
     expect(screen.getByText(es.passwordChange.title)).toBeInTheDocument();
   });
 
+  it('lets each password field be revealed on its own and re-masks both on submit', async () => {
+    const calls = renderApp({
+      '/api/v1/auth/refresh': session({ must_change_password: true }),
+      '/api/v1/auth/password': {
+        status: 422,
+        body: { code: 'weak_password', message_key: 'errors.auth.weakPassword' },
+      },
+    });
+    const user = userEvent.setup();
+    const current = await screen.findByLabelText(es.passwordChange.current);
+    const next = screen.getByLabelText(es.passwordChange.new);
+    await user.type(current, 'initial-password');
+    await user.type(next, 'short');
+    expect(current).toHaveAttribute('type', 'password');
+    expect(next).toHaveAttribute('type', 'password');
+
+    // One eye per field: revealing the new password leaves the current one masked.
+    const eyes = screen.getAllByRole('button', { name: es.password.show });
+    expect(eyes).toHaveLength(2);
+    await user.click(eyes[1] as HTMLElement);
+    expect(next).toHaveAttribute('type', 'text');
+    expect(current).toHaveAttribute('type', 'password');
+    expect(calls.mock.calls.some(([path]) => String(path) === '/api/v1/auth/password')).toBe(false);
+
+    await user.click(screen.getByRole('button', { name: es.passwordChange.submit }));
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(next).toHaveAttribute('type', 'password');
+    expect(current).toHaveAttribute('type', 'password');
+    const sent = calls.mock.calls.filter(([path]) => String(path) === '/api/v1/auth/password');
+    expect(sent).toHaveLength(1);
+    const init = (sent[0] as unknown as [string, RequestInit])[1];
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual({
+      current_password: 'initial-password',
+      new_password: 'short',
+    });
+  });
+
   it('signs out and calls the server so the family is revoked', async () => {
     const calls = renderApp({
       '/api/v1/auth/refresh': session(),

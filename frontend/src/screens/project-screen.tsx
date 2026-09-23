@@ -315,7 +315,7 @@ function AnalysisCard({
 
 export function ProjectScreen({ route, projectId, onNavigate }: Props): React.ReactNode {
   const { t } = useTranslation();
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const [project, setProject] = useState<Project | null>(null);
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [errorKey, setErrorKey] = useState<string | null>(null);
@@ -356,6 +356,12 @@ export function ProjectScreen({ route, projectId, onNavigate }: Props): React.Re
   }, [pending, refresh]);
 
   const stage = stageFor(analyses);
+  // Uploading code and starting an analysis is E1–E2: admin or analyst
+  // (docs/roles-and-permissions.md). The server already refuses a developer;
+  // the screen must not offer it, nor tell them to do it in the banner.
+  const canIngest = user?.role === 'analyst' || user?.role === 'admin';
+  const step = stageKey(stage);
+  const stepKey = !canIngest && step === 'code' ? 'codeDeveloper' : step;
 
   return (
     <AppShell route={route} onNavigate={onNavigate} context={project?.name}>
@@ -373,17 +379,24 @@ export function ProjectScreen({ route, projectId, onNavigate }: Props): React.Re
           </div>
           <section className="nextstep">
             <div className="txt">
-              <b>{t(`project.nextStep.${stageKey(stage)}Title`)}</b>
-              <div>{t(`project.nextStep.${stageKey(stage)}Body`)}</div>
+              <b>{t(`project.nextStep.${stepKey}Title`)}</b>
+              <div>{t(`project.nextStep.${stepKey}Body`)}</div>
             </div>
           </section>
           <div className="cols side">
-            <IngestCard
-              projectId={project.id}
-              onQueued={(analysis) => {
-                setAnalyses((current) => [analysis, ...current]);
-              }}
-            />
+            {canIngest ? (
+              <IngestCard
+                projectId={project.id}
+                onQueued={(analysis) => {
+                  setAnalyses((current) => [analysis, ...current]);
+                }}
+              />
+            ) : (
+              <section className="panel">
+                <h5>{t('project.ingest.section')}</h5>
+                <p className="desc">{t('project.ingest.waiting')}</p>
+              </section>
+            )}
             <aside className="panel">
               <h4>{t('project.explain.title')}</h4>
               <ul>

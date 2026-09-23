@@ -62,6 +62,7 @@ describe('locale files', () => {
       'errors.ingest.invalidUrl',
       'errors.ingest.repoUnreachable',
       'errors.projects.notFound',
+      'errors.projects.installedAtInFuture',
       'errors.analysis.notFound',
       'errors.analysis.notReady',
       'errors.analysis.normalization',

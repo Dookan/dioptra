@@ -297,7 +297,11 @@ def build_context(
         "system": {
             "name": system_name,
             "framework": _or_na(framework),
-            "installed_at": _or_na(system.installed_at if system is not None else None),
+            "installed_at": _or_na(
+                system.installed_at.strftime(DATE_FORMAT)
+                if system is not None and system.installed_at is not None
+                else None
+            ),
             "database": _or_na(system.database if system is not None else None),
             "developer": _or_na(system.developer if system is not None else None),
         },

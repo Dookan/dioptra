@@ -8,21 +8,27 @@ import { App } from '../app';
 import { AuthProvider } from '../auth/auth-provider';
 import { NO_SESSION, stubFetch, type Routes } from '../test/http';
 
-const SESSION = {
-  status: 200,
-  body: {
-    access_token: 'an-access-token',
-    token_type: 'bearer',
-    expires_in: 900,
-    user: {
-      id: '0f9b2a5e-0000-4000-8000-000000000001',
-      username: 'mmarin',
-      display_name: 'Moises Marin',
-      role: 'analyst',
-      must_change_password: false,
+type Role = 'analyst' | 'admin' | 'developer';
+
+function session(role: Role = 'analyst') {
+  const username = role === 'developer' ? 'cperez' : role === 'admin' ? 'amedina' : 'mmarin';
+  return {
+    status: 200,
+    body: {
+      access_token: 'an-access-token',
+      token_type: 'bearer',
+      expires_in: 900,
+      user: {
+        id: '0f9b2a5e-0000-4000-8000-000000000001',
+        username,
+        display_name: role === 'developer' ? 'Carla Perez' : 'Moises Marin',
+        role,
+        must_change_password: false,
+      },
     },
-  },
-};
+  };
+}
+
 
 const PROJECT = {
   id: '22222222-2222-4222-8222-222222222222',
@@ -57,11 +63,11 @@ function analysis(status: 'queued' | 'done') {
   };
 }
 
-function renderProject(routes: Routes) {
+function renderProject(routes: Routes, role: Role = 'analyst') {
   globalThis.location.hash = `#/projects/${PROJECT.id}`;
   const calls = stubFetch({
     '/api/v1/auth/refresh': NO_SESSION,
-    '/api/v1/auth/login': SESSION,
+    '/api/v1/auth/login': session(role),
     [`/api/v1/projects/${PROJECT.id}`]: { status: 200, body: PROJECT },
     ...routes,
   });
@@ -73,9 +79,9 @@ function renderProject(routes: Routes) {
   return calls;
 }
 
-async function signIn() {
+async function signIn(username = 'mmarin') {
   const user = userEvent.setup();
-  await user.type(await screen.findByLabelText(es.login.username), 'mmarin');
+  await user.type(await screen.findByLabelText(es.login.username), username);
   await user.type(screen.getByLabelText(es.login.password), 'correct-horse-battery-staple');
   await user.click(screen.getByRole('button', { name: es.login.submit }));
   return user;
@@ -91,6 +97,33 @@ describe('project screen', () => {
     expect(screen.getByText(es.stepper.verification)).toBeInTheDocument();
     expect(screen.queryByText(/E[1-8]\b/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: es.project.ingest.uploadSubmit })).toBeDisabled();
+  });
+
+  it('never offers the upload to a developer, nor tells them to do it', async () => {
+    // E1–E2 is the analyst's (docs/roles-and-permissions.md). The server
+    // refuses a developer; the screen must not offer what the server denies.
+    renderProject({ [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [] } }, 'developer');
+    await signIn('cperez');
+
+    expect(await screen.findByText(es.project.ingest.waiting)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: es.project.ingest.uploadSubmit })).toBeNull();
+    expect(screen.queryByRole('button', { name: es.project.ingest.gitSubmit })).toBeNull();
+    expect(screen.queryByLabelText(es.project.ingest.zipLabel)).toBeNull();
+    expect(screen.queryByLabelText(es.project.ingest.gitLabel)).toBeNull();
+    // The banner says what they are waiting for, never "sube el código".
+    expect(screen.getByText(es.project.nextStep.codeDeveloperTitle)).toBeInTheDocument();
+    expect(screen.queryByText(es.project.nextStep.codeTitle)).toBeNull();
+    // The section heading stays, so the developer still knows where they are.
+    expect(screen.getByText(es.project.ingest.section)).toBeInTheDocument();
+  });
+
+  it('keeps the upload for the admin', async () => {
+    renderProject({ [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [] } }, 'admin');
+    await signIn('amedina');
+
+    expect(await screen.findByRole('button', { name: es.project.ingest.uploadSubmit })).toBeInTheDocument();
+    expect(screen.getByText(es.project.nextStep.codeTitle)).toBeInTheDocument();
+    expect(screen.queryByText(es.project.ingest.waiting)).toBeNull();
   });
 
   it('translates an ingest rejection into plain language', async () => {

@@ -112,6 +112,18 @@ describe('projects screen', () => {
     await user.type(screen.getByLabelText(es.projects.form.name), PROJECT.name);
     await user.type(screen.getByLabelText(es.projects.form.systemName), PROJECT.system.name);
     await user.type(screen.getByLabelText(es.projects.form.framework), 'Express');
+    // The installation date comes from the calendar picker: the value it hands
+    // over is ISO whatever the locale shows, and it cannot be after today.
+    await user.click(screen.getByLabelText(es.projects.form.installedAt));
+    // The screen mirrors the server's `installed_at_in_future` refusal: a day
+    // after today cannot even be chosen.
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowLabel = new Intl.DateTimeFormat('es', { dateStyle: 'full' }).format(tomorrow);
+    expect(screen.getByRole('button', { name: tomorrowLabel })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: es.datePicker.today }));
+    const now = new Date();
+    const todayIso = `${String(now.getFullYear())}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     await user.click(screen.getByRole('button', { name: es.projects.form.submit }));
 
     await waitFor(() => {
@@ -120,7 +132,7 @@ describe('projects screen', () => {
       const body = JSON.parse(String(post[1].body));
       expect(body).toEqual({
         name: PROJECT.name,
-        system: { name: PROJECT.system.name, framework: 'Express' },
+        system: { name: PROJECT.system.name, framework: 'Express', installed_at: todayIso },
       });
     });
     expect(await screen.findByText(es.project.nextStep.codeTitle)).toBeInTheDocument();

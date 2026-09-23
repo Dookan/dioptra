@@ -117,6 +117,43 @@ jobs:
           DIOPTRA_JWT_SECRET: ci-only-secret-value-at-least-32-chars
           DIOPTRA_DATABASE_URL: postgresql+psycopg://dioptra:ci-only-password@localhost:5432/dioptra
 
+      - name: A data-converting migration meets real rows, not an empty table
+        # `alembic upgrade head` on an EMPTY database never runs a USING clause,
+        # so a data conversion can be broken and CI stays green. Proven by the
+        # precommit panel on 2026-09-23: 0011 guarded on the SHAPE of an ISO
+        # date and not its VALIDITY, so a hand-typed `2024-02-30` passed the
+        # regex, raised in the cast and aborted the whole ALTER TABLE — every
+        # deployment holding such a row could not upgrade. Seed the values a
+        # free-text column really held, then migrate across it.
+        run: |
+          set -euo pipefail
+          uv run alembic downgrade 0010_equivalent_mutants
+          psql "$PGURL" -v ON_ERROR_STOP=1 -c "
+            INSERT INTO projects (id, name, created_at, updated_at)
+              SELECT gen_random_uuid(), 'ci-' || i, now(), now() FROM generate_series(1, 7) i;
+            INSERT INTO systems (id, project_id, name, installed_at, created_at, updated_at)
+              SELECT gen_random_uuid(), p.id, p.name, v.val, now(), now()
+              FROM (SELECT id, name, row_number() OVER (ORDER BY name) rn FROM projects) p
+              JOIN (VALUES (1,'2024-02-30'), (2,'2024-13-45'), (3,'marzo 2024'),
+                           (4,'2024-03-05'), (5,NULL),
+                           (6,'05/03/2024'), (7,'3 Jan 2024')) v(rn, val) ON v.rn = p.rn;"
+          uv run alembic upgrade head
+          # Only the one real date survives; every impossible or free-text value
+          # is NULL, which the report prints as N/A. Rows 6 and 7 are why the
+          # ISO-SHAPE guard is load-bearing and not redundant with the validity
+          # one: PostgreSQL accepts `05/03/2024` and reads it as 3 May, so a
+          # Spanish 5 March would become a WRONG date in an institutional
+          # report instead of N/A.
+          test "$(psql "$PGURL" -tAc 'SELECT count(*) FROM systems WHERE installed_at IS NOT NULL;')" = "1"
+          test "$(psql "$PGURL" -tAc 'SELECT installed_at FROM systems WHERE installed_at IS NOT NULL;')" = "2024-03-05"
+          psql "$PGURL" -v ON_ERROR_STOP=1 -c "DELETE FROM projects WHERE name LIKE 'ci-%';"
+        working-directory: backend
+        env:
+          DIOPTRA_ENV: test
+          DIOPTRA_JWT_SECRET: ci-only-secret-value-at-least-32-chars
+          DIOPTRA_DATABASE_URL: postgresql+psycopg://dioptra:ci-only-password@localhost:5432/dioptra
+          PGURL: postgresql://dioptra:ci-only-password@localhost:5432/dioptra
+
       - name: The audit trail is append-only in the real database
         # The suite runs on SQLite, which cannot exercise the plpgsql trigger.
         # Creating it is not the same as proving it enforces, so assert here that

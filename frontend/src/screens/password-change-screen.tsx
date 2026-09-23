@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/auth-context';
+import { PasswordInput } from '../components/password-input';
 
 export function PasswordChangeScreen(): React.ReactNode {
   const { t } = useTranslation();
@@ -18,10 +19,12 @@ export function PasswordChangeScreen(): React.ReactNode {
   const [newPassword, setNewPassword] = useState('');
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [maskSignal, setMaskSignal] = useState(0);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setErrorKey(null);
+    setMaskSignal((n) => n + 1);
     setSubmitting(true);
     try {
       await changePassword(currentPassword, newPassword);
@@ -51,31 +54,23 @@ export function PasswordChangeScreen(): React.ReactNode {
 
         <div className="field">
           <label htmlFor={currentId}>{t('passwordChange.current')}</label>
-          <input
+          <PasswordInput
             id={currentId}
-            className="input"
-            type="password"
             autoComplete="current-password"
-            required
             value={currentPassword}
-            onChange={(event) => {
-              setCurrentPassword(event.target.value);
-            }}
+            onChange={setCurrentPassword}
+            maskSignal={maskSignal}
           />
         </div>
 
         <div className="field">
           <label htmlFor={newId}>{t('passwordChange.new')}</label>
-          <input
+          <PasswordInput
             id={newId}
-            className="input"
-            type="password"
             autoComplete="new-password"
-            required
             value={newPassword}
-            onChange={(event) => {
-              setNewPassword(event.target.value);
-            }}
+            onChange={setNewPassword}
+            maskSignal={maskSignal}
           />
           <p className="hint">{t('passwordChange.hint')}</p>
         </div>

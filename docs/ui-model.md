@@ -51,6 +51,52 @@ Added to `docs/mockups/index.html` on 2026-08-28, same tokens and principles:
 - **Drop zone** of screen 03 "2 · El código" (`.drop`, dashed accent) is a
   native file input in P1; the buttons say what they do ("Subir y analizar" /
   "Clonar y analizar"). The drag-and-drop affordance is deferred to P2.
+- **The ingest panel is analyst/admin only** (2026-09-23): E1–E2 belongs to
+  them (`docs/roles-and-permissions.md`), the server already refuses a
+  developer, and the screen used to offer the upload to one AND tell them
+  "Siguiente paso: sube el código" in the banner. The developer now gets the
+  same "2 · El código" heading with one sentence saying an analyst uploads it,
+  and a banner that names what they are waiting for. Asked by `mmarin`. The
+  sibling case is NOT fixed: at the triage stage the banner still says
+  "Confirma o descarta cada hallazgo" to a developer and to an admin, neither
+  of whom may triage — it lands with the per-action role vocabulary named as a
+  non-goal in `tasks/phase6-user-administration.md`.
+
+## Registro (screen 03) — 2026-09-23
+
+- "Fecha de instalación" is our own calendar picker
+  (`components/date-picker.tsx`): a field that opens a month grid (Monday
+  first, month and weekday names from `Intl` in the UI language, today
+  outlined, the chosen day filled with the accent, days after today disabled,
+  "Hoy" / "Borrar la fecha" underneath, arrows / Enter / Escape on the
+  keyboard). The value it hands over is ISO `YYYY-MM-DD` built from LOCAL
+  calendar parts, displayed formatted for the locale; the server stores a
+  `date` and refuses text or a future date
+  (`errors.projects.installedAtInFuture`); the report and the screens format
+  it themselves. No library: tokens only, both themes — the popover sits a
+  surface step above the panel it opens in, because `--s1` on `--s1` left the
+  hairline as the only elevation cue.
+  The day cells are plain buttons in a labelled group, NOT
+  `role="grid"`/`gridcell`: that contract needs `role="row"` owners, and a
+  gridcell role on a button hides that it is activatable. The field names
+  itself with its label AND its value (`aria-labelledby`), so the chosen date
+  is announced rather than only the label. Both glyphs on these screens are
+  inline SVG, never a font character, so neither can land as a tofu box.
+  The anchor draws the field as plain text. Asked by `mmarin` ("un selector
+  de fecha bonito e intuitivo", replacing the native input of the same day).
+
+## Login (screen 01) — deviation recorded 2026-09-23
+
+- The password field has an eye glyph INSIDE the input, on the right
+  (`components/password-input.tsx`: an inline SVG button, icon-only, named
+  "Mostrar la contraseña" / "Ocultar la contraseña" through `aria-label` and
+  `title`, with `aria-pressed`) that the anchor does not draw. It only
+  flips the input's `type`, i.e. how the browser PAINTS the characters: the
+  value stays in React state and is sent in the same POST body as before,
+  nothing goes into the URL, a header or storage, and the field is re-masked on
+  every submit so a typed password is not left readable behind a spinner.
+  The forced password-change screen uses the same component on both of its
+  fields, each with its own eye. Asked by `mmarin`.
 
 ## Phase 2 screens (2026-09-22)
 

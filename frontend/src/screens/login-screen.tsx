@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { ApiError } from '../api/client';
 import { useAuth } from '../auth/auth-context';
 import { LanguageToggle } from '../components/language-toggle';
+import { PasswordInput } from '../components/password-input';
 import { ThemeToggle } from '../components/theme-toggle';
 import { useTheme } from '../theme/use-theme';
 
@@ -19,10 +20,12 @@ export function LoginScreen(): React.ReactNode {
   const [password, setPassword] = useState('');
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [maskSignal, setMaskSignal] = useState(0);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setErrorKey(null);
+    setMaskSignal((n) => n + 1);
     setSubmitting(true);
     try {
       await signIn(username, password);
@@ -71,17 +74,13 @@ export function LoginScreen(): React.ReactNode {
 
         <div className="field">
           <label htmlFor={passwordId}>{t('login.password')}</label>
-          <input
+          <PasswordInput
             id={passwordId}
-            className="input"
             name="password"
-            type="password"
             autoComplete="current-password"
-            required
             value={password}
-            onChange={(event) => {
-              setPassword(event.target.value);
-            }}
+            onChange={setPassword}
+            maskSignal={maskSignal}
           />
         </div>
 

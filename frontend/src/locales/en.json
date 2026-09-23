@@ -13,6 +13,18 @@
     "submitting": "Signing in…",
     "noAccount": "No account yet? Ask your administrator for access."
   },
+  "password": {
+    "show": "Show the password",
+    "hide": "Hide the password"
+  },
+  "datePicker": {
+    "placeholder": "Pick a date",
+    "dialog": "Calendar",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "today": "Today",
+    "clear": "Clear the date"
+  },
   "passwordChange": {
     "title": "Change your password",
     "reason": "This account still uses its initial password. Choose a new one to continue.",
@@ -72,6 +84,7 @@
       "repoUnreachable": "The repository could not be reached."
     },
     "projects": {
+      "installedAtInFuture": "The installation date cannot be later than today.",
       "notFound": "The project does not exist."
     },
     "analysis": {
@@ -226,6 +239,8 @@
     "nextStep": {
       "codeTitle": "Next step: upload the code",
       "codeBody": "Upload a ZIP or paste the repository's HTTPS address. The analysis runs on its own and tells you when it is done.",
+      "codeDeveloperTitle": "Next step: wait for the analysis",
+      "codeDeveloperBody": "An analyst uploads the code and starts the analysis. You can plan the tests once it finishes.",
       "triageTitle": "Next step: review the findings",
       "triageBody": "Confirm or discard every finding with a written reason. When you finish, the test plan unlocks.",
       "planTitle": "Next step: plan the tests",
@@ -236,6 +251,7 @@
     "ingest": {
       "section": "2 · The code",
       "intro": "The code is analyzed in an isolated environment with no internet access. Nothing from the system is executed.",
+      "waiting": "An analyst uploads this system's code and starts the analysis. The analyzed versions will appear here.",
       "zipLabel": "ZIP file with the code",
       "uploadSubmit": "Upload and analyze",
       "duration": "Usually takes a few minutes.",
