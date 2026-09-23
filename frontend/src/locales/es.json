@@ -134,7 +134,8 @@
       "designNotApproved": "Esa función todavía no tiene sus casos aprobados, así que no hay archivo que preparar.",
       "testsUnparsable": "El archivo de tests tiene un error de sintaxis y no se puede leer.",
       "testsTooLarge": "El archivo de tests es demasiado grande.",
-      "mutantUnknown": "Ese mutante no está entre los que sobrevivieron en la última ejecución de la función."
+      "mutantUnknown": "Ese mutante no está entre los que sobrevivieron en la última ejecución de la función.",
+      "findingNotTriageable": "Este hallazgo está en código de una dependencia, así que no se revisa aquí: lo cubren el inventario y la correlación de CVE."
     },
     "ast": {
       "failed": "No se pudo analizar el código de esa función.",
@@ -278,7 +279,9 @@
       "pdf": "Descargar PDF",
       "docx": "Descargar DOCX",
       "md": "Descargar Markdown",
-      "sbom": "Descargar SBOM (CycloneDX)"
+      "sbom": "Descargar SBOM (CycloneDX)",
+      "working": "Preparando…",
+      "workingHint": "Estamos componiendo el documento. En un informe grande el PDF puede tardar cerca de un minuto."
     },
     "findings": {
       "empty": "No se encontraron hallazgos.",
@@ -327,6 +330,19 @@
       "owasp": "Categoría OWASP",
       "tool": "Herramienta",
       "file": "Archivo"
+    },
+    "page": {
+      "previous": "← Anteriores",
+      "next": "Siguientes →",
+      "of": "Página {{page}} de {{pages}} · mostrando {{shown}} de {{total}} hallazgos"
+    },
+    "detailLabel": "Detalle del hallazgo",
+    "thirdParty": {
+      "title_one": "Hallazgo en código de terceros ({{count}})",
+      "title_other": "Hallazgos en código de terceros ({{count}})",
+      "why": "Están en dependencias que tú no mantienes, así que no entran en tu revisión ni frenan el paso al plan de pruebas. Siguen en el informe, y el inventario los cruza contra la base de vulnerabilidades.",
+      "listLabel": "Hallazgos en código de terceros",
+      "note": "Este hallazgo está en una dependencia. Puedes leerlo, pero no se revisa aquí: lo cubren el inventario y la correlación de CVE."
     }
   },
   "report": {
@@ -632,7 +648,8 @@
     "equivalentNote": "Un mutante equivalente es el que ningún test puede detectar porque el código sigue haciendo lo mismo (por ejemplo, cambiar un texto que solo se escribe en el registro). Escribe por qué; queda en la bitácora y en el reporte, y se descuenta en la próxima ejecución.",
     "equivalentReasonLabel": "Por qué este mutante es equivalente",
     "equivalentMarked": "Marcado. Vuelve a ejecutar y medir para que se descuente.",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "mutationNotMeasured": "No pudimos romper el código a propósito en esta función: la herramienta de mutación solo trabaja dentro de clases, y esta es una función suelta. Que no aparezcan sobrevivientes aquí no significa que tus tests los hayan matado."
   },
   "inventory": {
     "title": "Inventario de software",

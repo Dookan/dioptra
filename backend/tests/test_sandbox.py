@@ -447,3 +447,59 @@ def test_a_module_over_the_size_cap_is_refused(tmp_path: Path) -> None:
             source_path="enorme.py",
             test_content="def test_c1_x():\n    assert True\n",
         )
+
+
+def test_php_coverage_is_read_from_our_own_neutral_shape() -> None:
+    """The PHP wrapper emits Dioptra's shape, not a tool's — measured by E7.
+
+    PHPUnit's Clover and Cobertura reports carry no branch data (measured
+    2026-09-23), so `docker/sandbox/php-harness.php` reads Xdebug directly and
+    writes these fields. The mutation pass at the phase close found this parser
+    had NO test at all.
+    """
+    document = {
+        "executed_lines": [5, 6, 9],
+        "missing_lines": [11, 13],
+        "partial_branch_lines": [5, 9],
+        "total_branches": 6,
+        "covered_branches": 3,
+    }
+    coverage = results.parse_coverage(
+        json.dumps(document).encode(), language="php", module_file="Documento.php"
+    )
+    assert coverage.executed_lines == frozenset({5, 6, 9})
+    assert coverage.missing_lines == frozenset({11, 13})
+    assert coverage.partial_branch_lines == frozenset({5, 9})
+    assert (coverage.total_branches, coverage.covered_branches) == (6, 3)
+    assert coverage.branch_percent == 50.0
+    # A half-taken branch covers NEITHER side, so its line is not covered.
+    assert coverage.covers_line(6) is True
+    assert coverage.covers_line(5) is False
+
+
+def test_php_coverage_refuses_to_flatter_a_forged_document() -> None:
+    """The wrapper runs in the container the audited code executes in."""
+    forged = {
+        "executed_lines": [1, 2],
+        # A line cannot be both run and missed: the executed set wins, so a
+        # planted "missing" cannot deflate the statement percentage.
+        "missing_lines": [2, 3],
+        "partial_branch_lines": ["nope", 2],
+        # More covered than total would read as over 100 %.
+        "total_branches": 4,
+        "covered_branches": 99,
+    }
+    coverage = results.parse_coverage(
+        json.dumps(forged).encode(), language="php", module_file="x.php"
+    )
+    assert coverage.missing_lines == frozenset({3})
+    assert coverage.covered_branches == 4 and coverage.branch_percent == 100.0
+    assert coverage.partial_branch_lines == frozenset({2})
+
+
+def test_php_coverage_of_a_half_shaped_document_measures_nothing() -> None:
+    """Wrong types measure nothing rather than raising; absence is ERRORED upstream."""
+    for raw in (b"", b"not json", b"[]", b'{"total_branches": "many"}'):
+        coverage = results.parse_coverage(raw, language="php", module_file="x.php")
+        assert coverage.total_branches == 0
+        assert coverage.executed_lines == frozenset()

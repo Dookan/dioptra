@@ -76,11 +76,15 @@ class ToolRunOut(BaseModel):
 class TriageOut(BaseModel):
     """E3 progress; ``complete`` is the gate condition, computed server-side."""
 
+    #: The QUEUE — dependency findings are in none of these four.
     total: int
     confirmed: int
     false_positive: int
     pending: int
     complete: bool
+    #: How many findings sit in dependency code, so the screen can say they
+    #: exist instead of leaving the reader to wonder where the rest went.
+    third_party: int = 0
 
 
 class AnalysisOut(BaseModel):
@@ -132,6 +136,9 @@ class FindingOut(BaseModel):
     message: str | None
     advisory: dict[str, Any] | None
     references: list[str]
+    #: In dependency code: shown and reported, but never in the analyst's queue
+    #: and never awaited by the E3 gate (`app/analysis/third_party.py`).
+    third_party: bool = False
     # Institutional prose for the CWE (report content shown as data: the
     # analyst reviews the very text the PDF will print).
     description: str = ""
@@ -309,6 +316,10 @@ class VerificationRunOut(BaseModel):
     equivalent_mutants: list[dict[str, str]] = []
     assertion_free_cases: list[str]
     failed_cases: list[str]
+    #: False when the mutation tool could never have produced a mutant for this
+    #: function (a free PHP function under Infection). The screen says so in
+    #: plain words; "no survivor" must never read as "nothing survived".
+    mutation_measured: bool = True
     detail: str | None
     duration_ms: int
     created_by_username: str

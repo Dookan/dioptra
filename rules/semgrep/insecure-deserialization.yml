@@ -30,3 +30,18 @@ rules:
       - pattern: $S.unserialize(...)
       - pattern: "$YAML.load($X, { ..., schema: $YAML.DEFAULT_FULL_SCHEMA, ... })"
       - pattern: $YAML.unsafeLoad(...)
+  - id: php-unsafe-unserialize
+    message: unserialize() on untrusted data instantiates attacker-chosen classes (object injection); use json_decode(), or pass allowed_classes => false.
+    severity: ERROR
+    languages: [php]
+    metadata:
+      cwe: "CWE-502"
+      owasp: "A08:2021"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: unserialize($DATA)
+          - pattern: unserialize($DATA, ...)
+      - pattern-not: unserialize($DATA, ["allowed_classes" => false])
+      - pattern-not: unserialize($DATA, ["allowed_classes" => false], ...)

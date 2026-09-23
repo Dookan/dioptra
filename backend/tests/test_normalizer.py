@@ -466,3 +466,96 @@ def test_osv_scoped_npm_package_keeps_its_name() -> None:
     assert finding.advisory["package"] == "@babel/core"
     assert finding.advisory["version"] == "7.29.0"
     assert "@babel/core@7.29.0" in finding.title
+
+
+def test_severity_falls_back_to_the_rules_default_configuration() -> None:
+    """SARIF 2.1.0 §3.27.10: a result with no level inherits its RULE's.
+
+    Semgrep writes the level once per rule and omits it on every result, so
+    reading only ``result.level`` sent every SAST finding to INFO whatever the
+    rule declared. Found by running a real Laravel application through the
+    pipeline (2026-09-23): 611 results, none carrying a level, and rules
+    declared ``severity: ERROR`` reported as informational.
+    """
+    sarif = {
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "rules": [
+                            {
+                                "id": "rules.semgrep.php-dynamic-include",
+                                "defaultConfiguration": {"level": "error"},
+                                "properties": {"cwe": "CWE-98", "owasp": "A03:2021"},
+                            },
+                            {
+                                "id": "rules.semgrep.php-debug-output-function",
+                                "defaultConfiguration": {"level": "warning"},
+                                "properties": {"cwe": "CWE-489", "owasp": "A05:2021"},
+                            },
+                            {"id": "rules.semgrep.unset-level", "properties": {}},
+                        ]
+                    }
+                },
+                "results": [
+                    {
+                        "ruleId": "rules.semgrep.php-dynamic-include",
+                        "message": {"text": "include with a non-literal path"},
+                        "locations": [
+                            {
+                                "physicalLocation": {
+                                    "artifactLocation": {"uri": "/work/app/Http/X.php"},
+                                    "region": {"startLine": 7},
+                                }
+                            }
+                        ],
+                    },
+                    {
+                        "ruleId": "rules.semgrep.php-debug-output-function",
+                        "message": {"text": "debug dump"},
+                        "locations": [
+                            {
+                                "physicalLocation": {
+                                    "artifactLocation": {"uri": "/work/app/Http/Y.php"},
+                                    "region": {"startLine": 9},
+                                }
+                            }
+                        ],
+                    },
+                    {
+                        "ruleId": "rules.semgrep.unset-level",
+                        "message": {"text": "no level anywhere"},
+                        "locations": [
+                            {
+                                "physicalLocation": {
+                                    "artifactLocation": {"uri": "/work/app/Http/Z.php"},
+                                    "region": {"startLine": 3},
+                                }
+                            }
+                        ],
+                    },
+                    {
+                        "ruleId": "rules.semgrep.php-dynamic-include",
+                        "level": "note",
+                        "message": {"text": "the result wins when it has one"},
+                        "locations": [
+                            {
+                                "physicalLocation": {
+                                    "artifactLocation": {"uri": "/work/app/Http/W.php"},
+                                    "region": {"startLine": 11},
+                                }
+                            }
+                        ],
+                    },
+                ],
+            }
+        ]
+    }
+    findings = normalize(
+        [ToolReport(tool="semgrep", category=ToolCategory.SAST, sarif=sarif)], roots=("/work",)
+    )
+    by_path = {f.path: f.severity for f in findings}
+    assert by_path["app/Http/X.php"] is Severity.HIGH  # rule says error
+    assert by_path["app/Http/Y.php"] is Severity.MEDIUM  # rule says warning
+    assert by_path["app/Http/Z.php"] is Severity.INFO  # nothing says anything
+    assert by_path["app/Http/W.php"] is Severity.LOW  # the result's own level wins

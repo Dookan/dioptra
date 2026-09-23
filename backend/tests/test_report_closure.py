@@ -143,6 +143,8 @@ def test_test_debt_context_reads_plan_designs_files_and_latest_runs(
         "approved": 1,
         "written": 1,
         "passed": 0,
+        # Both runs measured mutation: the gap is a wave-2 (PHP) case.
+        "mutation_not_measured": 0,
         "survivors": 1,
         "equivalent": 0,
         "statement_percent": 80.0,
@@ -348,6 +350,41 @@ def test_excused_mutants_are_counted_per_function_and_in_the_totals(
     rows = {row["function"]: row for row in debt["functions"]}
     assert rows["calculateDiscount"]["equivalent"] == 1
     assert debt["totals"]["equivalent"] == 1
+
+
+def test_a_function_mutation_could_not_measure_says_so_in_every_format(
+    db: Session, tmp_path: Path
+) -> None:
+    """Zero survivors and no measurement are different facts; the report tells them apart.
+
+    A free PHP function under Infection yields no mutant at all
+    (tasks/phase7a-php.md), so printing "0" in the survivors column would
+    read as "your tests killed them all".
+    """
+    analysis = _with_workflow(db, tmp_path / "jail")
+    analysis.verification_runs[0].mutation_measured = False
+    db.commit()
+    db.refresh(analysis)
+
+    debt = closure.test_debt_context(analysis)
+    assert debt["functions"][0]["mutation_measured"] is False
+    assert debt["totals"]["mutation_not_measured"] == 1
+
+    project = ingest_service.get_project(db, analysis.project_id)
+    html = engine.render_html(analysis, project)
+    assert "no medida" in html
+    assert "solo rompe código declarado dentro de una clase" in html
+
+    markdown = engine.render_markdown(analysis, project)
+    assert "no medida" in markdown
+    assert "solo rompe c\u00f3digo declarado dentro de una clase" in markdown
+
+    with zipfile.ZipFile(io.BytesIO(engine.render_docx(analysis, project))) as archive:
+        document = archive.read("word/document.xml").decode()
+    assert "no medida" in document
+    # The sentence under the totals, not just the cell: "mutantes vivos: 0"
+    # alone reads as a measured zero (precommit invariant panel, 2026-09-23).
+    assert "solo rompe c\u00f3digo declarado dentro de una clase" in document
 
 
 def test_a_detached_analysis_gets_the_sbom_summary_without_a_correlation(

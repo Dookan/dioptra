@@ -75,6 +75,7 @@ describe('locale files', () => {
       'errors.report.unknownSection',
       'errors.report.sectionTooLong',
       'errors.findings.notFound',
+      'errors.workflow.findingNotTriageable',
       'errors.workflow.failed',
       'errors.workflow.justificationRequired',
       'errors.workflow.stageFinal',

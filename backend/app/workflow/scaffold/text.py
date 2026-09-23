@@ -45,11 +45,41 @@ def py_string(text: str) -> str:
     return repr(one_line(text))
 
 
+def php_string(text: str) -> str:
+    """A SINGLE-quoted PHP string literal for arbitrary text.
+
+    Single quotes are the smallest escape surface PHP offers: they interpolate
+    nothing — no ``$var``, no ``{$expr}``, no ``\n`` — so a backslash and a
+    quote are the whole of it. A double-quoted literal would make every ``$``
+    in a developer's title an interpolation, i.e. code.
+    """
+    return "'" + one_line(text).replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+
+def studly(text: str, *, fallback: str) -> str:
+    """StudlyCase, from the same ASCII slug every other identifier is built on.
+
+    PHPUnit resolves a test class by file name, so the class and the file must
+    agree; both are built from this.
+    """
+    return "".join(part.capitalize() for part in slug(text, fallback=fallback).split("_") if part)
+
+
 def one_line(text: str) -> str:
     """Collapse to a single line: a newline in a ``//`` or ``#`` comment escapes it."""
     return " ".join(text.split())
 
 
 def comment(text: str) -> str:
-    """Comment-safe text: one line, and never closing a block comment."""
-    return one_line(text).replace("*/", "* /")
+    """Comment-safe text: one line, and never ending the comment it sits in.
+
+    Two sequences end a comment, and PHP is why there are two. ``*/`` closes a
+    block comment in every language here. ``?>`` leaves PHP MODE ALTOGETHER —
+    it ends a ``//`` line comment and everything after it is output, so a value
+    carrying ``?> <?php …`` injects statements into a file that still passes
+    ``php -l``. Proven inside `dioptra-sandbox-php:latest` by the precommit
+    security panel, 2026-09-23: the values reaching here include brief-item
+    text lifted from the AUDITED source (``$x === '?> <?php …'`` is a legal PHP
+    condition), so this is hostile input, not prose.
+    """
+    return one_line(text).replace("*/", "* /").replace("?>", "? >")

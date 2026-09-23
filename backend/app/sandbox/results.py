@@ -14,6 +14,12 @@ Coverage is normalised to one shape for both languages:
 - JavaScript: the v8 provider emits an istanbul document — ``statementMap``
   keyed by id with line ranges, ``s`` with hit counts, ``branchMap`` with a
   ``line`` per branch and ``b`` with the count of each of its arms.
+- PHP: OUR OWN shape, already normalised by the wrapper inside the image
+  (``docker/sandbox/run-php.sh``), exactly as the mutation document has been
+  since P4. PHPUnit's native output is Clover XML; converting it in the image
+  keeps an XML parser out of this process and makes a PHPUnit version change
+  a one-file problem. The fields are the ones ``Coverage`` needs and nothing
+  else, and every one of them is bounded here like any other hostile document.
 """
 
 from __future__ import annotations
@@ -116,6 +122,8 @@ def parse_coverage(raw: bytes | None, *, language: str, module_file: str) -> Cov
         return EMPTY_COVERAGE
     if language == "python":
         return _python_coverage(document, module_file)
+    if language == "php":
+        return _dioptra_coverage(document)
     return _istanbul_coverage(document, module_file)
 
 
@@ -139,6 +147,32 @@ def _python_coverage(document: dict[str, Any], module_file: str) -> Coverage:
         partial_branch_lines=frozenset(source for source, _ in untaken),
         total_branches=len(taken) + len(untaken),
         covered_branches=len(taken),
+    )
+
+
+def _dioptra_coverage(document: dict[str, Any]) -> Coverage:
+    """Our own normalised shape, written by the wrapper inside the image.
+
+    Defensive like every other parser here: the wrapper runs in the container
+    the audited code executes in, so this document is attacker-influenced
+    exactly like a tool's own would be. A missing or wrong-typed field
+    measures nothing rather than raising, and the branch counters are clamped
+    so a forged pair cannot read as more covered than total.
+    """
+    executed = _ints(document.get("executed_lines"))
+    missing = _ints(document.get("missing_lines"))
+    total = document.get("total_branches")
+    covered = document.get("covered_branches")
+    total = total if isinstance(total, int) and total >= 0 else 0
+    covered = covered if isinstance(covered, int) and covered >= 0 else 0
+    return Coverage(
+        executed_lines=frozenset(executed),
+        # A line cannot be both run and missed; the executed set wins, so a
+        # forged "missing" cannot silently deflate the statement percentage.
+        missing_lines=frozenset(missing - executed),
+        partial_branch_lines=frozenset(_ints(document.get("partial_branch_lines"))),
+        total_branches=total,
+        covered_branches=min(covered, total),
     )
 
 

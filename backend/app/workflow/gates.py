@@ -82,7 +82,13 @@ def leave_code(analysis: Analysis) -> GateResult:
 
 
 def leave_analysis(analysis: Analysis) -> GateResult:
-    """E3 → E4: EVERY finding confirmed or discarded with a justification."""
+    """E3 → E4: every finding OF THE QUEUE confirmed or discarded, with a reason.
+
+    The queue is not every finding: `triage_status` drops the ones in
+    dependency directories, which the analyst may not adjudicate at all
+    (`app/analysis/third_party.py`, `mmarin` 2026-09-23). They stay stored,
+    shown and printed — this gate simply never waits for them.
+    """
     if not triage_status(analysis).complete:
         return _closed(REASON_TRIAGE_PENDING)
     return OPEN

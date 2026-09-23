@@ -74,3 +74,32 @@ rules:
       confidence: MEDIUM
     # regex rather than generic pattern: one finding per binding, line-exact.
     pattern-regex: v-html="[^"]+"
+  - id: php-echo-request-data
+    message: Request data echoed into the response without escaping; use htmlspecialchars() or a template engine with autoescape.
+    severity: ERROR
+    languages: [php]
+    metadata:
+      cwe: "CWE-79"
+      owasp: "A03:2021"
+      category: security
+      confidence: MEDIUM
+    pattern-either:
+      - pattern: echo $_GET[...];
+      - pattern: echo $_POST[...];
+      - pattern: echo $_REQUEST[...];
+      - pattern: echo $_COOKIE[...];
+      - pattern: print($_GET[...]);
+      - pattern: print($_POST[...]);
+  - id: laravel-blade-unescaped-echo
+    message: Blade {!! !!} renders raw HTML; use {{ }} so the value is escaped, or sanitize it first.
+    severity: ERROR
+    languages: [regex]
+    metadata:
+      cwe: "CWE-79"
+      owasp: "A03:2021"
+      category: security
+      confidence: LOW
+    paths:
+      include:
+        - "*.blade.php"
+    pattern-regex: '\{!!(?!\s*\$?[A-Za-z_]+\s*\(\s*\)\s*!!\})[^!]*!!\}'

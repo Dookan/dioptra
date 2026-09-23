@@ -41,6 +41,7 @@ from app.analysis.runners import default_runners
 from app.analysis.runners.base import WORK_DIR, ExecutionResult, Runner, RunnerSpec
 from app.analysis.runners.executor import build_executor
 from app.analysis.sbom import SbomInvalid, component_count, validate_cyclonedx
+from app.analysis.third_party import finding_is_third_party, is_third_party
 from app.core.clock import utc_now
 from app.core.config import Settings, get_settings
 from app.core.errors import AppError
@@ -163,9 +164,40 @@ def _execute(db: Session, analysis: Analysis, settings: Settings) -> None:
         raise NoToolRan("no SAST/SCA/secret tool produced a report")
 
     findings = normalize(collected.reports, collected.roots)
+    # The audited project's OWN findings rank before dependency ones, and the
+    # normalizer's worst-first order is preserved inside each group because
+    # Python's sort is stable.
+    #
+    # This is load-bearing for the cap below, not cosmetic. Severity used to
+    # collapse to INFO for every SAST finding (the SARIF `defaultConfiguration`
+    # defect fixed the same day), so the order inside the cap was effectively
+    # arbitrary and nothing was systematically evicted. Now that a dependency
+    # tree can contribute hundreds of genuine HIGHs, a fat or hostile `vendor/`
+    # would fill every slot and push the team's own findings out of the stored
+    # set entirely — out of the report, the executive summary, the E3 queue AND
+    # the E4 risk matrix — leaving only what nobody on that team can fix. The
+    # audited tree chooses how many files it ships, so that is its decision to
+    # make, which is exactly why it must not be able to make it.
+    # Found by the precommit security auditor, 2026-09-23.
+    # TWO levels, not one. Using the triage predicate alone reopened the very
+    # defect this sort closes: it exempts the whole SCA category whatever the
+    # path, so a vendored `composer.lock` landed in the privileged half and a
+    # tree shipping many nested lockfiles could still evict its own developers'
+    # findings. The first key is the PATH rule, so dependency code is
+    # de-prioritised however it was found; the second keeps a vendored CVE
+    # above vendored SAST, because it is the only one of the two an analyst
+    # can still act on. Own code < vendored SCA < vendored everything else.
+    # Found by the precommit security auditor re-auditing its own remedy.
+    findings = sorted(
+        findings,
+        key=lambda item: (
+            is_third_party(item.path),
+            finding_is_third_party(item.category, item.path),
+        ),
+    )
     if len(findings) > settings.max_findings_per_analysis:
-        # Worst first is already the normalizer's order; what falls off the end
-        # is a recorded coverage gap, never a silent drop.
+        # What falls off the end is a recorded coverage gap, never a silent
+        # drop — and it is dependency code before it is ever the team's own.
         db.add(
             ToolRun(
                 analysis_id=analysis.id,
@@ -174,7 +206,9 @@ def _execute(db: Session, analysis: Analysis, settings: Settings) -> None:
                 status=ToolStatus.RAN,
                 detail=(
                     f"findings capped at {settings.max_findings_per_analysis} of "
-                    f"{len(findings)} (worst first); the rest are not in this report"
+                    f"{len(findings)} (the audited project's own code first, then "
+                    f"dependency code, worst first within each); the rest are not "
+                    f"in this report"
                 ),
             )
         )
@@ -200,6 +234,11 @@ def _execute(db: Session, analysis: Analysis, settings: Settings) -> None:
                 advisory=item.advisory,
                 references=list(item.references),
                 fingerprint=item.fingerprint,
+                # Decided once, here, from the category and the report-relative
+                # path — not at read time, so the E3 gate can be a plain row
+                # predicate. Same predicate as the sort key above, deliberately:
+                # two copies of this rule would drift.
+                third_party=finding_is_third_party(item.category, item.path),
             )
         )
     # The CBOM rows (P5): the crypto-inventory results the normalizer set aside.

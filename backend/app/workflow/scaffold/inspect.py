@@ -30,6 +30,9 @@ from app.workflow.scaffold import ScaffoldCase
 #: A longer run simply does not match, so the case reads as unwritten.
 _JS_CASE_ID = re.compile(r"^\s*C(\d{1,6})\b")
 _PY_CASE_ID = re.compile(r"^test_c(\d{1,6})(?:_|$)")
+#: PHPUnit resolves a case by the ``test`` prefix, so the id sits right after
+#: it: ``testC3_…``. Same bounded digit run, for the same reason.
+_PHP_CASE_ID = re.compile(r"^testC(\d{1,6})(?:_|$)")
 
 _JS_CASE_CALLEES = frozenset({"it", "test"})
 #: Callees that can wrap cases in a suite, and can themselves be skipped.
@@ -41,6 +44,21 @@ _JS_SKIPPED = frozenset({"skip", "todo", "skipIf", "runIf", "fails"})
 _PY_SKIP_MARKER = "skip"
 
 _PY_EMPTY = frozenset({"pass_statement"})
+
+#: PHPUnit has no ``it.skip`` and no skip attribute: a case opts out at RUNTIME
+#: by calling this. A gate decides on what is guaranteed to run, so a case that
+#: skips itself is not a written case — the same call the JS and Python rules
+#: make about ``it.skip`` and ``@pytest.mark.skipif``.
+_PHP_SKIP_CALLS = frozenset({"markTestSkipped", "markTestIncomplete"})
+
+#: Method names that assert. PHPUnit's whole vocabulary is ``assert*`` plus the
+#: ``expect*`` family for exceptions and errors; OUR rule stays deliberately
+#: generous, exactly like the JS and Python ones — whether the assertion is a
+#: GOOD one is what the mutation run answers.
+_PHP_ASSERT_PREFIXES = ("assert", "expect")
+#: The two shapes a PHPUnit assertion can take: ``$this->assertSame(…)`` and
+#: ``self::assertSame(…)`` / ``static::assertSame(…)``.
+_PHP_CALL_TYPES = frozenset({"member_call_expression", "scoped_call_expression"})
 
 #: Roots of a call that asserts something. OUR rule, deterministic and
 #: deliberately generous: E7 rejects a case with NO assertion at all, it does
@@ -89,7 +107,11 @@ def _is_string_only(statement: Node) -> bool:
     if statement.type != "expression_statement":
         return False
     children = statement.named_children
-    return len(children) == 1 and children[0].type in ("string", "template_string")
+    return len(children) == 1 and children[0].type in (
+        "string",
+        "template_string",
+        "encapsed_string",
+    )
 
 
 def _meaningful(block: Node | None) -> int:
@@ -230,6 +252,46 @@ def _py_asserts(node: Node) -> bool:
     return False
 
 
+def _php_call_name(node: Node) -> str:
+    """The method name of a ``->`` or ``::`` call, or the empty string."""
+    if node.type not in _PHP_CALL_TYPES:
+        return ""
+    return _text(node.child_by_field_name("name"))
+
+
+def _php_skipped(body: Node | None) -> bool:
+    if body is None:
+        return False
+    return any(_php_call_name(node) in _PHP_SKIP_CALLS for node in _walk(body))
+
+
+def _php_case_bodies(root: Node) -> dict[str, Node]:
+    """``public function testC3_…()`` → its body, skipped cases left out."""
+    found: dict[str, Node] = {}
+    for node in _walk(root):
+        if node.type != "method_declaration":
+            continue
+        match = _PHP_CASE_ID.match(_text(node.child_by_field_name("name")))
+        if match is None:
+            continue
+        body = node.child_by_field_name("body")
+        if body is None or _php_skipped(body):
+            continue
+        found[f"C{int(match.group(1))}"] = body
+    return found
+
+
+def _php_bodies(root: Node) -> dict[str, int]:
+    return {case_id: _meaningful(body) for case_id, body in _php_case_bodies(root).items()}
+
+
+def _php_asserts(node: Node) -> bool:
+    return any(
+        _php_call_name(descendant).lower().startswith(_PHP_ASSERT_PREFIXES)
+        for descendant in _walk(node)
+    )
+
+
 def assertion_free_cases(content: str, path: str, cases: Sequence[ScaffoldCase]) -> list[str]:
     """Ids of the cases whose body asserts nothing at all.
 
@@ -241,8 +303,12 @@ def assertion_free_cases(content: str, path: str, cases: Sequence[ScaffoldCase])
     root = parse(content.encode("utf-8"), language)
     if root.has_error:
         raise UnparsableTests(path[:200])
-    bodies = _python_case_nodes(root) if language == "python" else _js_case_nodes(root)
-    asserts = _py_asserts if language == "python" else _js_asserts
+    if language == "python":
+        bodies, asserts = _python_case_nodes(root), _py_asserts
+    elif language == "php":
+        bodies, asserts = _php_case_bodies(root), _php_asserts
+    else:
+        bodies, asserts = _js_case_nodes(root), _js_asserts
     free: list[str] = []
     for case in cases:
         node = bodies.get(case.id)
@@ -303,7 +369,12 @@ def inspect_cases(content: str, path: str, cases: Sequence[ScaffoldCase]) -> lis
     root = parse(content.encode("utf-8"), language)
     if root.has_error:
         raise UnparsableTests(path[:200])
-    found = _python_bodies(root) if language == "python" else _js_bodies(root)
+    if language == "python":
+        found = _python_bodies(root)
+    elif language == "php":
+        found = _php_bodies(root)
+    else:
+        found = _js_bodies(root)
     return [
         CaseBody(id=case.id, present=case.id in found, statements=found.get(case.id, 0))
         for case in cases

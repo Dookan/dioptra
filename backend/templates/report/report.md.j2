@@ -183,8 +183,11 @@ Existe código comentado en los siguientes archivos del sistema:
 | {{ strings.test_debt.labels.function }} | {{ strings.test_debt.labels.cases }} | {{ strings.test_debt.labels.written }} | {{ strings.test_debt.labels.statements }} | {{ strings.test_debt.labels.branches }} | {{ strings.test_debt.labels.status }} | {{ strings.test_debt.labels.survivors }} |
 |---|---|---|---|---|---|---|
 {% for f in test_debt.functions %}
-| `{{ f.path | md }}` · {{ f.function | md }} | {{ f.cases }} | {{ strings.test_debt.labels.yes if f.written else strings.test_debt.labels.no }} | {{ (f.statement_percent ~ ' %') if f.statement_percent is not none else 'N/A' }} | {{ (f.branch_percent ~ ' %') if f.branch_percent is not none else 'N/A' }} | {{ f.status_label }} | {{ f.survivors }} |
+| `{{ f.path | md }}` · {{ f.function | md }} | {{ f.cases }} | {{ strings.test_debt.labels.yes if f.written else strings.test_debt.labels.no }} | {{ (f.statement_percent ~ ' %') if f.statement_percent is not none else 'N/A' }} | {{ (f.branch_percent ~ ' %') if f.branch_percent is not none else 'N/A' }} | {{ f.status_label }} | {{ strings.test_debt.labels.not_measured if not f.mutation_measured else f.survivors }} |
 {% endfor %}
+{% if test_debt.totals.mutation_not_measured %}
+{{ strings.test_debt.not_measured_note.format(count=test_debt.totals.mutation_not_measured) | md }}
+{% endif %}
 {% else %}
 {{ strings.test_debt.no_plan | md }}
 {% endif %}

@@ -269,6 +269,152 @@ def test_findings_are_capped_worst_first_and_recorded(
     assert cap_row.detail is not None and "100 of 150" in cap_row.detail
 
 
+def test_dependency_findings_never_evict_the_projects_own(
+    client: TestClient,
+    analyst: User,
+    db: Session,
+    fixture_executor: FixtureExecutor,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The cap must not hand the audited tree a way to hide the team's own code.
+
+    The tree chooses how many files it ships and where. With severity now read
+    correctly from the rule (the SARIF `defaultConfiguration` fix), a `vendor/`
+    full of genuine HIGHs would fill every slot of a worst-first cap and push
+    the project's own LOW findings out of the stored set — out of the report,
+    the executive summary, the E3 queue and the E4 risk matrix. Found by the
+    precommit security auditor, 2026-09-23.
+    """
+    del fixture_executor
+    from app.analysis.models import Severity, ToolCategory
+    from app.analysis.normalizer import NormalizedFinding
+    from app.core.config import get_settings
+
+    def make(
+        index: int,
+        path: str,
+        severity: Severity,
+        category: ToolCategory = ToolCategory.SAST,
+    ) -> NormalizedFinding:
+        return NormalizedFinding(
+            category=category,
+            tools=("semgrep",),
+            rule_id="flood",
+            cwe=79,
+            owasp="A03:2021",
+            title=f"flood {index}",
+            severity=severity,
+            cvss_score=None,
+            cvss_vector=None,
+            path=path,
+            line=index,
+            snippet=None,
+            message=None,
+            advisory=None,
+            references=(),
+            fingerprint=f"{index:064x}",
+        )
+
+    def flood(_reports: object, _roots: object) -> list[NormalizedFinding]:
+        # Worst-first, as the normalizer hands them over: every dependency
+        # finding outranks every finding of the project's own code. The
+        # vendored SCA findings are the second half of the trap — exempting
+        # the whole SCA category from the ORDERING (rather than only from the
+        # triage queue) would put these back in the privileged group and let a
+        # tree with many nested lockfiles evict the team's own code again.
+        vendored_sca = [
+            make(900 + i, f"vendor/pkg{i}/composer.lock", Severity.HIGH, ToolCategory.SCA)
+            for i in range(60)
+        ]
+        return (
+            [make(i, f"vendor/pkg/f{i}.php", Severity.HIGH) for i in range(120)]
+            + vendored_sca
+            + [make(500 + i, f"app/Http/Own{i}.php", Severity.LOW) for i in range(10)]
+        )
+
+    monkeypatch.setattr("app.analysis.pipeline.normalize", flood)
+    capped = get_settings().model_copy(update={"max_findings_per_analysis": 100})
+    monkeypatch.setattr("app.analysis.pipeline.get_settings", lambda: capped)
+    headers = login(client, analyst.username)
+    analysis = db.get(Analysis, uuid.UUID(_ingest(client, headers)))
+    assert analysis is not None
+
+    kept = analysis.findings
+    assert len(kept) == 100
+    own = [f for f in kept if f.path.startswith("app/Http/")]
+    # All ten survive although every one of them is the lowest severity present
+    # and 180 findings outranked them on severity alone.
+    assert len(own) == 10
+    assert {f.path for f in own} == {f"app/Http/Own{i}.php" for i in range(10)}
+    # And they lead, so the stored set opens on the team's own code.
+    assert all(f.path.startswith("app/Http/") for f in kept[:10])
+    # A vendored CVE is triageable (`third_party` False) yet must NOT thereby
+    # outrank the team's own code in the cap — the exemption belongs to the
+    # queue, not to the ordering.
+    vendored = [f for f in kept[10:] if f.path.startswith("vendor/")]
+    assert len(vendored) == 90
+
+
+def test_an_sca_finding_inside_a_dependency_path_stays_in_the_queue(
+    client: TestClient,
+    analyst: User,
+    db: Session,
+    fixture_executor: FixtureExecutor,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A CVE is the analyst's whatever directory its lockfile sits in.
+
+    `osv-scanner scan source --recursive` walks nested lockfiles, so a vendored
+    `composer.lock` produces an SCA finding whose path carries a dependency
+    segment. Taking it out of the queue would freeze its VEX state at
+    `in_triage` for the life of the analysis: the verdict is the only input of
+    the VEX document and `record_verdict` refuses a third-party finding.
+    """
+    del fixture_executor
+    from app.analysis.models import Severity, ToolCategory
+    from app.analysis.normalizer import NormalizedFinding
+    from app.analysis.third_party import finding_is_third_party
+
+    def two(_reports: object, _roots: object) -> list[NormalizedFinding]:
+        return [
+            NormalizedFinding(
+                category=category,
+                tools=("osv-scanner",) if category is ToolCategory.SCA else ("semgrep",),
+                rule_id=f"r-{index}",
+                cwe=None,
+                owasp="A06:2021",
+                title=f"finding {index}",
+                severity=Severity.HIGH,
+                cvss_score=None,
+                cvss_vector=None,
+                path=path,
+                line=1,
+                snippet=None,
+                message=None,
+                advisory=None,
+                references=(),
+                fingerprint=f"{index:064x}",
+            )
+            for index, (category, path) in enumerate(
+                [
+                    (ToolCategory.SCA, "vendor/acme/lib/composer.lock"),
+                    (ToolCategory.SAST, "vendor/acme/lib/Runner.php"),
+                ]
+            )
+        ]
+
+    monkeypatch.setattr("app.analysis.pipeline.normalize", two)
+    headers = login(client, analyst.username)
+    analysis = db.get(Analysis, uuid.UUID(_ingest(client, headers)))
+    assert analysis is not None
+
+    by_category = {f.category: f for f in analysis.findings}
+    assert by_category[ToolCategory.SCA].third_party is False
+    assert by_category[ToolCategory.SAST].third_party is True
+    # The unit rule agrees with what was persisted — one predicate, not two.
+    assert finding_is_third_party(ToolCategory.SCA, "vendor/acme/lib/composer.lock") is False
+
+
 def test_tree_level_scanner_override_files_are_removed_before_scanning(
     client: TestClient, analyst: User, db: Session, fixture_executor: FixtureExecutor
 ) -> None:

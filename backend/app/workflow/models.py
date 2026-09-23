@@ -11,7 +11,17 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, Enum, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    true,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.clock import utc_now
@@ -199,6 +209,12 @@ class VerificationRun(Base):
     equivalent_mutants: Mapped[list[dict[str, str]]] = mapped_column(JSON, default=list)
     assertion_free_cases: Mapped[list[str]] = mapped_column(JSON, default=list)
     failed_cases: Mapped[list[str]] = mapped_column(JSON, default=list)
+    #: False when the mutation tool could NEVER have produced a mutant for this
+    #: function — a free PHP function under Infection, which only mutates code
+    #: declared inside a class (tasks/phase7a-php.md, `mmarin` 2026-09-23).
+    #: The gate then decides on the other three questions and the gap is stated
+    #: on the screen and in the report: a declared gap, never a silent pass.
+    mutation_measured: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
     #: Tail of the sandbox's stderr, bounded; audited output, rendered as text.
     detail: Mapped[str | None] = mapped_column(Text, default=None)
     duration_ms: Mapped[int] = mapped_column(Integer, default=0)

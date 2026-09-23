@@ -51,7 +51,7 @@ run_supply_chain() {
   # vitest, Stryker) at BUILD time, so they are invisible to the checks above:
   # they live inside the image, not in backend/.venv or frontend/node_modules.
   # Run the same gate in there, against the image's own trees.
-  log "supply chain: free licences inside the E7 sandbox image"
+  log "supply chain: free licences inside the E7 sandbox images"
   if command -v docker >/dev/null 2>&1 \
      && docker image inspect "${DIOPTRA_SANDBOX_IMAGE:-dioptra-sandbox:latest}" >/dev/null 2>&1
   then
@@ -61,6 +61,30 @@ run_supply_chain() {
       python3 /tmp/license_gate.py --backend-venv /usr/local --node-modules /opt/dioptra-js/node_modules
   else
     echo "sandbox image not built here — build it (docker compose build sandbox-image) to check its licences"
+  fi
+
+  # The PHP image (phase 7a) installs PHPUnit and Infection as PHARS and Xdebug
+  # through pecl: none of them appears in any lockfile of this repository, which
+  # is the same reason the wave-1 image is gated from the inside. It carries no
+  # Python venv and no node_modules, so the gate reads the manifest the image
+  # generates about itself at build time — 64 packages, walked out of the
+  # phars' own per-component LICENSE files.
+  if command -v docker >/dev/null 2>&1 \
+     && docker image inspect "${DIOPTRA_SANDBOX_IMAGE_PHP:-dioptra-sandbox-php:latest}" >/dev/null 2>&1
+  then
+    # The gate runs on the HOST and reads the manifest out of the image: that
+    # image has no python3 (checked — it is php:8.3-cli), so the wave-1 shape
+    # of "run the gate inside" cannot work here. What matters is unchanged:
+    # the declaration ships INSIDE the artefact and the gate fails the build
+    # on it, rather than trusting a comment in the Dockerfile.
+    php_manifest="$(mktemp)"
+    docker run --rm --network none --entrypoint cat \
+      "${DIOPTRA_SANDBOX_IMAGE_PHP:-dioptra-sandbox-php:latest}" \
+      /opt/dioptra-php/licenses.json > "$php_manifest"
+    uv run --project backend python scripts/license_gate.py --php-manifest "$php_manifest"
+    rm -f "$php_manifest"
+  else
+    echo "php sandbox image not built here — build it (docker compose build sandbox-php-image) to check its licences"
   fi
 
   log "supply chain: no CDN in the built bundle"

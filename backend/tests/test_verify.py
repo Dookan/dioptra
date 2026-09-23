@@ -9,6 +9,7 @@ on their own, and each one is shown to the developer by name.
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +27,8 @@ from app.sandbox.executor import SandboxResult
 from app.sandbox.workspace import Attempt
 from app.workflow import gates, verify
 from app.workflow import models as workflow_models
+from app.workflow.ast.extract import declared_in_class
+from app.workflow.design import FunctionRef
 from app.workflow.models import VerificationStatus
 from tests.support import login, seed_done_analysis
 
@@ -178,6 +181,13 @@ def test_a_green_run_passes_and_opens_the_gate(
     assert run.reasons == [] and run.uncovered_items == []
     assert run.coverage["statement_percent"] == 100.0
     assert run.duration_ms == 1234
+    # The ORDINARY direction of the wave-2 flag, which nothing pinned until the
+    # precommit coverage adversary set it to False unconditionally and the whole
+    # backend suite stayed green (2026-09-23). A mutation that WAS measured must
+    # say so: otherwise every Python and JS/TS run would print "no medida" on the
+    # E7 screen and in all four report formats, silently downgrading what an E7
+    # pass attests — the exact opposite of "declared on every surface".
+    assert run.mutation_measured is True
     assert gates.leave_verification(analysis).open is True
 
     entry = db.scalars(
@@ -216,6 +226,192 @@ def test_a_surviving_mutant_is_shown_to_the_developer_by_name(
         {"id": "0", "line": "4", "mutant": "ConditionalExpression: false"}
     ]
     assert gates.check(Stage.VERIFICATION, analysis).open is False
+
+
+def _never_measurable(*_args: object, **_kwargs: object) -> bool:
+    """Stand-in for the AST query: this phase's tests pin it separately."""
+    return False
+
+
+def _php_analysis(tmp_path: Path, source: str) -> Analysis:
+    """A bare analysis whose jail holds one PHP file — enough for the AST query."""
+    jail = tmp_path / "phpjail"
+    (jail / "app").mkdir(parents=True)
+    (jail / "app" / "Documento.php").write_text(source, encoding="utf-8")
+    analysis = Analysis()
+    analysis.workspace_path = str(jail)
+    return analysis
+
+
+PHP_METHOD = """<?php
+class Documento
+{
+    public static function validar(?string $c): bool
+    {
+        return $c !== null;
+    }
+}
+"""
+
+PHP_FREE = """<?php
+function validar(?string $c): bool
+{
+    return $c !== null;
+}
+"""
+
+
+def test_mutation_is_not_measurable_for_a_free_php_function(tmp_path: Path) -> None:
+    """Infection mutates only code inside a class, so a free function yields none.
+
+    Decided from the SOURCE, before the run is scored: an empty survivor list
+    must never be allowed to read as "nothing survived".
+    """
+    ref = FunctionRef(path="app/Documento.php", function="validar", line=None)
+    assert not verify.mutation_is_measurable(
+        _php_analysis(tmp_path / "free", PHP_FREE), language="php", ref=ref
+    )
+    assert verify.mutation_is_measurable(
+        _php_analysis(tmp_path / "method", PHP_METHOD), language="php", ref=ref
+    )
+
+
+def test_every_other_language_is_always_measurable(tmp_path: Path) -> None:
+    """mutmut and Stryker mutate free functions; only PHP carries the limit."""
+    ref = FunctionRef(path="app/Documento.php", function="validar", line=None)
+    assert verify.mutation_is_measurable(
+        _php_analysis(tmp_path / "ts", PHP_FREE), language="typescript", ref=ref
+    )
+
+
+def test_a_function_the_source_no_longer_declares_is_scored_on_mutation(
+    tmp_path: Path,
+) -> None:
+    """Not finding the function is not evidence that it is free.
+
+    False means "excuse the mutation question", so anything unresolved must
+    answer True. The earlier version returned False here — a planned function
+    renamed out of the source would have had its mutation question skipped and
+    a zero-mutant run could pass (precommit panel, 2026-09-23).
+    """
+    analysis = _php_analysis(tmp_path / "gone", PHP_FREE)
+    ref = FunctionRef(path="app/Documento.php", function="noSuchFunction", line=None)
+    assert verify.mutation_is_measurable(analysis, language="php", ref=ref)
+
+
+def test_a_language_without_a_profile_is_scored_on_mutation(tmp_path: Path) -> None:
+    """An unknown language is unresolved too, and unresolved means measurable."""
+    analysis = _php_analysis(tmp_path / "lang", PHP_FREE)
+    ref = FunctionRef(path="app/Documento.php", function="validar", line=None)
+    assert declared_in_class(PHP_FREE.encode(), "php", "validar", None) is False
+    assert declared_in_class(PHP_FREE.encode(), "cobol", "validar", None) is True
+    assert verify.mutation_is_measurable(analysis, language="cobol", ref=ref)
+
+
+def test_an_unreadable_source_is_scored_on_mutation_like_any_other(tmp_path: Path) -> None:
+    """The conservative side: we do not excuse a function we could not read."""
+    analysis = Analysis()
+    analysis.workspace_path = str(tmp_path / "missing")
+    ref = FunctionRef(path="app/Nope.php", function="validar", line=None)
+    assert verify.mutation_is_measurable(analysis, language="php", ref=ref)
+
+
+def test_a_function_the_tool_cannot_mutate_is_not_a_dead_end(
+    db: Session, developer: User, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`mmarin`, 2026-09-23: declare the gap, decide on the other three questions.
+
+    The run passes, the gate opens, and the row carries ``mutation_measured``
+    False so the screen and the report can say so.
+    """
+    monkeypatch.setattr(verify, "mutation_is_measurable", _never_measurable)
+    analysis = _analysis(db, tmp_path)
+    result = replace(
+        _result(),
+        mutation=json.dumps(
+            {"tool": "infection", "killed": 0, "total": 0, "survived": []}
+        ).encode(),
+    )
+    run = _run(db, analysis, developer, result)
+    assert run.status is VerificationStatus.PASSED
+    assert run.mutation_measured is False
+    assert gates.check(Stage.VERIFICATION, analysis).open is True
+
+
+def test_the_gap_never_excuses_the_other_three_questions(
+    db: Session, developer: User, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Coverage still closes the gate on a function mutation cannot measure."""
+    monkeypatch.setattr(verify, "mutation_is_measurable", _never_measurable)
+    analysis = _analysis(db, tmp_path)
+    result = replace(
+        _result(missing=[5]),
+        mutation=json.dumps(
+            {"tool": "infection", "killed": 0, "total": 0, "survived": []}
+        ).encode(),
+    )
+    run = _run(db, analysis, developer, result)
+    assert run.status is VerificationStatus.FAILED
+    assert "coverage_short" in run.reasons
+    assert run.mutation_measured is False
+
+
+def test_an_empty_result_document_is_missing_not_a_clean_sheet(
+    db: Session, developer: User, tmp_path: Path
+) -> None:
+    """Zero bytes is not a document.
+
+    Measured on a Laravel model the sandbox cannot load (it extends
+    ``Illuminate\\...``, and nothing of the audited project is installed):
+    PHPUnit died before writing a single test case, leaving a 0-byte
+    junit.xml. Counted as present, that reads as "no test failed".
+    """
+    analysis = _analysis(db, tmp_path)
+    run = _run(db, analysis, developer, replace(_result(), junit=b""))
+    assert run.status is VerificationStatus.ERRORED
+    assert run.detail is not None and "junit.xml" in run.detail
+    assert gates.check(Stage.VERIFICATION, analysis).open is False
+
+
+def test_a_run_that_generated_no_mutant_is_errored_not_passed(
+    db: Session, developer: User, tmp_path: Path
+) -> None:
+    """Zero mutants measured NOTHING; "no survivor" must not read as a pass.
+
+    Found while building wave 2 (tasks/phase7a-php.md): Infection only mutates
+    code inside a CLASS, so a free PHP function yields ``total: 0`` however
+    good or bad the suite is. The survivor list is then empty and every other
+    question can pass — the same fail-OPEN the missing-document rule of P4
+    exists for, reached by a different road.
+    """
+    analysis = _analysis(db, tmp_path)
+    result = _result()
+    result = replace(
+        result,
+        mutation=json.dumps(
+            {"tool": "infection", "killed": 0, "total": 0, "survived": []}
+        ).encode(),
+    )
+    run = _run(db, analysis, developer, result)
+    assert run.status is VerificationStatus.ERRORED
+    assert run.reasons == ["sandbox_error"]
+    assert run.detail == verify.NO_MUTANTS_DETAIL
+    assert gates.check(Stage.VERIFICATION, analysis).open is False
+
+
+def test_a_tool_that_reports_no_count_still_scores_on_its_survivor_list(
+    db: Session, developer: User, tmp_path: Path
+) -> None:
+    """``None`` is not zero: mutmut's counts are best effort, its list is exact."""
+    analysis = _analysis(db, tmp_path)
+    result = replace(
+        _result(),
+        mutation=json.dumps(
+            {"tool": "mutmut", "killed": None, "total": None, "survived": []}
+        ).encode(),
+    )
+    run = _run(db, analysis, developer, result)
+    assert run.status is VerificationStatus.PASSED
 
 
 def test_a_case_that_asserts_nothing_is_rejected(

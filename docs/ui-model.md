@@ -62,6 +62,37 @@ Added to `docs/mockups/index.html` on 2026-08-28, same tokens and principles:
   of whom may triage — it lands with the per-action role vocabulary named as a
   non-goal in `tasks/phase6-user-administration.md`.
 
+## Descargas del reporte (screen 03) — 2026-09-23
+
+- The export buttons carry a **busy state**: the one in flight reads
+  "Preparando…", every download button is disabled while it runs, and a
+  `role="status"` line underneath says the document is being composed and that
+  a large PDF can take close to a minute.
+- **Why it exists, measured**: the server composes the PDF with WeasyPrint,
+  which took **58 s** on a real Laravel analysis (687 findings, 1 369 SBOM
+  components; the HTML of the same report takes 0.5 s). The buttons used to
+  stay enabled and say nothing, so the screen read as frozen — and a second
+  click stacked another minute of CPU-bound server work on top of the first.
+  Reported by `mmarin`.
+- **The anchor draws no download buttons on screen 03 at all** — mockup 09 is
+  the only screen with exports ("Exportar PDF / DOCX / Markdown"). These
+  buttons are a P1 addition, so there is nothing to match them against; the
+  busy state follows the product's own patterns instead.
+- The hint uses `.sub`, not the anchor's `.hint`, which is the element mockup
+  03 uses for exactly this kind of "how long will this take" line. `--hint`
+  resolves to `--t3`, recorded in `components.css` as below AA at that size,
+  and this text is load-bearing — so `.sub` on purpose. It shows for the PDF
+  only: the other formats are sub-second.
+- The wait itself is not a UI problem and is NOT fixed here: rendering is
+  synchronous in the request. **Profiled on the same report** (2026-09-23):
+  Jinja 0.45 s, WeasyPrint parse 2.1 s, `write_pdf` the rest — 70 s of layout
+  plus 21 s of PDF writing under cProfile, over a **516-page** document. No
+  pathology and nothing of ours in the hot path: the cost is proportional to
+  the document. So the two real levers are making the report smaller (422 of
+  those 687 findings are in `vendor/`) or moving the export to the RQ queue.
+  Both are `mmarin`'s call. nginx already allows it: `proxy_read_timeout 600s`
+  on `/api/`, so the request is not cut off.
+
 ## Registro (screen 03) — 2026-09-23
 
 - "Fecha de instalación" is our own calendar picker
@@ -270,6 +301,114 @@ Radii: frames 14, cards 12, buttons 9, badges 5. Borders 1px hairline.
   inside the banner; the implementation keeps the reopen in the right panel
   because it needs a written reason first, which does not fit a banner
   button. That last one is `mmarin`'s call to overrule.
+
+## Hallazgos (E3) — paginación, 2026-09-23
+
+- The list paints **25 findings at a time**, with a pager underneath
+  (`.pager`: previous / next and a `role="status"` line saying which page and
+  how many of how many). The filters apply BEFORE the page, and changing any
+  filter returns to the first page — otherwise a narrowed list leaves the
+  reader on a page that no longer exists.
+- **Why, measured**: a real Laravel application produced **687 findings** and
+  the screen rendered a card for every one of them, which froze the browser.
+  The server was never involved — it answered the whole list in **0.08 s** and
+  refused the stage transition in under a millisecond. `mmarin` reported it
+  from real use (2026-09-23).
+- Paging is **client-side**: the payload is one request (0.6 MiB for 687, and
+  `max_findings_per_analysis` caps an analysis at 2 000, so ~1.8 MiB worst
+  case). **Revisit trigger**: raising that cap, or a browser reaching the API
+  over a slow link.
+- **Card harmony and the detail panel** (same report, `mmarin`): long titles
+  and long paths overflowed their card, so no two cards were the same height,
+  and because the detail sits at the TOP of the right column, clicking a card
+  near the bottom of the list updated something off-screen — it read as
+  "nothing happened", with an empty column beside the scroll. Fixed in
+  `.cols.findings`: the title and the path are each clamped to two lines AND
+  floored at two lines (`line-height` pinned so the reserve is exact), with
+  `overflow-wrap: anywhere` because paths and rule ids have nowhere to break;
+  the detail panel is `position: sticky` so it follows the list, scrolling
+  inside itself rather than adding a second page scrollbar. Below 900 px the
+  layout is one column and the panel is deliberately NOT sticky — it would
+  cover the list it belongs to.
+- **Two independent panes, not a scrolling page** (`mmarin`, same session,
+  after seeing it): "primero baja la barra de la página y después bajan las
+  tarjetas — deberían bajar las tarjetas si tengo el puntero sobre la caja de
+  las tarjetas". The first attempt put the scroll on the DETAIL panel and left
+  the page scrolling the list, which is backwards for a master-detail screen.
+  Both columns are now capped to the viewport and scroll inside themselves: the
+  card list is the scroll region (`.listpane > .list.scrollpane`), the pager
+  sits OUTSIDE it so it does not scroll away, and the detail keeps its own.
+  Below 900 px the panes stack, nothing is sticky or capped, and the page
+  scrolls — which is right when there is no second column to scroll against.
+- **A scroll region has to look like one** (`mmarin`, same session): sticky and
+  internally scrollable was not discoverable — nothing said the box scrolled on
+  its own. `.scrollpane` gives it a thin token-coloured scrollbar
+  (`scrollbar-color` for Firefox, `::-webkit-scrollbar` for Chromium; no new
+  colour, `--line-strong` at rest and `--t3` on hover), firms the border on
+  hover and `:focus-within`, and carries the same `--acc` focus ring every
+  other focusable surface uses. It is also an **accessibility fix, not only a
+  visual one**: a scrollable region that is not focusable cannot be scrolled by
+  keyboard, so the panel takes `tabIndex={0}` and an `aria-label`
+  (`findings.detailLabel`) — which is what makes the `<section>` a named region
+  rather than an anonymous box, announced when the reader tabs into it.
+- Recorded deviation: mockup 04 draws a short list and no pager, so there is
+  nothing to match this against; it follows the product's own button and
+  `.sub` patterns. The pager uses `.sub` rather than `.hint` for the same
+  reason the download hint does — `--t3` is below AA at that size and this
+  line tells the analyst where they are.
+
+## Hallazgos (E3) — código de terceros, 2026-09-23
+
+- The screen has **two lists**, both in the LEFT pane. The working queue holds
+  the findings of the audited project's OWN code; at the foot of the same pane,
+  a collapsed `<details class="panel deps">` — "Hallazgos en código de terceros
+  (N)" — holds everything the platform found inside a dependency directory.
+  It sits inside the pane rather than after the grid **on purpose**: the detail
+  panel is `sticky` only within `.cols.findings`, so a section placed after the
+  grid would update a detail that had already scrolled off above — which is the
+  exact "parece que no pasa nada" complaint this file records as fixed for the
+  queue. Open, it shares the pane's height with the queue and scrolls on its
+  own; below 900 px both caps are lifted and the page scrolls, because a nested
+  scroll on a phone traps the reader's gesture. The second list has its own
+  pager, the same cards, and **no verdict form**: selecting one shows the
+  detail with a `.sub.warn` sentence saying it comes from a dependency, that it
+  is in the report and in the inventory, and that it is not the analyst's to
+  adjudicate.
+- The queue's "next step" banner counts only the queue, so "Te faltan N
+  hallazgos por revisar" is now a number the analyst can actually reach. The
+  third-party count is NOT in that banner — it is on the section's own summary
+  line ("Hallazgos en código de terceros (N)"), which is always on the page.
+  Deliberate: the banner states the next STEP, and reading dependency findings
+  is not a step. Revisit if an analyst reports being surprised by what the
+  report printed.
+- **Why** (`mmarin`, 2026-09-23, from real use): a Laravel application produced
+  687 findings, **430 of them inside `vendor/`** — Symfony, Laravel and DomPDF
+  source the analyst can neither fix nor sensibly write 430 separate
+  justifications about. The queue is now 257. Nothing was suppressed: the
+  findings are still produced, stored, exported in every format and carried by
+  the inventory; what changed is only who is required to adjudicate them.
+- The section is collapsed by default and says its count on the summary line,
+  because "invisible" and "not in the queue" are different things and the
+  analyst has to be able to see what the report will print.
+- **Checked on screen by `mmarin`, 2026-09-23.** Worth writing down because no
+  test can: `components.css` is imported only by `main.tsx`, which the Vitest
+  suite never loads, jsdom applies no stylesheet and nothing asserts a computed
+  style. Every CSS claim in this file — the two scroll panes, the token-coloured
+  scrollbar in both themes, the two-line clamp and floor, the height the two
+  lists share when the dependency section opens — rests on that look, not on
+  CI. A change to these rules needs the same look again.
+
+## Verificación (E7) — 2026-09-23
+
+- A run whose mutation could not be measured carries one extra sentence on its
+  result card (`verify.mutationNotMeasured`, `.sub.warn`): the mutation tool
+  works only inside classes, so a free PHP function yields no mutant, and the
+  line says explicitly that an empty survivor list here does not mean the
+  tests killed them. `.caserow .sub.warn` is its own descendant rule —
+  `warn` alone matches nothing in `components.css`, so without it the sentence
+  would render identically to the measurements above it.
+- It states the TOOL's limit, never the developer's. Background:
+  `docs/workflow-gates.md` → E7 re-audit rules, and `tasks/phase7a-php.md`.
 
 ## Phase 5 screens (2026-09-22)
 

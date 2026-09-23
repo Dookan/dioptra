@@ -12,7 +12,19 @@ from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import JSON, Enum, Float, ForeignKey, Integer, LargeBinary, String, Text, Uuid
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    String,
+    Text,
+    Uuid,
+    false,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.clock import utc_now
@@ -191,6 +203,13 @@ class Finding(Base):
     references: Mapped[list[str]] = mapped_column(JSON, default=list)
     #: (path, line, rule-or-CWE) key used for cross-tool deduplication.
     fingerprint: Mapped[str] = mapped_column(String(64), index=True)
+    #: The finding sits in a dependency directory, so it is NOT the analyst's
+    #: to adjudicate: it never enters the E3 queue and the gate does not wait
+    #: for a verdict on it. It is still stored, shown and reported
+    #: (`app/analysis/third_party.py`, `tasks/phase9-survey.md`).
+    third_party: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), index=True
+    )
 
     # Triage (E3). The latest verdict lives here; every verdict ever given,
     # including revisions, is a row of the append-only audit log — that trail

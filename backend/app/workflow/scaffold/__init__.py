@@ -29,7 +29,15 @@ from typing import Any
 from app.workflow.ast.source import language_for
 from app.workflow.errors import DesignNotApproved
 from app.workflow.models import CaseDesign
-from app.workflow.scaffold.text import comment, js_string, one_line, py_string, slug
+from app.workflow.scaffold.text import (
+    comment,
+    js_string,
+    one_line,
+    php_string,
+    py_string,
+    slug,
+    studly,
+)
 
 #: The case id opens the case name; the E6 gate finds a case by this prefix,
 #: so the developer may reword the title but must keep the id.
@@ -150,6 +158,8 @@ def build_scaffold(design: CaseDesign) -> ScaffoldFile:
     language = language_for(design.path)
     if language == "python":
         return _python_scaffold(design)
+    if language == "php":
+        return _php_scaffold(design)
     return _javascript_scaffold(design, language)
 
 
@@ -289,6 +299,80 @@ def _python_scaffold(design: CaseDesign) -> ScaffoldFile:
         language="python",
         runner="pytest",
         import_specifier=module or design.path,
+        content="\n".join(lines),
+        cases=cases,
+    )
+
+
+def php_class_name(path: str, function: str, mark: str) -> str:
+    """The test class, which PHPUnit resolves by FILE NAME — so both agree.
+
+    Built from the same ASCII slug every other generated identifier uses, so a
+    Unicode function name or a path with a hyphen cannot produce a class PHP
+    refuses to declare.
+    """
+    stem = studly(_stem(path), fallback="Module")
+    name = studly(function, fallback="Fn")
+    return f"{stem}{name}{mark.upper()}DioptraTest"
+
+
+def _php_scaffold(design: CaseDesign) -> ScaffoldFile:
+    items = _brief_items(design)
+    function = design.function
+    mark = _discriminator(design.path, design.line)
+    class_name = php_class_name(design.path, function, mark)
+    filename = f"{class_name}.php"
+    # The sandbox copies the module under test FLAT beside this file, so the
+    # require is by basename and relative to this file's own directory —
+    # never the audited tree's layout, and never an include_path lookup.
+    specifier = _basename(design.path)
+
+    lines = [
+        "<?php",
+        "",
+        f"// Dioptra · E6 scaffold — {comment(function)} ({comment(design.path)}:{design.line})",
+        "// The platform does not write tests. The names below and the brief",
+        "// items each case must demonstrate come from the design you approved;",
+        "// every assertion, every input and every expected value is yours.",
+        "// Keep the case id at the start of each method name — E6 finds your",
+        "// case by it.",
+        "",
+        "declare(strict_types=1);",
+        "",
+        "use PHPUnit\\Framework\\TestCase;",
+        "",
+        f"require_once __DIR__ . '/' . {php_string(specifier)};",
+        "",
+        f"final class {class_name} extends TestCase",
+        "{",
+    ]
+
+    cases: list[ScaffoldCase] = []
+    stored = _stored_cases(design)
+    for index, case in enumerate(stored, start=1):
+        case_id = f"C{index}"
+        title = one_line(str(case.get("title") or ""))
+        # `testC1_…`: the id sits right after the `test` PHPUnit requires, which
+        # is what the gate matches after the developer rewords the title.
+        name = f"test{case_id}_{slug(title, fallback=slug(function, fallback='fn'))}"
+        covers = _covers_of(case)
+        cases.append(ScaffoldCase(id=case_id, name=name, title=title, covers=covers))
+        lines.append(f"    // {comment(name_title(case_id, title))}")
+        lines.append(f"    public function {name}(): void")
+        lines.append("    {")
+        for note in _covers_notes(covers, items):
+            lines.append(f"        // covers {note}")
+        lines.append("        // TODO(developer): write this case.")
+        lines.append("    }")
+        if index < len(stored):
+            lines.append("")
+    lines.append("}")
+    lines.append("")
+    return ScaffoldFile(
+        filename=filename,
+        language="php",
+        runner="phpunit",
+        import_specifier=specifier,
         content="\n".join(lines),
         cases=cases,
     )

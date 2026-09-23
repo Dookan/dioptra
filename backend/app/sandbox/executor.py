@@ -40,7 +40,26 @@ from app.sandbox.workspace import (
 
 #: The wrapper each runner is invoked through. It lives in the IMAGE, not in
 #: the attempt directory, so the audited tree can never replace it.
-ENTRYPOINTS = {"pytest": "dioptra-run-python", "vitest": "dioptra-run-js"}
+ENTRYPOINTS = {
+    "pytest": "dioptra-run-python",
+    "vitest": "dioptra-run-js",
+    "phpunit": "dioptra-run-php",
+}
+
+
+def image_for(settings: Settings, runner: str) -> str:
+    """The image that carries this runner — one per language (phase 7a).
+
+    An unknown runner is a programming error, not a request: it would mean a
+    scaffold was generated for a language no image can execute, and running it
+    in the WRONG image would execute audited code against a toolchain nobody
+    chose. Failing here is the safe answer.
+    """
+    if runner == "phpunit":
+        return settings.sandbox_image_php
+    if runner in ENTRYPOINTS:
+        return settings.sandbox_image
+    raise KeyError(runner)
 
 
 @dataclass(frozen=True)
@@ -62,7 +81,14 @@ class SandboxResult:
 
     @property
     def missing(self) -> list[str]:
-        """Declared files the container did not produce."""
+        """Declared files the container did not produce, or produced EMPTY.
+
+        Zero bytes is not a document: every runner writes at least a JSON
+        object or a `<testsuites>` element, so an empty file means the tool
+        died before writing. Counting it as present let a PHPUnit run that
+        never started read as "no test failed" — measured on a Laravel model
+        the sandbox cannot load, 2026-09-23 (tasks/phase7a-php.md).
+        """
         return [
             name
             for name, blob in (
@@ -70,13 +96,14 @@ class SandboxResult:
                 (JUNIT_FILE, self.junit),
                 (MUTATION_FILE, self.mutation),
             )
-            if blob is None
+            if not blob
         ]
 
 
 def command(settings: Settings, attempt: Attempt, *, container_name: str) -> list[str]:
     """The exact ``docker run`` argv. Exposed so the tests can assert every flag."""
     entrypoint = ENTRYPOINTS[attempt.runner]
+    image = image_for(settings, attempt.runner)
     return [
         "docker",
         "run",
@@ -118,7 +145,7 @@ def command(settings: Settings, attempt: Attempt, *, container_name: str) -> lis
         "HOME=/tmp",  # noqa: S108 — the container's own tmpfs
         "-e",
         f"DIOPTRA_OUT={RUN_DIR}",
-        settings.sandbox_image,
+        image,
         entrypoint,
         attempt.test_file,
         attempt.module_file,

@@ -50,6 +50,7 @@ def analysis_out(analysis: Analysis) -> AnalysisOut:
         false_positive=status.false_positive,
         pending=status.pending,
         complete=status.complete,
+        third_party=status.third_party,
     )
     return payload
 

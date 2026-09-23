@@ -24,3 +24,32 @@ rules:
       - pattern: "$RES.json({ ..., stack: $ERR.stack, ... })"
       - pattern: "$RES.status($CODE).send($ERR.stack)"
       - pattern: "$RES.status($CODE).json({ ..., stack: $ERR.stack, ... })"
+  - id: php-debug-output-function
+    message: Debug dump reaches the response and exposes internal state; remove it or log server-side.
+    severity: WARNING
+    languages: [php]
+    metadata:
+      cwe: "CWE-489"
+      owasp: "A05:2021"
+      category: security
+      confidence: MEDIUM
+    pattern-either:
+      - pattern: var_dump(...)
+      - pattern: print_r($X);
+      - pattern: dd(...)
+      - pattern: dump(...)
+      - pattern: phpinfo(...)
+  - id: php-display-errors-enabled
+    message: display_errors sends stack traces and paths to the client; log errors instead.
+    severity: WARNING
+    languages: [php]
+    metadata:
+      cwe: "CWE-209"
+      owasp: "A05:2021"
+      category: security
+      confidence: HIGH
+    pattern-either:
+      - pattern: ini_set("display_errors", "1")
+      - pattern: ini_set("display_errors", 1)
+      - pattern: ini_set('display_errors', '1')
+      - pattern: ini_set('display_errors', 'On')

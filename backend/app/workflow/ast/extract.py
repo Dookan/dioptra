@@ -1,4 +1,5 @@
-"""tree-sitter → FlowGraph, for JavaScript / TypeScript / Python (wave 1).
+"""tree-sitter → FlowGraph, for JavaScript / TypeScript / Python (wave 1)
+and PHP (wave 2, phase 7a).
 
 One builder, one profile per language: the profile names the node types
 that matter (functions, blocks, decisions, loops, exits) and the builder
@@ -27,11 +28,19 @@ MAX_NODES = 400
 @dataclass(frozen=True)
 class Profile:
     function_types: frozenset[str]
+    #: Declarations whose body holds methods. Used to tell a METHOD from a free
+    #: function, which E7 needs: Infection mutates only code inside a class
+    #: (tasks/phase7a-php.md), so a free PHP function can never be measured.
+    class_types: frozenset[str]
     #: Declarators whose value is an anonymous function (``const f = () => …``).
     declarator_types: frozenset[str]
     anonymous_function_types: frozenset[str]
     block_types: frozenset[str]
     if_types: frozenset[str]
+    #: Chained alternatives that are a named child of the ``if`` and carry
+    #: their own condition (Python ``elif_clause``, PHP ``else_if_clause``).
+    #: JavaScript has none — it nests an ``if`` inside its ``else_clause``.
+    elif_types: frozenset[str]
     else_types: frozenset[str]
     loop_types: frozenset[str]
     switch_types: frozenset[str]
@@ -42,6 +51,11 @@ class Profile:
     finally_types: frozenset[str]
     #: Compound statements whose body simply continues the flow (with, labeled…).
     transparent_types: frozenset[str]
+    #: Thin statement wrappers around a single expression. PHP 8 made ``throw``
+    #: an EXPRESSION, so a bare ``throw`` reaches the walker wrapped in an
+    #: ``expression_statement``; unwrapping is what keeps it a throw node
+    #: instead of a process box. Empty where the language has no such wrapper.
+    unwrap_types: frozenset[str]
     return_types: frozenset[str]
     throw_types: frozenset[str]
     #: Counted for cyclomatic complexity beyond the structural ones above.
@@ -58,10 +72,12 @@ class Profile:
 
 PYTHON = Profile(
     function_types=frozenset({"function_definition"}),
+    class_types=frozenset({"class_definition"}),
     declarator_types=frozenset(),
     anonymous_function_types=frozenset({"lambda"}),
     block_types=frozenset({"block"}),
     if_types=frozenset({"if_statement", "elif_clause"}),
+    elif_types=frozenset({"elif_clause"}),
     else_types=frozenset({"else_clause"}),
     loop_types=frozenset({"for_statement", "while_statement"}),
     switch_types=frozenset({"match_statement"}),
@@ -71,6 +87,7 @@ PYTHON = Profile(
     handler_types=frozenset({"except_clause", "except_group_clause"}),
     finally_types=frozenset({"finally_clause"}),
     transparent_types=frozenset({"with_statement"}),
+    unwrap_types=frozenset(),
     return_types=frozenset({"return_statement"}),
     throw_types=frozenset({"raise_statement"}),
     expression_decision_types=frozenset({"conditional_expression"}),
@@ -85,12 +102,14 @@ JAVASCRIPT = Profile(
     function_types=frozenset(
         {"function_declaration", "generator_function_declaration", "method_definition"}
     ),
+    class_types=frozenset({"class_declaration", "class"}),
     declarator_types=frozenset({"variable_declarator", "public_field_definition", "pair"}),
     anonymous_function_types=frozenset(
         {"arrow_function", "function_expression", "function", "generator_function"}
     ),
     block_types=frozenset({"statement_block"}),
     if_types=frozenset({"if_statement"}),
+    elif_types=frozenset(),
     else_types=frozenset({"else_clause"}),
     loop_types=frozenset({"for_statement", "for_in_statement", "while_statement", "do_statement"}),
     switch_types=frozenset({"switch_statement"}),
@@ -100,6 +119,7 @@ JAVASCRIPT = Profile(
     handler_types=frozenset({"catch_clause"}),
     finally_types=frozenset({"finally_clause"}),
     transparent_types=frozenset({"labeled_statement", "with_statement"}),
+    unwrap_types=frozenset(),
     return_types=frozenset({"return_statement"}),
     throw_types=frozenset({"throw_statement"}),
     expression_decision_types=frozenset({"ternary_expression"}),
@@ -110,15 +130,64 @@ JAVASCRIPT = Profile(
     string_types=frozenset({"string", "template_string"}),
 )
 
+# PHP (wave 2, phase 7a). Node types confirmed against the INSTALLED grammar
+# (tree-sitter-php 0.24.1), not from memory — tasks/phase7-survey.md §3.1.
+# Three shapes have no wave-1 analogue and are handled by the generalisations
+# below rather than by special cases in the walker:
+#   - `throw` is an EXPRESSION since PHP 8 → `unwrap_types`;
+#   - `elseif` is a chained clause with its own condition → `elif_types`;
+#   - the if/while/foreach body field is `body`, not `consequence`.
+# `match` is deliberately NOT a switch here: it is an expression, so it never
+# reaches the statement walker. Its arms still COUNT (they are in `case_types`,
+# so each one adds a basis path and raises `min_cases`) but they are not drawn
+# as branches and the brief does not name them — the same treatment a `try`'s
+# success edge already gets (docs/workflow-gates.md → Test brief).
+PHP = Profile(
+    function_types=frozenset({"function_definition", "method_declaration"}),
+    class_types=frozenset(
+        {"class_declaration", "trait_declaration", "interface_declaration", "enum_declaration"}
+    ),
+    # `$f = function () {…}` is an assignment_expression with left/right
+    # fields, not name/value, so a closure bound to a variable is not a NAMED
+    # function here. E4 plans functions Lizard measured by name, so this costs
+    # nothing today; revisit if a factory project plans closures.
+    declarator_types=frozenset(),
+    anonymous_function_types=frozenset({"anonymous_function", "arrow_function"}),
+    block_types=frozenset({"compound_statement"}),
+    if_types=frozenset({"if_statement", "else_if_clause"}),
+    elif_types=frozenset({"else_if_clause"}),
+    else_types=frozenset({"else_clause"}),
+    loop_types=frozenset({"for_statement", "foreach_statement", "while_statement", "do_statement"}),
+    switch_types=frozenset({"switch_statement"}),
+    case_types=frozenset({"case_statement", "match_conditional_expression"}),
+    default_case_types=frozenset({"default_statement"}),
+    try_types=frozenset({"try_statement"}),
+    handler_types=frozenset({"catch_clause"}),
+    finally_types=frozenset({"finally_clause"}),
+    transparent_types=frozenset(),
+    unwrap_types=frozenset({"expression_statement"}),
+    return_types=frozenset({"return_statement"}),
+    throw_types=frozenset({"throw_expression"}),
+    expression_decision_types=frozenset({"conditional_expression"}),
+    # `and` / `or` / `xor` are the low-precedence spellings of && / || .
+    boolean_operator_tokens=frozenset({"&&", "||", "??", "and", "or", "xor"}),
+    boolean_expression_types=frozenset({"binary_expression"}),
+    comparison_types=frozenset({"binary_expression"}),
+    number_types=frozenset({"integer", "float"}),
+    string_types=frozenset({"string", "encapsed_string"}),
+)
+
+
 PROFILES: dict[str, Profile] = {
     "python": PYTHON,
     "javascript": JAVASCRIPT,
     "typescript": JAVASCRIPT,
     "tsx": JAVASCRIPT,
+    "php": PHP,
 }
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=8)
 def _language(name: str) -> Language:
     # Imported lazily: the grammars are compiled extensions, loaded once.
     if name == "python":
@@ -129,6 +198,13 @@ def _language(name: str) -> Language:
         import tree_sitter_javascript as grammar_js  # noqa: PLC0415
 
         return Language(grammar_js.language())
+    if name == "php":
+        import tree_sitter_php as grammar_php  # noqa: PLC0415
+
+        # `language_php` parses a full file (with the `<?php` tag); the
+        # `_only` variant assumes the tag was already consumed, which an
+        # audited file never is.
+        return Language(grammar_php.language_php())
     import tree_sitter_typescript as grammar_ts  # noqa: PLC0415
 
     if name == "tsx":
@@ -186,6 +262,40 @@ def find_function(root: Node, name: str, line: int | None, profile: Profile) -> 
     return candidates[0][1]
 
 
+def declared_in_class(source: bytes, language: str, name: str, line: int | None) -> bool:
+    """Is the named function declared INSIDE a class (a method), or free?
+
+    Answered from the source, never from an empty result: E7 has to know
+    BEFORE it scores a run whether the mutation tool could have produced
+    anything at all, so that "no mutants" is read as "not measurable here"
+    rather than as "nothing survived" (tasks/phase7a-php.md → the `mmarin`
+    decision of 2026-09-23).
+
+    **Which side is conservative, and why it is True.** The caller excuses the
+    mutation question when this answers False, so False is the PERMISSIVE
+    side: a run with no mutants may then pass. Anything we could not resolve —
+    the function is not in the source under that name, the language has no
+    profile — therefore answers **True**, and the run is scored on mutation
+    like any other (zero mutants from a measurable function is `ERRORED`).
+    The earlier version of this function returned False here and said in this
+    same docstring that False was the conservative side; both the precommit
+    security auditor and the invariant checker caught it, 2026-09-23.
+    """
+    profile = PROFILES.get(language)
+    if profile is None:
+        return True
+    try:
+        function = find_function(parse(source, language), name, line, profile)
+    except FunctionNotFound:
+        return True
+    parent = function.parent
+    while parent is not None:
+        if parent.type in profile.class_types:
+            return True
+        parent = parent.parent
+    return False
+
+
 def _has_error(node: Node) -> bool:
     return node.has_error
 
@@ -197,6 +307,19 @@ def _params(function: Node) -> list[str]:
     if params.is_named and not params.children:
         return [clip(_text(params))]
     return [clip(_text(child)) for child in params.named_children if child.type != "comment"]
+
+
+#: The keyword each grammar spells the chained alternative with. Read from
+#: the node instead of mapped per language, so the diagram says what the
+#: source says (`elseif` in PHP, `elif` in Python).
+_IF_KEYWORDS = frozenset({"if", "elif", "elseif"})
+
+
+def _if_keyword(node: Node) -> str:
+    for child in node.children:
+        if not child.is_named and child.type in _IF_KEYWORDS:
+            return child.type
+    return "if"
 
 
 def _statements(node: Node | None, profile: Profile) -> list[Node]:
@@ -237,6 +360,7 @@ class _Builder:
         try:
             buffer: list[Node] = []
             for statement in statements:
+                statement = self._unwrap(statement)
                 if self._is_compound(statement):
                     pending = self._flush(buffer, pending)
                     buffer = []
@@ -246,6 +370,21 @@ class _Builder:
             return self._flush(buffer, pending)
         finally:
             self.depth -= 1
+
+    def _unwrap(self, node: Node) -> Node:
+        """A thin statement wrapper around a compound expression, or ``node``.
+
+        PHP 8 turned ``throw`` into an expression, so ``throw new X();`` is an
+        ``expression_statement`` holding a ``throw_expression``. Unwrapping
+        only when the single child IS compound keeps every ordinary
+        expression statement (an assignment, a call) a plain process box.
+        """
+        if node.type not in self.profile.unwrap_types:
+            return node
+        children = [child for child in node.named_children if child.type != "comment"]
+        if len(children) == 1 and self._is_compound(children[0]):
+            return children[0]
+        return node
 
     def _is_compound(self, node: Node) -> bool:
         profile = self.profile
@@ -302,18 +441,22 @@ class _Builder:
 
     def _if(self, node: Node, pending: list[tuple[str, str]]) -> list[tuple[str, str]]:
         profile = self.profile
-        keyword = "elif" if node.type == "elif_clause" else "if"
         decision = self._add(
-            "decision", self._condition_label(node, keyword), node.start_point.row + 1
+            "decision",
+            self._condition_label(node, _if_keyword(node)),
+            node.start_point.row + 1,
         )
         self._connect(pending, decision)
-        consequence = node.child_by_field_name("consequence")
+        # Python and JS name the taken branch `consequence`; PHP names it
+        # `body`, like every other compound statement in that grammar.
+        consequence = node.child_by_field_name("consequence") or node.child_by_field_name("body")
         exits = self.block(_statements(consequence, profile), [(decision, "true")])
         false_pending: list[tuple[str, str]] = [(decision, "false")]
-        # Python: elif_clause / else_clause are named children of the if.
-        # JS: one else_clause whose child is a block or another if_statement.
+        # Python / PHP: elif_clause / else_if_clause and else_clause are named
+        # children of the if. JS: one else_clause whose child is a block or
+        # another if_statement.
         for child in node.named_children:
-            if child.type == "elif_clause":
+            if child.type in profile.elif_types:
                 false_pending = self._if(child, false_pending)
             elif child.type in profile.else_types:
                 body = child.child_by_field_name("body")
@@ -345,7 +488,11 @@ class _Builder:
 
     def _switch(self, node: Node, pending: list[tuple[str, str]]) -> list[tuple[str, str]]:
         profile = self.profile
-        subject = node.child_by_field_name("value") or node.child_by_field_name("subject")
+        subject = (
+            node.child_by_field_name("value")
+            or node.child_by_field_name("subject")
+            or node.child_by_field_name("condition")
+        )
         keyword = "match" if node.type == "match_statement" else "switch"
         decision = self._add(
             "decision", clip(f"{keyword} {_text(subject)}"), node.start_point.row + 1
@@ -441,7 +588,8 @@ def complexity(function: Node, profile: Profile) -> int:
     return count
 
 
-COMPARISON_OPERATORS = frozenset({"<", "<=", ">", ">=", "==", "!=", "===", "!=="})
+#: `<>` is PHP's spelling of `!=`; no wave-1 grammar produces it.
+COMPARISON_OPERATORS = frozenset({"<", "<=", ">", ">=", "==", "!=", "===", "!==", "<>"})
 
 
 def _literal(node: Node, profile: Profile) -> int | float | str | None:
@@ -450,7 +598,8 @@ def _literal(node: Node, profile: Profile) -> int | float | str | None:
         return _literal(node.named_children[0], profile)
     if node.type in profile.number_types:
         return _number(_text(node))
-    if node.type == "unary_expression" and node.named_children:
+    # PHP spells it `unary_op_expression`; JS/Python `unary_expression`.
+    if node.type in ("unary_expression", "unary_op_expression") and node.named_children:
         # `-1` parses as unary minus over the literal.
         operator = next((c for c in node.children if not c.is_named), None)
         inner = _number(_text(node.named_children[0]))
@@ -458,7 +607,13 @@ def _literal(node: Node, profile: Profile) -> int | float | str | None:
             return -inner
         return None
     if node.type in profile.string_types:
-        if any(child.type in ("interpolation", "template_substitution") for child in node.children):
+        # A string with anything but literal content is not a boundary value.
+        # PHP's `encapsed_string` holds the interpolated variable directly as a
+        # child; JS/Python wrap it in a substitution node.
+        if any(
+            child.type in ("interpolation", "template_substitution", "variable_name")
+            for child in node.children
+        ):
             return None
         return _string_body(_text(node))
     return None

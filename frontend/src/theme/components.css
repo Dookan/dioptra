@@ -640,6 +640,21 @@
   padding: 0;
 }
 
+/* The findings list paints one page at a time; this is its footer. A real
+   analysis produces hundreds of findings and rendering them all froze the
+   browser (687, measured 2026-09-23). `.sub` and not `.hint`, for the same
+   reason the download hint uses it: `--t3` is below AA at this size and this
+   line tells the analyst where they are. */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
 .panel {
   background: var(--s1);
   border: 1px solid var(--line);
@@ -1400,6 +1415,14 @@ button.card:focus-visible {
   color: var(--t2);
 }
 
+/* A tone word on `.sub` needs its own descendant rule, like `.rowline .sub.ok`
+   below — `warn` alone matches nothing and the sentence would render exactly
+   like the measurements above it. The one line that says "this was NOT
+   measured" has to look different from the ones that report a measurement. */
+.caserow .sub.warn {
+  color: var(--warn);
+}
+
 .caserow b {
   color: var(--ink);
 }
@@ -1509,8 +1532,241 @@ button.card:focus-visible {
   margin-bottom: 18px;
 }
 
+/* --- E3 list: every card the same size, and the detail always in view ----
+   Reported from real use on a 687-finding analysis (2026-09-23): long titles
+   and long paths overflowed their card, so cards were all different heights;
+   and because the detail panel sits at the TOP of the right column, clicking
+   a card near the bottom of the list updated something off-screen — it read
+   as "nothing happened", with an empty column beside the scroll. */
+
+/* Reserve exactly two lines for each field: clamped from above so nothing
+   overflows, and a floor from below so a one-line title does not make a
+   shorter card than its neighbour. Together that is the visual harmony. */
+.cols.findings .card h4,
+.panel.deps .card h4 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  /* Paths and rule ids have no spaces to break at. */
+  overflow-wrap: anywhere;
+  /* The line height is pinned so the floor is exactly two lines: inheriting
+     1.6 from the body would make 2 lines ≈ 3.2em and the reserve wrong. */
+  line-height: 1.35;
+  min-height: 2.7em;
+}
+
+/* The dependency list lives OUTSIDE `.cols.findings` (it is a `<details>`
+   after the grid), so it needs naming here or the harmony stops exactly where
+   the longest paths in the analysis are — `vendor/symfony/...`. */
+.cols.findings .card .mono,
+.panel.deps .card .mono {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  min-height: 2.6em;
+  line-height: 1.3;
+}
+
+/* Master-detail with TWO independent panes, which is what `mmarin` actually
+   asked for: "deberían bajar las tarjetas si tengo el puntero sobre la caja de
+   las tarjetas". Before this the PAGE scrolled and the cards came with it, so
+   the reader had to move the whole document to reach finding 20 and the detail
+   column sat beside a growing strip of nothing.
+
+   Both columns are bounded to the viewport and scroll inside themselves. The
+   OVERFLOW belongs to `.scrollpane` below and is deliberately not set in these
+   two rules: they are more specific, so an `overflow-y` here would beat the
+   one that carries the visible scrollbar — which is what hid the bar twice. */
+.cols.findings {
+  align-items: start;
+}
+
+.cols.findings .listpane {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: sticky;
+  top: 16px;
+  /* `min-height: 0` lets the flex child actually shrink and scroll; without it
+     a flex item refuses to go below its content height and nothing scrolls. */
+  min-height: 0;
+  max-height: calc(100vh - 120px);
+}
+
+.cols.findings .listpane > .list {
+  flex: 1 1 auto;
+  min-height: 0;
+  /* Room for the scrollbar channel so a card's focus ring is not clipped. */
+  padding-right: 4px;
+}
+
+/* The pager stays put while the cards move under it. */
+.cols.findings .listpane > .pager {
+  flex: 0 0 auto;
+}
+
+.cols.findings > .panel {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 120px);
+}
+
+/* --- a scroll region has to LOOK like one ------------------------------
+   Sticky and internally scrollable was not discoverable: nothing told the
+   reader that this box scrolls on its own (`mmarin`, 2026-09-23). Two things
+   had to change after the first attempt, both reported from Brave:
+
+   1. `overflow-y: auto` only draws a bar when the content overflows, so a
+      short finding showed none at all — and the reader cannot learn a region
+      scrolls from a bar that is not there. The channel is now always
+      reserved, which also stops the panel's width jumping when the content
+      grows past the fold.
+   2. The standard `scrollbar-width` / `scrollbar-color` and the legacy
+      `::-webkit-scrollbar` rules were both present. Chromium has supported the
+      standard ones since 121 and IGNORES the pseudo-elements when they are
+      set — so the effective style was `scrollbar-color: … transparent`, i.e.
+      an invisible track on an invisible bar. The track now has a real colour
+      in both models, and the webkit block is kept only as the fallback for
+      engines without the standard properties.
+
+   No new colour: every value is a token already in use. */
+.scrollpane {
+  overflow-y: scroll;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) var(--s2);
+}
+
+/* Fallback for engines without `scrollbar-color`; modern Chromium ignores it. */
+.scrollpane::-webkit-scrollbar {
+  width: 10px;
+}
+
+.scrollpane::-webkit-scrollbar-track {
+  background: var(--s2);
+  border-radius: 999px;
+}
+
+.scrollpane::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+  border: 2px solid var(--s2);
+}
+
+/* Pointing at it or tabbing into it says "this is its own thing". */
+.scrollpane:hover,
+.scrollpane:focus-within {
+  border-color: var(--line-strong);
+  scrollbar-color: var(--t3) var(--s2);
+}
+
+.scrollpane:hover::-webkit-scrollbar-thumb,
+.scrollpane:focus-within::-webkit-scrollbar-thumb {
+  background: var(--t3);
+}
+
+/* The third-party section: present, readable, and visibly not the queue.
+   It lives INSIDE the left pane rather than after the grid, so selecting one
+   of its cards updates the detail panel beside it instead of one that has
+   already scrolled off above — the very complaint `docs/ui-model.md` records
+   as fixed for the queue list. Closed it is a one-line summary at the foot of
+   the pane; open it shares the pane's height with the queue and scrolls on
+   its own, so neither list can push the other off the screen. */
+.panel.deps {
+  margin-top: 18px;
+}
+
+.cols.findings .listpane > details.deps {
+  flex: 0 0 auto;
+}
+
+.cols.findings .listpane > details.deps[open] {
+  flex: 1 1 auto;
+  /* Same reason as `.listpane` itself: without `min-height: 0` a flex item
+     refuses to shrink below its content and nothing scrolls. */
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.cols.findings .listpane > details.deps[open] > .list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.panel.deps > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.panel.deps > .sub {
+  margin: 8px 0 12px;
+}
+
+/* Same tone cue the E7 card uses for a declared gap. */
+.panel .sub.warn {
+  color: var(--warn);
+}
+
+/* Tabbing INTO the region (rather than into a control inside it) gets the
+   same ring every other focusable surface here uses. */
+.scrollpane:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
 @media (max-width: 900px) {
   .cols.inventory {
     grid-template-columns: 1fr;
+  }
+
+  /* One column: the panes stack, so neither is sticky and neither is capped —
+     the page scrolls, which is the right behaviour when there is no second
+     column to scroll against. */
+  .cols.findings {
+    grid-template-columns: 1fr;
+  }
+
+  .cols.findings .listpane,
+  .cols.findings > .panel {
+    position: static;
+    max-height: none;
+  }
+
+  .cols.findings .listpane > .list,
+  .cols.findings > .panel {
+    /* `.scrollpane` sets `overflow-y: scroll`, which ALWAYS paints its track.
+       Without this the detail panel carries a permanently empty scrollbar
+       gutter on a phone, on a box that can no longer scroll at all. */
+    overflow-y: visible;
+  }
+
+  .cols.findings .listpane > details.deps[open],
+  .cols.findings .listpane > details.deps[open] > .list {
+    /* One column, nothing capped: the page scrolls, so a nested scroll here
+       would trap the reader's gesture in a box on a phone. */
+    flex: 0 0 auto;
+    min-height: auto;
+    overflow-y: visible;
+  }
+
+  .cols.findings > .panel.scrollpane {
+    /* Nothing scrolls here, so the affordances that say "this scrolls" go too:
+       no focus ring and no border firming on a box that cannot move. The
+       `tabIndex` stays (it is the component's, not the stylesheet's) but it
+       lands on an ordinary named region, which is harmless. */
+    border-color: var(--line);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cols.findings > .panel {
+    scroll-behavior: smooth;
   }
 }

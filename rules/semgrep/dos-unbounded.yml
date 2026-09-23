@@ -44,3 +44,29 @@ rules:
       - metavariable-regex:
           metavariable: $SRC
           regex: ^(request|req)\.
+  - id: php-regex-from-input
+    message: Regular expression built from request data can be catastrophic (ReDoS); use preg_quote() or a fixed pattern.
+    severity: WARNING
+    languages: [php]
+    metadata:
+      cwe: "CWE-1333"
+      owasp: "A05:2021"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: preg_match($PATTERN, ...)
+          - pattern: preg_match_all($PATTERN, ...)
+          - pattern: preg_replace($PATTERN, ...)
+          - pattern: preg_split($PATTERN, ...)
+      - metavariable-pattern:
+          metavariable: $PATTERN
+          patterns:
+            - pattern-either:
+                - pattern: $A . $B
+                - pattern: $_GET[...]
+                - pattern: $_POST[...]
+                - pattern: $_REQUEST[...]
+            # preg_quote() anywhere in the expression IS the fix this rule
+            # asks for; flagging it would train people to ignore the rule.
+            - pattern-not-regex: 'preg_quote\s*\('

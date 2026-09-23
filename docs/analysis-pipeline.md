@@ -45,12 +45,18 @@ Every runner has a timeout and CPU/RAM limits, and its raw output is persisted
 before normalization (the plan's day 7), so a normalizer bug never loses a
 tool's result.
 
-Languages (analysis runners and, since P3 day 14, the tree-sitter AST layer of E5): wave 1 JS/TS + Python (P1–P4); wave 2 PHP/Laravel + Java/Spring
-**cut to a second cycle on 2026-09-22** (the plan's contingency; E2 still detects them, E4 refuses their functions); wave 3 Go + C#/.NET is out of scope for v1.0.0.
+Languages (analysis runners and, since P3 day 14, the tree-sitter AST layer of
+E5): wave 1 JS/TS + Python (P1–P4). Wave 2 was **cut to a second cycle on
+2026-09-22** and is being built there: **PHP/Laravel is IN PROGRESS since
+2026-09-23** (`tasks/phase7a-php.md`) — the AST layer parses `.php`, so E4 now
+plans PHP functions, E5 briefs them, E6 scaffolds them as PHPUnit and E7 runs
+them in their own sandbox image; **Java/Spring has not started** (phase 7b,
+same survey), so E4 still refuses its functions like any the AST cannot parse.
+Wave 3 Go + C#/.NET stays out of scope for v1.0.0.
 
 ## Rule authoring (`rules/semgrep/`)
 
-- One YAML file per rule family; every SECURITY rule carries `metadata: {cwe, owasp}`. The CBOM inventory rules (`crypto-inventory.yml`, P5) carry `metadata.category: inventory` and no CWE/OWASP instead: a strong algorithm is not a weakness. Their ids start with `crypto-inventory-` and their message has the fixed shape `crypto-asset primitive=… algorithm=… weak=yes|no`, which the normalizer parses (`backend/tests/test_runners.py` pins both contracts).
+- One YAML file per rule family; every SECURITY rule carries `metadata: {cwe, owasp}`. Wave 2 added **17 PHP/Laravel rules** across eleven families on 2026-09-23 (`tasks/phase7a-php.md`); two of them (`laravel-model-unguarded`, `laravel-blade-unescaped-echo`) are `languages: [regex]` over `*.php` / `*.blade.php`, because a class property and a Blade directive are not valid standalone patterns for semgrep-core's PHP parser. The CBOM inventory rules (`crypto-inventory.yml`, P5) carry `metadata.category: inventory` and no CWE/OWASP instead: a strong algorithm is not a weakness. Their ids start with `crypto-inventory-` and their message has the fixed shape `crypto-asset primitive=… algorithm=… weak=yes|no`, which the normalizer parses (`backend/tests/test_runners.py` pins both contracts).
 - Each rule ships with a `tests/` pair (positive + negative snippet).
 - Re-run the full ruleset against the anchor fixtures (the MINCYT form
   systems whose manual reports are the P1 success criterion) before merging
@@ -67,6 +73,16 @@ Languages (analysis runners and, since P3 day 14, the tree-sitter AST layer of E
 - **"Unknown CWE" is a valid state, not an error.** A Semgrep rule without a
   CWE (or a tool that emits none) yields a finding with `cwe = null` and an
   OWASP bucket of "unclassified"; it still reaches triage and the report.
+- **Severity precedence is fixed, and the last step is a FALLBACK, not a default.**
+  A CVSS vector wins; then a `security-severity` property; then the result's own
+  `level`; then — since 2026-09-23 — **the rule's `defaultConfiguration.level`**,
+  which SARIF 2.1.0 §3.27.10 makes the inherited value for a result that omits
+  one. Semgrep writes the level once per rule and omits it on every result, so
+  reading only `result.level` sent every SAST finding to INFO whatever its rule
+  declared (measured: 0 of 611 real results carried a level, 67 rules declared
+  one; 513 INFO became 312 high + 201 medium). The step is monotone — an absent
+  level used to yield INFO, the floor — so it can only raise a severity, never
+  lower one, and the rules are ours, never the audited tree's.
 - Findings are deduplicated across tools on (path, line, rule-or-CWE) before
   persistence; the surviving finding keeps every source tool in `references`.
 - **Paths are relative to the TREE ROOT, and only an exact root is stripped.**
@@ -77,6 +93,13 @@ Languages (analysis runners and, since P3 day 14, the tree-sitter AST layer of E
   MINCYT frontend (2026-09-22), so findings said `helpers/x.js` while the
   metrics said `work/src/helpers/x.js` — the E4 risk matrix then correlated
   nothing and E5 could not read the file.
+- **Third-party findings are marked, never dropped.** A finding whose path has
+  a dependency directory as one of its segments (`backend/app/analysis/third_party.py`)
+  is persisted with `third_party = true`. It is normalised, stored, deduped,
+  reported and inventoried exactly like any other; the flag only takes it out
+  of the E3 triage queue (`docs/workflow-gates.md` → Third-party findings). A
+  runner is never told to skip those paths — the scanners still refuse the
+  audited tree's own ignore files.
 - Snippets are stored raw and ESCAPED AT EVERY RENDER (UI and report) — the
   audited code is hostile input.
 - A tool that fails to run is recorded as a coverage gap in the report, never

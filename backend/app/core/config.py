@@ -101,7 +101,13 @@ class Settings(BaseSettings):
     # The analysis containers PARSE hostile code; the sandbox EXECUTES it, so
     # every limit here is tighter than its analysis counterpart and the
     # writable mount is the only one (tasks/phase4-survey.md §2).
+    #: ONE IMAGE PER LANGUAGE (tasks/phase7-survey.md §7.1, `mmarin` 2026-09-23):
+    #: a JDK or a PHP runtime added to a single fat image roughly doubles it,
+    #: and an air-gapped factory should ship only the languages it audits. The
+    #: JS/Python image KEEPS its name — renaming it would break every existing
+    #: deployment's built tag to buy nothing, since it is already that image.
     sandbox_image: str = "dioptra-sandbox:latest"
+    sandbox_image_php: str = "dioptra-sandbox-php:latest"
     #: Root of the per-attempt run directories. Its filesystem MUST be
     #: size-bounded by the operator (a tmpfs or a quota on the host): the
     #: sandbox mounts one of these read-write, and Compose cannot bound it

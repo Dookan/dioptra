@@ -57,3 +57,34 @@ rules:
       - metavariable-regex:
           metavariable: $VAR
           regex: (?i).*(token|secret|nonce|otp|session|password|salt|key|code)
+  - id: php-weak-hash-algorithm
+    message: Broken hash algorithm; use SHA-256 or better, and password_hash() for passwords.
+    severity: ERROR
+    languages: [php]
+    metadata:
+      cwe: "CWE-327"
+      owasp: "A02:2021"
+      category: security
+      confidence: HIGH
+    pattern-either:
+      - pattern: md5(...)
+      - pattern: sha1(...)
+      - pattern: hash("md5", ...)
+      - pattern: hash("sha1", ...)
+      - pattern: hash('md5', ...)
+      - pattern: hash('sha1', ...)
+      - pattern: crypt($P)
+  - id: php-insecure-random-for-secret
+    message: rand()/mt_rand() are not cryptographically secure; use random_bytes() or random_int().
+    severity: ERROR
+    languages: [php]
+    metadata:
+      cwe: "CWE-338"
+      owasp: "A02:2021"
+      category: security
+      confidence: MEDIUM
+    pattern-either:
+      - pattern: $TOKEN = rand(...);
+      - pattern: $TOKEN = mt_rand(...);
+      - pattern: $TOKEN = uniqid(...);
+      - pattern: str_shuffle(...)

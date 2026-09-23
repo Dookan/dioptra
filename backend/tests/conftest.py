@@ -161,21 +161,33 @@ def admin(db: Session) -> User:
     return user
 
 
-@pytest.fixture
-def sandbox_available() -> bool:
-    """Whether a real E7 run can happen here: Docker present and the image built."""
+def _image_built(image: str) -> bool:
     import shutil
     import subprocess
-
-    from app.core.config import get_settings
 
     if shutil.which("docker") is None:
         return False
     docker = shutil.which("docker") or "docker"
     probe = subprocess.run(  # noqa: S603 — fixed argv, resolved binary
-        [docker, "image", "inspect", get_settings().sandbox_image],
+        [docker, "image", "inspect", image],
         capture_output=True,
         check=False,
         timeout=60,
     )
     return probe.returncode == 0
+
+
+@pytest.fixture
+def sandbox_available() -> bool:
+    """Whether a real E7 run can happen here: Docker present and the image built."""
+    from app.core.config import get_settings
+
+    return _image_built(get_settings().sandbox_image)
+
+
+@pytest.fixture
+def php_sandbox_available() -> bool:
+    """The same question for the PHP image — one image per language (phase 7a)."""
+    from app.core.config import get_settings
+
+    return _image_built(get_settings().sandbox_image_php)

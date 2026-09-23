@@ -502,6 +502,13 @@ export interface VerificationRun extends PlannedFunction {
   equivalent_mutants: { id: string; line: string; mutant: string }[];
   assertion_free_cases: string[];
   failed_cases: string[];
+  /**
+   * False when the mutation tool could never have produced a mutant for this
+   * function (a free PHP function under Infection, which only mutates code
+   * inside a class). The screen says so: an empty survivor list then means
+   * "not measured", not "nothing survived".
+   */
+  mutation_measured: boolean;
   detail: string | null;
   duration_ms: number;
   created_by_username: string;

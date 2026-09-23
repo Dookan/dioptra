@@ -150,17 +150,29 @@ def test_a_weak_suite_leaves_surviving_mutants(live: Settings, tmp_path: Path) -
         workspace.discard(attempt)
 
 
-def _probe(settings: Settings, tmp_path: Path, script: str) -> subprocess.CompletedProcess[bytes]:
+def _probe(
+    settings: Settings,
+    tmp_path: Path,
+    script: str,
+    *,
+    attempt: workspace.Attempt | None = None,
+) -> subprocess.CompletedProcess[bytes]:
     """Run ``script`` with the EXACT flags the executor ships, command swapped.
 
     Note what IS swapped besides the command: `--user`, because the `live`
     fixture sets it to this process's uid so the container can write the
     attempt directory this process created. Both values are non-root.
+
+    ``attempt`` chooses the IMAGE, because the executor picks it from the
+    attempt's runner — pass a PHP attempt to probe the PHP image.
     """
-    attempt = _attempt(settings, tmp_path, WEAK)
+    attempt = attempt if attempt is not None else _attempt(settings, tmp_path, WEAK)
     name = "dioptra-escape-probe"
     argv = executor.command(settings, attempt, container_name=name)
-    argv = argv[: argv.index(settings.sandbox_image) + 1] + ["sh", "-c", script]
+    # Which image, from the SAME selector production uses — one image per
+    # language since phase 7a, chosen by the scaffold's runner.
+    image = executor.image_for(settings, attempt.runner)
+    argv = argv[: argv.index(image) + 1] + ["sh", "-c", script]
     try:
         return subprocess.run(  # noqa: S603 — our own argv
             argv, capture_output=True, timeout=180, check=False
@@ -324,3 +336,194 @@ def test_the_run_directory_is_gone_afterwards(live: Settings, tmp_path: Path) ->
     workspace.discard(attempt)
     if shutil.which("docker") is not None:
         assert not attempt.run_dir.exists()
+
+
+# --------------------------------------------------------------------------
+# PHP (phase 7a): a SECOND image, and therefore a second escape suite.
+#
+# The flags are shared by construction — `executor.command` is one function and
+# only the image string differs — but P4's lesson is that a negative control
+# which cannot go positive is not evidence, so every probe is re-run HERE and
+# each one is expressed in something this image actually has.
+#
+# What this image does NOT have, measured 2026-09-23: no `python3` (four of the
+# wave-1 probes use it and would have failed for the wrong reason), no `pcntl`
+# (so `pcntl_fork` cannot be the fork bomb), no `sockets` extension. What it
+# does have: `php` with `posix`, stream functions (`fsockopen`), and `perl`
+# from the Debian base — which is what forks here.
+# --------------------------------------------------------------------------
+
+PHP_MODULE = """<?php
+
+class Edad
+{
+    public static function obtener(int $anio): string
+    {
+        if ($anio <= 0) {
+            throw new InvalidArgumentException('anio');
+        }
+        $edad = 2026 - $anio;
+        if ($edad >= 18) {
+            return 'mayor';
+        }
+        return 'menor';
+    }
+}
+"""
+
+PHP_WEAK = """<?php
+
+declare(strict_types=1);
+
+use PHPUnit\\Framework\\TestCase;
+
+require_once __DIR__ . '/' . 'Edad.php';
+
+final class EdadDioptraTest extends TestCase
+{
+    public function testC1_mayor(): void
+    {
+        $this->assertSame('mayor', Edad::obtener(2000));
+    }
+}
+"""
+
+
+def _php_scaffold() -> ScaffoldFile:
+    return ScaffoldFile(
+        filename="EdadDioptraTest.php",
+        language="php",
+        runner="phpunit",
+        import_specifier="Edad.php",
+        content="",
+        cases=[ScaffoldCase(id="C1", name="testC1_mayor", title="mayor", covers=[])],
+    )
+
+
+def _php_attempt(settings: Settings, tmp_path: Path, content: str) -> workspace.Attempt:
+    jail = tmp_path / "phpjail"
+    jail.mkdir(exist_ok=True)
+    (jail / "Edad.php").write_text(PHP_MODULE)
+    analysis = Analysis(workspace_path=str(jail))
+    return workspace.build_attempt(
+        settings,
+        analysis=analysis,
+        scaffold=_php_scaffold(),
+        source_path="Edad.php",
+        test_content=content,
+    )
+
+
+@pytest.fixture
+def php_live(php_sandbox_available: bool, tmp_path: Path) -> Settings:
+    if not php_sandbox_available:
+        pytest.skip("Docker or dioptra-sandbox-php:latest is not available here")
+    return get_settings().model_copy(
+        update={
+            "sandbox_runs_root": tmp_path / "runs",
+            "runner_user": f"{os.getuid()}:{os.getgid()}",
+        }
+    )
+
+
+#: `memory_limit` is 512M in this image's php.ini, so a balloon would hit PHP's
+#: own limit instead of the container's `--memory` — and pass for the wrong
+#: reason. Lifting it first is what makes the probe attributable.
+PHP_BALLOON = (
+    'php -r \'ini_set("memory_limit", -1); $c = []; while (true) { '
+    '$c[] = str_repeat("x", 64 * 1024 * 1024); }\''
+)
+
+#: No `pcntl` here, so the fork comes from perl (Debian base). Exit 7 is the
+#: probe's OWN refused-fork branch, exactly as the Python version's is: a
+#: missing binary or a syntax error gives a different code.
+PHP_FORK_BOMB = """cat > /tmp/bomb.pl <<'EOF'
+my $n = 0;
+while ($n < 5000) {
+    my $pid = fork();
+    exit(7) unless defined $pid;
+    $n++;
+}
+exit(0);
+EOF
+perl /tmp/bomb.pl"""
+
+PHP_ESCAPES: list[tuple[str, str]] = [
+    # Shell-only probes: identical to wave 1, and every binary they use exists
+    # in this image (checked).
+    ("write outside the workspace", "touch /etc/dioptra-pwned"),
+    ("write to the image's own tree", "touch /usr/local/bin/dioptra-pwned"),
+    ("write to /proc", "echo 1 > /proc/sys/kernel/core_uses_pid"),
+    ("read the docker socket", "test -S /var/run/docker.sock"),
+    (
+        "gain capabilities",
+        "grep -E '^Cap(Prm|Eff|Bnd):' /proc/self/status | grep -qv '0000000000000000'",
+    ),
+    ("keep the right to gain privileges", "grep -q 'NoNewPrivs:\t0' /proc/self/status"),
+    ("mount a filesystem", "mount -t tmpfs tmpfs /mnt && test -w /mnt"),
+    # Re-expressed for this image: PHP where wave 1 used python3.
+    (
+        "outbound network",
+        "php -r '$e=null;$m=null;exit(@fsockopen(\"1.1.1.1\", 53, $e, $m, 3) ? 0 : 1);'",
+    ),
+    ("become root", "php -r 'exit(@posix_setuid(0) ? 0 : 1);'"),
+]
+
+
+@pytest.mark.parametrize(("name", "script"), PHP_ESCAPES, ids=[name for name, _ in PHP_ESCAPES])
+def test_the_php_sandbox_refuses_every_escape(
+    php_live: Settings, tmp_path: Path, name: str, script: str
+) -> None:
+    attempt = _php_attempt(php_live, tmp_path, PHP_WEAK)
+    try:
+        probe = _probe(php_live, tmp_path, script, attempt=attempt)
+    finally:
+        workspace.discard(attempt)
+    assert probe.returncode != 0, f"{name} SUCCEEDED: {probe.stdout!r} {probe.stderr!r}"
+
+
+def test_the_php_sandbox_refuses_a_fork_bomb(php_live: Settings, tmp_path: Path) -> None:
+    """Exit 7 is the probe's own refused-fork branch — proof a fork WAS refused."""
+    attempt = _php_attempt(php_live, tmp_path, PHP_WEAK)
+    try:
+        probe = _probe(php_live, tmp_path, PHP_FORK_BOMB, attempt=attempt)
+    finally:
+        workspace.discard(attempt)
+    assert probe.returncode == 7, f"no fork was refused: {probe.returncode} {probe.stderr!r}"
+
+
+def test_the_php_sandbox_kills_a_memory_balloon(php_live: Settings, tmp_path: Path) -> None:
+    attempt = _php_attempt(php_live, tmp_path, PHP_WEAK)
+    try:
+        probe = _probe(php_live, tmp_path, PHP_BALLOON, attempt=attempt)
+    finally:
+        workspace.discard(attempt)
+    assert probe.returncode != 0, "the balloon was never stopped"
+
+
+def test_a_weak_php_suite_leaves_surviving_mutants(php_live: Settings, tmp_path: Path) -> None:
+    """The phase's own acceptance: a surviving mutant must be able to reject the gate.
+
+    One assertion over one path, so Infection has plenty to escape with. This
+    is the PHP half of `test_a_weak_suite_leaves_surviving_mutants`; what it
+    guards is the wiring, because three separate defects in this chain each
+    produced "no survivors" from a suite that proves nothing — a duplicated
+    `--configuration`, an invalid `pathCoverage` attribute, and a missing
+    bootstrap that made every mutant die in PHPUnit's own startup and count as
+    killed (tasks/phase7a-php.md).
+    """
+    attempt = _php_attempt(php_live, tmp_path, PHP_WEAK)
+    try:
+        result = executor.run(php_live, attempt)
+        assert not result.missing, f"the run produced nothing to score: {result.missing}"
+        mutation = results.parse_mutation(result.mutation)
+        coverage = results.parse_coverage(
+            result.coverage, language="php", module_file=attempt.module_file
+        )
+        assert mutation.tool == "infection"
+        assert mutation.total, "zero mutants is not a measurement (verify.py refuses it)"
+        assert mutation.survived, "a one-assertion suite must leave mutants alive"
+        assert coverage.total_branches, "branch coverage is what the E4 criterion needs"
+        assert coverage.partial_branch_lines, "this suite takes one side of each branch"
+    finally:
+        workspace.discard(attempt)

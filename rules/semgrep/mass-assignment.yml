@@ -37,3 +37,38 @@ rules:
       - pattern: $MODEL.objects.create(**request.POST)
       - pattern: $MODEL.objects.create(**request.data)
       - pattern: $MODEL(**request.POST.dict())
+  - id: laravel-mass-assignment-request-all
+    message: Whole request assigned onto a model; pass an explicit allowlist ($request->only([...])) and keep $fillable narrow.
+    severity: ERROR
+    languages: [php]
+    metadata:
+      cwe: "CWE-915"
+      owasp: "A04:2021"
+      category: security
+      confidence: MEDIUM
+    pattern-either:
+      - pattern: $M::create($REQ->all())
+      - pattern: $M::forceCreate($REQ->all())
+      - pattern: $M->fill($REQ->all())
+      - pattern: $M->forceFill(...)
+      - pattern: $M->update($REQ->all())
+      - pattern: $M::create($_POST)
+      - pattern: $M->fill($_POST)
+  - id: laravel-model-unguarded
+    message: The model turns mass-assignment protection off entirely; declare $fillable with the fields the API may set.
+    severity: ERROR
+    # A class PROPERTY is not a valid standalone pattern for semgrep-core's PHP
+    # parser ("Invalid pattern for PHP: Parse_error"), and wrapping it in a
+    # `class $C { ... }` pattern would report the whole class rather than the
+    # line. A bounded regex over PHP files is exact here: both shapes are one
+    # line and neither has a benign spelling.
+    languages: [regex]
+    metadata:
+      cwe: "CWE-915"
+      owasp: "A04:2021"
+      category: security
+      confidence: HIGH
+    paths:
+      include:
+        - "*.php"
+    pattern-regex: '(?m)^\s*(?:protected\s+\$guarded\s*=\s*\[\s*\]\s*;|[A-Za-z_\\][A-Za-z0-9_\\]*::unguard\s*\(\s*\)\s*;)'

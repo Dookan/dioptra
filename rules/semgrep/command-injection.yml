@@ -37,3 +37,25 @@ rules:
       - pattern-not: subprocess.$FUNC("...", ..., shell=True, ...)
       - pattern-not: os.system("...")
       - pattern-not: os.popen("...")
+  - id: php-shell-command-injection
+    message: Shell command built from a non-literal value; use escapeshellarg() on every argument, or avoid the shell entirely.
+    severity: ERROR
+    languages: [php]
+    metadata:
+      cwe: "CWE-78"
+      owasp: "A03:2021"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: exec($CMD, ...)
+          - pattern: shell_exec($CMD, ...)
+          - pattern: system($CMD, ...)
+          - pattern: passthru($CMD, ...)
+          - pattern: popen($CMD, ...)
+          - pattern: proc_open($CMD, ...)
+      - metavariable-pattern:
+          metavariable: $CMD
+          patterns:
+            - pattern-not: "\"...\""
+            - pattern-not: "'...'"

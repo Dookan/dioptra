@@ -82,6 +82,11 @@ function RunCard({ run, onMarkEquivalent, busy = false }: RunCardProps): React.R
           ))}
         </div>
       )}
+      {run.mutation_measured === false && (
+        // A declared gap, never a silent pass: without this line an empty
+        // survivor list reads as "nothing survived" (docs/workflow-gates.md).
+        <p className="sub warn">{t('verify.mutationNotMeasured')}</p>
+      )}
       {run.surviving_mutants.length > 0 && (
         <>
           <p className="sub">

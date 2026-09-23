@@ -53,3 +53,31 @@ rules:
             - pattern: os.path.join(..., request.$SRC[$K], ...)
             - pattern: os.path.join(..., request.$SRC.get($K), ...)
             - pattern: f"..."
+  - id: php-path-traversal
+    message: File path built from request data; resolve it with realpath() and verify it stays inside the intended directory.
+    severity: ERROR
+    languages: [php]
+    metadata:
+      cwe: "CWE-22"
+      owasp: "A01:2021"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: file_get_contents($PATH, ...)
+          - pattern: file_put_contents($PATH, ...)
+          - pattern: fopen($PATH, ...)
+          - pattern: unlink($PATH, ...)
+          - pattern: readfile($PATH, ...)
+      - metavariable-pattern:
+          metavariable: $PATH
+          pattern-either:
+            - pattern: $_GET[...]
+            - pattern: $_POST[...]
+            - pattern: $_REQUEST[...]
+            - pattern: $_COOKIE[...]
+            - pattern: $A . $_GET[...]
+            - pattern: $A . $_POST[...]
+            - pattern: $A . $_REQUEST[...]
+            - pattern: $REQ->input(...)
+            - pattern: $A . $REQ->input(...)

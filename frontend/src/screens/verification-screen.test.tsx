@@ -84,6 +84,7 @@ const FAILED_RUN = {
   equivalent_mutants: [],
   assertion_free_cases: ['C3'],
   failed_cases: [],
+  mutation_measured: true,
   detail: null,
   duration_ms: 4200,
   created_by_username: 'cperez',
@@ -142,6 +143,29 @@ describe('verification screen', () => {
     expect(
       screen.getByText(fill(es.verify.nextStep.resultTitle_one, { passed: 0, count: 1 })),
     ).toBeTruthy();
+  });
+
+  it('says when mutation could not be measured, instead of implying a clean run', async () => {
+    // A free PHP function yields no mutant at all (tasks/phase7a-php.md), so an
+    // empty survivor list here would otherwise read as "your tests killed them".
+    renderVerify('developer', {
+      [VERIFICATION_URL]: {
+        status: 200,
+        body: [
+          {
+            ...FAILED_RUN,
+            status: 'passed',
+            reasons: [],
+            surviving_mutants: [],
+            assertion_free_cases: [],
+            uncovered_items: [],
+            mutation_measured: false,
+          },
+        ],
+      },
+    });
+    await signIn('cperez');
+    expect(await screen.findByText(es.verify.mutationNotMeasured)).toBeTruthy();
   });
 
   it('asks for a written reason before reopening the design', async () => {

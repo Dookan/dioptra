@@ -135,6 +135,11 @@ def test_debt_context(analysis: Analysis) -> dict[str, Any]:
                 else _S["test_debt"]["status"]["none"],
                 "survivors": len(run.surviving_mutants) if run is not None else 0,
                 "equivalent": len(run.equivalent_mutants) if run is not None else 0,
+                # Zero survivors means two different things, and the report has
+                # to tell them apart: "the tests killed every mutant" and "the
+                # tool could not produce one" (a free PHP function under
+                # Infection). tasks/phase7a-php.md, `mmarin` 2026-09-23.
+                "mutation_measured": run.mutation_measured if run is not None else True,
                 "uncovered": list(run.uncovered_items) if run is not None else [],
             }
         )
@@ -147,6 +152,7 @@ def test_debt_context(analysis: Analysis) -> dict[str, Any]:
         "passed": sum(1 for r in rows if r["status"] == "passed"),
         "survivors": sum(int(r["survivors"]) for r in rows),
         "equivalent": sum(int(r["equivalent"]) for r in rows),
+        "mutation_not_measured": sum(1 for r in rows if not r["mutation_measured"]),
         "statement_percent": round(
             sum(float(r["statement_percent"]) for r in measured) / len(measured), 1
         )

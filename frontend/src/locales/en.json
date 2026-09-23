@@ -134,7 +134,8 @@
       "designNotApproved": "That function's cases are not approved yet, so there is no file to prepare.",
       "testsUnparsable": "The test file has a syntax error and cannot be read.",
       "testsTooLarge": "The test file is too large.",
-      "mutantUnknown": "That mutant is not among the survivors of the function's latest run."
+      "mutantUnknown": "That mutant is not among the survivors of the function's latest run.",
+      "findingNotTriageable": "This finding is in a dependency, so it is not reviewed here: the inventory and the CVE correlation cover it."
     },
     "ast": {
       "failed": "That function's code could not be analyzed.",
@@ -278,7 +279,9 @@
       "pdf": "Download PDF",
       "docx": "Download DOCX",
       "md": "Download Markdown",
-      "sbom": "Download SBOM (CycloneDX)"
+      "sbom": "Download SBOM (CycloneDX)",
+      "working": "Preparing…",
+      "workingHint": "We are composing the document. On a large report the PDF can take close to a minute."
     },
     "findings": {
       "empty": "No findings were found.",
@@ -327,6 +330,19 @@
       "owasp": "OWASP category",
       "tool": "Tool",
       "file": "File"
+    },
+    "page": {
+      "previous": "← Previous",
+      "next": "Next →",
+      "of": "Page {{page}} of {{pages}} · showing {{shown}} of {{total}} findings"
+    },
+    "detailLabel": "Finding detail",
+    "thirdParty": {
+      "title_one": "Finding in third-party code ({{count}})",
+      "title_other": "Findings in third-party code ({{count}})",
+      "why": "They sit in dependencies you do not maintain, so they are not part of your review and they do not hold up the test plan. They stay in the report, and the inventory cross-checks them against the vulnerability database.",
+      "listLabel": "Findings in third-party code",
+      "note": "This finding is in a dependency. You can read it, but it is not reviewed here: the inventory and the CVE correlation cover it."
     }
   },
   "report": {
@@ -632,7 +648,8 @@
     "equivalentNote": "An equivalent mutant is one no test can detect because the code still does the same thing (changing a text that is only written to the log, for example). Write why; it is recorded in the audit log and the report, and discounted on the next run.",
     "equivalentReasonLabel": "Why this mutant is equivalent",
     "equivalentMarked": "Marked. Run and measure again so it is discounted.",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "mutationNotMeasured": "We could not break this function on purpose: the mutation tool only works inside classes, and this one stands on its own. No survivors listed here does not mean your tests killed them."
   },
   "inventory": {
     "title": "Software inventory",

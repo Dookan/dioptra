@@ -31,3 +31,39 @@ rules:
           - pattern: exec($X)
       - pattern-not: eval("...")
       - pattern-not: exec("...")
+  - id: php-dynamic-code-execution
+    message: Dynamic code execution on a non-literal value runs arbitrary PHP; replace with explicit dispatch.
+    severity: ERROR
+    languages: [php]
+    metadata:
+      cwe: "CWE-94"
+      owasp: "A03:2021"
+      category: security
+      confidence: HIGH
+    pattern-either:
+      - pattern: eval($CODE)
+      - pattern: assert($CODE)
+      - pattern: create_function(...)
+      - pattern: preg_replace("/.../e", ...)
+  - id: php-dynamic-include
+    message: include/require with a non-literal path can execute an attacker-chosen file; use a fixed allowlist.
+    severity: ERROR
+    languages: [php]
+    metadata:
+      cwe: "CWE-98"
+      owasp: "A03:2021"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: include $PATH;
+          - pattern: include_once $PATH;
+          - pattern: require $PATH;
+          - pattern: require_once $PATH;
+      - metavariable-pattern:
+          metavariable: $PATH
+          patterns:
+            - pattern-not: "\"...\""
+            - pattern-not: "'...'"
+            - pattern-not: __DIR__ . "..."
+            - pattern-not: __DIR__ . '...'

@@ -308,6 +308,10 @@ def _docx_closure(doc: Any, context: dict[str, Any], strings: dict[str, Any]) ->
                 equivalent=totals["equivalent"],
             )
         )
+        if totals.get("mutation_not_measured"):
+            # Same sentence the HTML and Markdown carry: "mutantes vivos: 0"
+            # under the totals would otherwise read as a measured zero.
+            add(sd["not_measured_note"].format(count=totals["mutation_not_measured"]))
         lbl = sd["labels"]
         _docx_table(
             doc,
@@ -328,7 +332,13 @@ def _docx_closure(doc: Any, context: dict[str, Any], strings: dict[str, Any]) ->
                     _na(f["statement_percent"], " %"),
                     _na(f["branch_percent"], " %"),
                     f["status_label"],
-                    str(f["survivors"]),
+                    # "no medida" instead of 0 when the tool could not mutate
+                    # this function at all (a free PHP function under
+                    # Infection): zero survivors and no measurement are not
+                    # the same fact. tasks/phase7a-php.md.
+                    str(f["survivors"])
+                    if f.get("mutation_measured", True)
+                    else lbl["not_measured"],
                 ]
                 for f in debt["functions"]
             ],

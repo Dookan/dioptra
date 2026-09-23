@@ -33,6 +33,23 @@ VITEST_CONFIG = "dioptra.vitest.config.mjs"
 PYTEST_CONFIG = "dioptra.pytest.ini"
 STRYKER_CONFIG = "dioptra.stryker.json"
 MUTMUT_CONFIG = "pyproject.toml"
+#: Infection refuses any name but PHPUnit's own ("Could not locate the files
+#: phpunit.xml, phpunit.xml.dist, …"), so OURS carries that name. It cannot
+#: be confused with the audited tree's: nothing of that tree is ever copied
+#: into the attempt directory except the one module under test.
+PHPUNIT_CONFIG = "phpunit.xml"
+#: A real bootstrap file, and the reason it has to exist: Infection runs
+#: every mutant through an include-interceptor bootstrap that requires the
+#: project's composer autoloader. Nothing of the audited project is ever
+#: installed here (that is the v1.0.0 non-goal), so `vendor/autoload.php`
+#: does not exist — and without this file EVERY mutant run died in the
+#: bootstrap, PHPUnit errored, and Infection counted all 26 of them as
+#: "killed by Test Framework". A suite asserting nothing scored 100 % MSI.
+#: That is a fail-OPEN of the same family as the P4 one
+#: (`docs/development-phases.md`, 2026-09-22), found before shipping:
+#: with this file the same suite scores 1 killed and 25 escaped.
+PHPUNIT_BOOTSTRAP = "dioptra.bootstrap.php"
+INFECTION_CONFIG = "dioptra.infection.json"
 
 #: Where the runners produce their artefacts INSIDE the container: its own
 #: tmpfs, not the shared mount. The wrappers copy the three declared files
@@ -96,6 +113,11 @@ def build_attempt(
     )
 
 
+def _xml_text(value: str) -> str:
+    """Escape a value that becomes XML TEXT in the config we write."""
+    return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def _write_config(root: Path, scaffold: ScaffoldFile, module_file: str) -> None:
     """OUR configuration, never the audited tree's."""
     if scaffold.runner == "pytest":
@@ -111,6 +133,89 @@ def _write_config(root: Path, scaffold: ScaffoldFile, module_file: str) -> None:
             f"only_mutate = [{json.dumps(module_file)}]\n"
             f"pytest_add_cli_args_test_selection = [{json.dumps(scaffold.filename)}]\n"
             f"also_copy = [{json.dumps(scaffold.filename)}, {json.dumps(PYTEST_CONFIG)}]\n",
+            encoding="utf-8",
+        )
+        return
+
+    if scaffold.runner == "phpunit":
+        # The two file names below are XML TEXT NODES, escaped by `_xml_text`
+        # (`&`, `<`, `>` — which is the whole escape surface for a text node).
+        # One is the generator's own ASCII class name; the other is the audited
+        # path's basename, and that is the only value here the audited tree
+        # chooses. An audited basename holding an XML-illegal control character
+        # yields a config PHPUnit refuses, i.e. ERRORED — fail-closed.
+        (root / PHPUNIT_BOOTSTRAP).write_text(
+            "<?php\n"
+            "// Dioptra E7. Deliberately empty: nothing of the audited project is\n"
+            "// installed, so there is no composer autoloader to load. It exists\n"
+            "// so Infection's include interceptor has a real file to attach to;\n"
+            "// the developer's test file requires the module under test itself.\n",
+            encoding="utf-8",
+        )
+        (root / PHPUNIT_CONFIG).write_text(
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            "<phpunit "
+            'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
+            # A REAL bootstrap file, never an empty attribute: an empty one
+            # makes PHP try to include the directory and warn on every run,
+            # and Infection's include interceptor needs a real file to attach
+            # to (see PHPUNIT_BOOTSTRAP above for what that costs if missing).
+            f'bootstrap="{PHPUNIT_BOOTSTRAP}" '
+            'cacheDirectory="/tmp/dioptra/phpunit-cache" '
+            'colors="false" '
+            # NO `pathCoverage` here: it is not a valid attribute of <phpunit>
+            # (PHPUnit refuses the whole configuration and runs NO tests, which
+            # Infection then reports as "tests must be in a passing state" —
+            # measured 2026-09-23). It is not needed either: the branch sides
+            # the brief is measured by come from Xdebug directly, through
+            # docker/sandbox/php-harness.php, not from a PHPUnit report.
+            'failOnWarning="false" '
+            'failOnRisky="false">\n'
+            "  <testsuites>\n"
+            '    <testsuite name="dioptra">\n'
+            f"      <file>{_xml_text(scaffold.filename)}</file>\n"
+            "    </testsuite>\n"
+            "  </testsuites>\n"
+            "  <source>\n"
+            "    <include>\n"
+            f"      <file>{_xml_text(module_file)}</file>\n"
+            "    </include>\n"
+            "  </source>\n"
+            "</phpunit>\n",
+            encoding="utf-8",
+        )
+        # Infection mutates ONLY the module under test and never the
+        # developer's file; its JSON log lands on the container's own tmpfs,
+        # like every other artefact, and the wrapper reshapes it there.
+        (root / INFECTION_CONFIG).write_text(
+            json.dumps(
+                {
+                    "source": {
+                        "directories": ["."],
+                        "excludes": [
+                            scaffold.filename,
+                            PHPUNIT_CONFIG,
+                            INFECTION_CONFIG,
+                            PHPUNIT_BOOTSTRAP,
+                        ],
+                    },
+                    "timeout": 20,
+                    "testFramework": "phpunit",
+                    # Infection builds its own PHPUnit invocation from this
+                    # directory and passes `--configuration` itself; passing it
+                    # again through `testFrameworkOptions` makes PHPUnit refuse
+                    # the run ("Option --configuration cannot be used more than
+                    # once"), which Infection then reports as "tests must be in
+                    # a passing state". Measured 2026-09-23.
+                    "phpUnit": {"configDir": "."},
+                    "logs": {"json": f"{CONTAINER_WORK_DIR}/infection.json"},
+                    "mutators": {"@default": True},
+                    "minMsi": 0,
+                    "minCoveredMsi": 0,
+                },
+                indent=2,
+            )
+            + "\n",
             encoding="utf-8",
         )
         return

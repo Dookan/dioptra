@@ -127,6 +127,7 @@ services:
       DIOPTRA_RULES_DIR: /srv/app/rules
       DIOPTRA_OSV_DB_DIR: /var/lib/dioptra/osv
       DIOPTRA_SANDBOX_IMAGE: dioptra-sandbox:latest
+      DIOPTRA_SANDBOX_IMAGE_PHP: dioptra-sandbox-php:latest
       DIOPTRA_SANDBOX_RUNS_ROOT: /var/lib/dioptra/runs
       # The vulnerability mirror (P5). The sync job is the ONLY outbound
       # connection of the whole stack, and it runs here, on the worker's
@@ -170,6 +171,8 @@ services:
         condition: service_completed_successfully
       sandbox-image:
         condition: service_completed_successfully
+      sandbox-php-image:
+        condition: service_completed_successfully
     # JSON payloads and a job class that refuses every callable but the
     # pipeline: a write to Valkey must not become code execution in the one
     # process that holds the Docker socket (threat model → Accepted residuals).
@@ -209,6 +212,20 @@ services:
       context: ..
       dockerfile: docker/sandbox.Dockerfile
     image: dioptra-sandbox:latest
+    command: ["true"]
+    restart: "no"
+
+  # ONE IMAGE PER LANGUAGE (tasks/phase7-survey.md §7.1): PHP brings its own
+  # runtime, PHPUnit, Infection and Xdebug, which would roughly double the
+  # wave-1 image for every deployment — including the ones that audit no PHP.
+  # A deployment that never audits PHP can skip building this one; the worker
+  # then refuses a PHP verification with SandboxUnavailable, which is closed,
+  # not silent.
+  sandbox-php-image:
+    build:
+      context: ..
+      dockerfile: docker/sandbox-php.Dockerfile
+    image: dioptra-sandbox-php:latest
     command: ["true"]
     restart: "no"
 

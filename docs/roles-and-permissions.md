@@ -11,7 +11,7 @@ Usernames are initial + lastname, lowercase, no dots: `mmarin`, `cperez`,
 |---|---|---|---|
 | Create/disable users, assign roles | ✓ | — | — |
 | Create project / start analysis (E1–E2) | ✓ | ✓ | — |
-| Triage findings: confirm / discard with justification (E3) | — | ✓ | — |
+| Triage findings: confirm / discard with justification (E3) | — | ✓ (the audited project's own code; a finding inside a dependency directory is informative and refused with `finding_not_triageable`) | — |
 | Build test plan, choose coverage criterion (E4) | view | view | ✓ |
 | Design cases: diagram text, cases, approval (E5) | view | view | ✓ |
 | Write tests (E6): store the test file | view | view | ✓ |

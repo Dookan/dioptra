@@ -335,4 +335,164 @@ describe('findings screen', () => {
     expect(screen.queryByRole('button', { name: es.findings.confirm })).not.toBeInTheDocument();
     expect(screen.queryByLabelText(es.findings.justificationLabel)).not.toBeInTheDocument();
   });
+
+  it('paints one page at a time and walks to the next', async () => {
+    // A real Laravel application produced 687 findings and the browser froze
+    // painting a card for every one of them (2026-09-23). The server was never
+    // the problem: it answered in 0.08 s.
+    const many = Array.from({ length: 60 }, (_, i) => finding(`f-${i + 1}`));
+    renderFindings('analyst', many);
+    const user = await signIn();
+
+    // Scoped to the LIST: a title also appears in the detail panel beside it.
+    const list = () => within(screen.getByRole('list', { name: es.findings.listLabel }));
+    await screen.findByRole('list', { name: es.findings.listLabel });
+
+    expect(list().getByText('Hallazgo f-1')).toBeInTheDocument();
+    expect(list().getByText('Hallazgo f-25')).toBeInTheDocument();
+    expect(list().queryByText('Hallazgo f-26')).not.toBeInTheDocument();
+    expect(
+      screen.getByText(fill(es.findings.page.of, { page: 1, pages: 3, shown: 25, total: 60 })),
+    ).toBeInTheDocument();
+    expect(
+      (screen.getByRole('button', { name: es.findings.page.previous }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+
+    await user.click(screen.getByRole('button', { name: es.findings.page.next }));
+    expect(list().getByText('Hallazgo f-26')).toBeInTheDocument();
+    expect(list().queryByText('Hallazgo f-25')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: es.findings.page.next }));
+    expect(list().getByText('Hallazgo f-60')).toBeInTheDocument();
+    expect(
+      (screen.getByRole('button', { name: es.findings.page.next }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it('keeps dependency findings out of the queue but visible on the screen', async () => {
+    // `mmarin`, from real use: 422 of a Laravel app's 687 findings were inside
+    // `vendor/`, and E3 demanded a written verdict for every one of them.
+    renderFindings('analyst', [
+      finding('own-1', { path: 'app/Http/Controllers/X.php' }),
+      finding('dep-1', { path: 'vendor/symfony/console/A.php', third_party: true }),
+      finding('dep-2', { path: 'vendor/laravel/framework/B.php', third_party: true }),
+    ]);
+    await signIn();
+
+    // The queue counts ONE, not three.
+    expect(
+      await screen.findByText(fill(es.findings.nextStep.pendingTitle, { count: 1 })),
+    ).toBeInTheDocument();
+
+    const list = within(screen.getByRole('list', { name: es.findings.listLabel }));
+    expect(list.getByText('Hallazgo own-1')).toBeInTheDocument();
+    expect(list.queryByText('Hallazgo dep-1')).not.toBeInTheDocument();
+
+    // But they are on the screen, in their own section, with the reason.
+    const deps = within(screen.getByRole('list', { name: es.findings.thirdParty.listLabel }));
+    expect(deps.getByText('Hallazgo dep-1')).toBeInTheDocument();
+    expect(deps.getByText('Hallazgo dep-2')).toBeInTheDocument();
+    expect(screen.getByText(es.findings.thirdParty.why)).toBeInTheDocument();
+  });
+
+  it('offers no verdict form for a dependency finding, and says why', async () => {
+    renderFindings('analyst', [
+      finding('dep-1', { path: 'vendor/x/y.php', third_party: true }),
+    ]);
+    const user = await signIn();
+    const deps = within(
+      await screen.findByRole('list', { name: es.findings.thirdParty.listLabel }),
+    );
+    await user.click(deps.getByText('Hallazgo dep-1'));
+
+    expect(await screen.findByText(es.findings.thirdParty.note)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: es.findings.confirm })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(es.findings.justificationLabel)).not.toBeInTheDocument();
+  });
+
+  it('makes the card list its own scroll region, not the page', async () => {
+    // What `mmarin` asked for: "deberían bajar las tarjetas si tengo el
+    // puntero sobre la caja de las tarjetas". Before this the page scrolled
+    // and the cards came with it.
+    renderFindings('analyst', Array.from({ length: 60 }, (_, i) => finding(`f-${i + 1}`)));
+    await signIn();
+    const list = await screen.findByRole('list', { name: es.findings.listLabel });
+    expect(list.className).toContain('scrollpane');
+    expect((list as HTMLElement).tabIndex).toBe(0);
+    // The pager must NOT be inside the scrolling box, or it scrolls away.
+    const pager = screen.getByRole('button', { name: es.findings.page.next }).parentElement;
+    expect(pager?.className).toContain('pager');
+    expect(list.contains(pager)).toBe(false);
+  });
+
+  it('exposes the detail as a named region a keyboard can reach and scroll', async () => {
+    // A scrollable box that is not focusable cannot be scrolled with the
+    // keyboard, and an unnamed one is announced as nothing. Asked for by
+    // `mmarin` after the sticky panel turned out not to look scrollable.
+    renderFindings('analyst', [finding('f-1')]);
+    await signIn();
+    const detail = await screen.findByRole('region', { name: es.findings.detailLabel });
+    expect(detail.tabIndex).toBe(0);
+    expect(detail.className).toContain('scrollpane');
+  });
+
+  it('does not show a pager when everything fits on one page', async () => {
+    renderFindings('analyst', [finding('f-1'), finding('f-2')]);
+    await signIn();
+    await screen.findByRole('list', { name: es.findings.listLabel });
+    expect(screen.queryByRole('button', { name: es.findings.page.next })).not.toBeInTheDocument();
+  });
+
+  it('goes back to the first page when a filter changes', async () => {
+    const many = [
+      ...Array.from({ length: 40 }, (_, i) => finding(`f-${i + 1}`)),
+      finding('solo-critico', { severity: 'critical', title: 'Hallazgo solo-critico' }),
+    ];
+    renderFindings('analyst', many);
+    const user = await signIn();
+    const list = () => within(screen.getByRole('list', { name: es.findings.listLabel }));
+    await screen.findByRole('list', { name: es.findings.listLabel });
+
+    await user.click(screen.getByRole('button', { name: es.findings.page.next }));
+    expect(list().getByText('Hallazgo f-26')).toBeInTheDocument();
+
+    // Filtering down to a single finding must not leave the list on a page
+    // that no longer exists.
+    await user.selectOptions(screen.getByLabelText(es.findings.filters.severity), 'critical');
+    expect(list().getByText('Hallazgo solo-critico')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: es.findings.page.next })).not.toBeInTheDocument();
+  });
+
+  it('returns to page one on a filter that still has several pages', async () => {
+    // The test above narrows to ONE finding, so `pages` becomes 1 and the
+    // clamp `Math.min(page, pages - 1)` lands on page 1 by itself: it proves
+    // the clamp, not the reset. The precommit coverage adversary removed all
+    // four `setPage(0)` calls and the whole suite stayed green (2026-09-23).
+    // Here the narrowed set keeps THREE pages, so clamp and reset give
+    // different answers: without the reset the analyst stays on page 3 and
+    // reads the LAST cards of the narrowed list instead of the first.
+    const many = [
+      ...Array.from({ length: 40 }, (_, i) => finding(`f-${i + 1}`)),
+      ...Array.from({ length: 60 }, (_, i) =>
+        finding(`c-${i + 1}`, { severity: 'critical', title: `Hallazgo c-${i + 1}` }),
+      ),
+    ];
+    renderFindings('analyst', many);
+    const user = await signIn();
+    const list = () => within(screen.getByRole('list', { name: es.findings.listLabel }));
+    await screen.findByRole('list', { name: es.findings.listLabel });
+
+    await user.click(screen.getByRole('button', { name: es.findings.page.next }));
+    await user.click(screen.getByRole('button', { name: es.findings.page.next }));
+    expect(list().queryByText('Hallazgo c-1')).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText(es.findings.filters.severity), 'critical');
+
+    // First card of the narrowed set, and the set still HAS a next page —
+    // which is what distinguishes a reset from the clamp.
+    expect(list().getByText('Hallazgo c-1')).toBeInTheDocument();
+    expect(list().queryByText('Hallazgo c-60')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: es.findings.page.next })).toBeEnabled();
+  });
 });

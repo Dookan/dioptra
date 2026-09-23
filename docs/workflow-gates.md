@@ -37,12 +37,55 @@ discipline does not depend on anyone's goodwill.
 |---|---|---|---|
 | E1 Register | analyst | system metadata (feeds report "Detalles del sistema") | required fields present |
 | E2 Ingest | analyst | stored codebase + language/framework detection | ingest completed without fatal error — `gates.leave_code` (built) |
-| E3 Analyze + triage | analyst | findings (CWE/OWASP/CVSS) + triage verdicts | EVERY finding confirmed or discarded-with-justification — `gates.leave_analysis` (built) |
+| E3 Analyze + triage | analyst | findings (CWE/OWASP/CVSS) + triage verdicts | every finding **of the audited project's own code** confirmed or discarded-with-justification — `gates.leave_analysis` (built); findings inside a dependency directory are outside the queue, see below |
 | E4 Test plan | developer | risk matrix selection + coverage criterion + written rationale | ≥1 function selected, criterion chosen, rationale non-empty — `gates.leave_plan` (built); the plan save itself refuses a function E5 could never approve (the AST layer cannot parse it, or its basis paths exceed `MAX_CASES` = 200), naming it — `test_plan.check_briefable` (built) |
 | E5 Case design | developer | AST flow diagrams (Mermaid, deterministic, editable) + test brief + the developer's cases with approval | every planned function has its cases approved — `gates.leave_design` (built); approval itself (`design.approve_cases`) is refused until every brief item is covered by a case and there are at least `min_cases` cases |
 | E6 Test writing | developer | tests (assertions/logic 100% human) over deterministic scaffolds | every approved case has a body the developer wrote — `gates.leave_tests` (built) |
 | E7 Verification | system | coverage vs. brief + mutation results | the LATEST run of every planned function passed — `gates.leave_verification` (built) |
 | E8 Report | analyst | editable versioned report | analyst signs; export enabled |
+
+## Third-party findings are outside the triage queue (2026-09-23)
+
+`gates.leave_analysis` keeps its shape — it reads `triage_status().complete` —
+but the set it counts got smaller. A finding whose path has a dependency
+directory as one of its SEGMENTS (`vendor`, `node_modules`,
+`bower_components`, `Pods`, `site-packages`, `dist-packages`, `.bundle`,
+`third_party`, `vendored` — `backend/app/analysis/third_party.py`) is stored
+with `third_party = true` and is **not** part of the queue the gate demands a
+verdict for. `POST …/findings/{id}/verdict` refuses one with a typed
+`finding_not_triageable` (422), so the rule is the server's, not the screen's.
+
+What deliberately does NOT change:
+
+- The finding is still produced, still stored, still exported in **every**
+  format, still counted by the executive summary, still carried by the
+  inventory and the VEX. This changes the analyst's workload, never the
+  document (`mmarin`, 2026-09-23).
+- The scanners still ignore the audited tree's own ignore files — a hostile
+  tree must not be able to silence them.
+- `dist` and `build` are NOT on the list: they are the audited project's own
+  output, and a finding in built code is still theirs.
+- The match is on a whole path segment, so `my-vendor-api/` stays in the queue.
+- A verdict recorded before this rule existed is kept and shown; it simply no
+  longer holds the gate open.
+
+**An SCA finding is never third-party, by rule.** It was tempting to rely on
+the observation that CVEs are attributed to the lockfile that declared the
+dependency (`composer.lock`, `package-lock.json`) rather than to a path inside
+`vendor/` — but that was MEASURED on one application, not guaranteed:
+`osv-scanner scan source --recursive` walks nested lockfiles too, so a vendored
+`composer.lock` or a `node_modules/<pkg>/package-lock.json` yields an SCA
+finding whose path carries a dependency segment. Such a finding must stay in
+the queue: its verdict is the ONLY input of the VEX document
+(`docs/software-inventory.md`), so taking it out would freeze its VEX state at
+`in_triage` for the life of the analysis with no way back short of a re-ingest.
+`third_party.finding_is_third_party` therefore exempts the whole SCA category,
+and the same predicate decides the column and the cap's ordering so the two
+cannot drift.
+
+Measured on the anchor Laravel application: 687 findings → 257 in the queue,
+430 informative — all of them SAST and secrets, which is what the rule exists
+for.
 
 ## Test brief (deterministic — no AI)
 
@@ -182,6 +225,30 @@ and each one is shown to the developer BY NAME, never as a score:
    tool bump that renumbers them makes the excused mutant a real survivor
    again rather than silently excusing a different one. The judgement is a
    person's and it is on the record, exactly like a triage verdict.
+
+**When mutation cannot be measured at all** (wave 2, 2026-09-23). Infection
+mutates only code declared INSIDE A CLASS, so a free PHP function yields no
+mutant however good or bad the developer's tests are — proven minimally on a
+file holding the same logic twice, as a free function and as a method: ten
+mutants, all of them in the method (`tasks/phase7a-php.md`). Zero mutants is
+therefore not "nothing survived", and the platform refuses to let it read that
+way:
+
+- the run records `mutation_measured = false` (migration `0012`), decided from
+  the SOURCE by `verify.mutation_is_measurable` BEFORE the run is scored,
+  never inferred from an empty result;
+- the gate then decides on the other three questions, which all still apply —
+  a coverage shortfall still closes it;
+- the E7 screen says so in plain words and the report prints "no medida"
+  instead of a zero in the survivors column, with a sentence under the totals;
+- a function the tool COULD have mutated and did not is still `ERRORED`: an
+  empty mutation document from a measurable function means the tool broke.
+
+`mmarin`'s call, 2026-09-23: declare the gap rather than refuse the function
+at E4. The platform exists to audit legacy code, and procedural PHP is a large
+part of it; three measured questions with the fourth named beats a function
+that can never be planned. It does mean an E7 pass on such a function attests
+less, which is exactly why every surface says so.
 
 The loop back to E5 is an explicit action, `POST …/reopen-design` (developer,
 written reason, audited) — **not** a backwards stage move: the machine stays

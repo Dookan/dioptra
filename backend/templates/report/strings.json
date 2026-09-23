@@ -232,7 +232,8 @@
       "uncovered": "Ítems sin cubrir",
       "yes": "Sí",
       "no": "No",
-      "equivalent": "Equivalentes"
+      "equivalent": "Equivalentes",
+      "not_measured": "no medida"
     },
     "criterion": {
       "statements": "sentencias",
@@ -245,7 +246,8 @@
       "errored": "No pudo ejecutarse",
       "none": "Sin ejecutar"
     },
-    "stage_note": "Etapa actual del flujo de trabajo: {stage}."
+    "stage_note": "Etapa actual del flujo de trabajo: {stage}.",
+    "not_measured_note": "En {count} de las funciones no se pudo medir la mutación: la herramienta solo rompe código declarado dentro de una clase, y esas son funciones sueltas. En ellas, «mutantes vivos» no es cero: es una medición que no se hizo."
   },
   "stages": {
     "register": "Registro",

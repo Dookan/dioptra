@@ -149,14 +149,26 @@ function Downloads({ analysis }: { analysis: Analysis }): React.ReactNode {
   const { t } = useTranslation();
   const { accessToken } = useAuth();
   const [errorKey, setErrorKey] = useState<string | null>(null);
+  // Which download is in flight, or null. The PDF of a real report is composed
+  // by WeasyPrint on the server and takes a WHILE — measured at 58 s on a
+  // Laravel analysis with 687 findings. Without this the button stayed
+  // enabled and said nothing, so the screen read as frozen and a second click
+  // stacked another minute of server work on top of the first.
+  const [busy, setBusy] = useState<ReportFormat | 'sbom' | null>(null);
   const ready = analysis.status === 'done';
 
-  async function fetchAndSave(action: () => Promise<api.Download>): Promise<void> {
+  async function fetchAndSave(
+    what: ReportFormat | 'sbom',
+    action: () => Promise<api.Download>,
+  ): Promise<void> {
     setErrorKey(null);
+    setBusy(what);
     try {
       api.saveDownload(await action());
     } catch (error) {
       setErrorKey(error instanceof ApiError ? error.messageKey : 'errors.internal');
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -167,28 +179,38 @@ function Downloads({ analysis }: { analysis: Analysis }): React.ReactNode {
           key={format}
           type="button"
           className={format === 'pdf' ? 'btn primary' : 'btn'}
-          disabled={!ready || accessToken === null}
+          disabled={!ready || accessToken === null || busy !== null}
           onClick={() => {
             if (accessToken !== null) {
-              void fetchAndSave(() => api.downloadReport(accessToken, analysis.id, format));
+              void fetchAndSave(format, () =>
+                api.downloadReport(accessToken, analysis.id, format),
+              );
             }
           }}
         >
-          {t(`project.download.${format}`)}
+          {busy === format ? t('project.download.working') : t(`project.download.${format}`)}
         </button>
       ))}
       <button
         type="button"
         className="btn"
-        disabled={!ready || accessToken === null}
+        disabled={!ready || accessToken === null || busy !== null}
         onClick={() => {
           if (accessToken !== null) {
-            void fetchAndSave(() => api.downloadSbom(accessToken, analysis.id));
+            void fetchAndSave('sbom', () => api.downloadSbom(accessToken, analysis.id));
           }
         }}
       >
-        {t('project.download.sbom')}
+        {busy === 'sbom' ? t('project.download.working') : t('project.download.sbom')}
       </button>
+      {busy === 'pdf' && (
+        // Only the PDF is slow (~50 s on a large report); the other formats are
+        // sub-second, and telling someone downloading Markdown that "the PDF can
+        // take a minute" is noise. The busy LABEL still covers every button.
+        <span className="sub" role="status">
+          {t('project.download.workingHint')}
+        </span>
+      )}
       {errorKey !== null && (
         <span className="alert inline" role="alert">
           {t(errorKey)}

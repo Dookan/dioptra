@@ -76,6 +76,7 @@ def test_triage_status_follows_every_verdict(
         "false_positive": 0,
         "pending": 3,
         "complete": False,
+        "third_party": 0,
     }
 
     _verdict(client, headers, ids[0], verdict="confirmed", justification=REASON)
@@ -91,6 +92,7 @@ def test_triage_status_follows_every_verdict(
         "false_positive": 1,
         "pending": 0,
         "complete": True,
+        "third_party": 0,
     }
     db.expire_all()
     assert triage_status(analysis).complete is True

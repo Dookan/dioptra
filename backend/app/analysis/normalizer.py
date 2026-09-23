@@ -390,7 +390,9 @@ def _semgrep_finding(
         metadata.get("cvss"),
         rule_props.get("cvss_vector"),
     )
-    score, severity = _score_and_severity(vector, _security_severity(rule, result), result)
+    score, severity = _score_and_severity(
+        vector, _security_severity(rule, result), result, rule=rule
+    )
     path, line, snippet = _location(result, roots)
     fallback = _rule_text(rule, "shortDescription") or _rule_name(rule) or rule_id
     title = describe(cwe, fallback_title=fallback).title[:MAX_TITLE]
@@ -414,8 +416,29 @@ def _semgrep_finding(
     )
 
 
+def _result_level(result: dict[str, Any], rule: dict[str, Any]) -> str | None:
+    """The SARIF level of a result, inherited from its RULE when absent.
+
+    SARIF 2.1.0 §3.27.10: ``result.level`` is optional and defaults to the
+    rule's ``defaultConfiguration.level``. Semgrep uses exactly that — it
+    writes the level once per rule and omits it on every result — so reading
+    only ``result.level`` sent EVERY Semgrep finding to INFO, whatever the
+    rule declared. Found by running a real Laravel application through the
+    pipeline on 2026-09-23: 611 results, not one of them carrying a level,
+    and rules declared ``severity: ERROR`` reported as "informativo".
+    """
+    level = _text(result.get("level"), 16)
+    if level:
+        return level
+    return _text(_dict(rule.get("defaultConfiguration")).get("level"), 16)
+
+
 def _score_and_severity(
-    vector: str | None, security_severity: float | None, result: dict[str, Any]
+    vector: str | None,
+    security_severity: float | None,
+    result: dict[str, Any],
+    *,
+    rule: dict[str, Any] | None = None,
 ) -> tuple[float | None, Severity]:
     if vector is not None:
         try:
@@ -426,7 +449,7 @@ def _score_and_severity(
             return score, severity_for_score(score)
     if security_severity is not None and 0 <= security_severity <= 10:
         return None, severity_for_score(security_severity)
-    return None, severity_for_level(_text(result.get("level"), 16))
+    return None, severity_for_level(_result_level(result, rule or {}))
 
 
 def _gitleaks_finding(
@@ -483,7 +506,9 @@ def _osv_finding(
         message,
         help_text,
     )
-    score, severity = _score_and_severity(vector, _security_severity(rule, result), result)
+    score, severity = _score_and_severity(
+        vector, _security_severity(rule, result), result, rule=rule
+    )
 
     package = _text(result_props.get("package"), MAX_TITLE)
     version = _text(result_props.get("version"), 100)

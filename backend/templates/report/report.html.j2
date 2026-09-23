@@ -217,12 +217,13 @@
 <h4>{{ strings.test_debt.rationale_title }}</h4>
 <p>{{ test_debt.plan.rationale }}</p>
 <p>{{ strings.test_debt.totals.format(approved=test_debt.totals.approved, functions=test_debt.totals.functions, written=test_debt.totals.written, passed=test_debt.totals.passed, statements=(test_debt.totals.statement_percent ~ ' %' if test_debt.totals.statement_percent is not none else 'N/A'), branches=(test_debt.totals.branch_percent ~ ' %' if test_debt.totals.branch_percent is not none else 'N/A'), survivors=test_debt.totals.survivors, equivalent=test_debt.totals.equivalent) }}</p>
+{% if test_debt.totals.mutation_not_measured %}<p>{{ strings.test_debt.not_measured_note.format(count=test_debt.totals.mutation_not_measured) }}</p>{% endif %}
 <h4>{{ strings.test_debt.table_title }}</h4>
 <table class="debt">
   <thead><tr><th>{{ strings.test_debt.labels.function }}</th><th>{{ strings.test_debt.labels.cases }}</th><th>{{ strings.test_debt.labels.written }}</th><th>{{ strings.test_debt.labels.statements }}</th><th>{{ strings.test_debt.labels.branches }}</th><th>{{ strings.test_debt.labels.status }}</th><th>{{ strings.test_debt.labels.survivors }}</th></tr></thead>
   <tbody>
   {% for f in test_debt.functions %}
-    <tr><td><span class="route">{{ f.path }}</span> · {{ f.function }}</td><td class="count">{{ f.cases }}</td><td class="count">{{ strings.test_debt.labels.yes if f.written else strings.test_debt.labels.no }}</td><td class="count">{{ (f.statement_percent ~ ' %') if f.statement_percent is not none else 'N/A' }}</td><td class="count">{{ (f.branch_percent ~ ' %') if f.branch_percent is not none else 'N/A' }}</td><td>{{ f.status_label }}{% if f.uncovered %} ({{ strings.test_debt.labels.uncovered }}: {{ f.uncovered | join(', ') }}){% endif %}</td><td class="count">{{ f.survivors }}</td></tr>
+    <tr><td><span class="route">{{ f.path }}</span> · {{ f.function }}</td><td class="count">{{ f.cases }}</td><td class="count">{{ strings.test_debt.labels.yes if f.written else strings.test_debt.labels.no }}</td><td class="count">{{ (f.statement_percent ~ ' %') if f.statement_percent is not none else 'N/A' }}</td><td class="count">{{ (f.branch_percent ~ ' %') if f.branch_percent is not none else 'N/A' }}</td><td>{{ f.status_label }}{% if f.uncovered %} ({{ strings.test_debt.labels.uncovered }}: {{ f.uncovered | join(', ') }}){% endif %}</td><td class="count">{{ strings.test_debt.labels.not_measured if not f.mutation_measured else f.survivors }}</td></tr>
   {% endfor %}
   </tbody>
 </table>

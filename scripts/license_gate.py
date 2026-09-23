@@ -55,6 +55,13 @@ ALLOWED_LICENSES = frozenset(
         "MIT-0",
         "MIT-CMU",  # Pillow: the historical CMU variant of MIT, OSI-approved
         "MPL-2.0",
+        # The PHP sandbox image (phase 7a). Both are free and OSI-compatible
+        # BSD-style licences with a naming clause, added by `mmarin` on
+        # 2026-09-23 as a WIDENING of this enumeration, not an exception to
+        # the rule it serves (CLAUDE.md → Hard Rules): neither is proprietary,
+        # source-available, nor carries a non-commercial clause.
+        "PHP-3.01",   # the PHP interpreter itself
+        "XDEBUG-1.03",  # the coverage driver; a BSD-3 derivative
         "PSF-2.0",
         "PYTHON-2.0",
         "PYTHON SOFTWARE FOUNDATION LICENSE",
@@ -230,6 +237,38 @@ def read_node_packages(node_modules: Path) -> list[Package]:
     return packages
 
 
+def read_php_manifest(manifest: Path) -> list[Package]:
+    """Packages declared by a PHP image about itself.
+
+    The PHP sandbox image installs phars and a pecl extension, which carry no
+    machine-readable metadata a scanner could walk — so the IMAGE declares what
+    it shipped, at the versions its Dockerfile pinned and verified by sha256,
+    and this reads that. Weaker than walking a dependency tree, stated as such
+    (docker/sandbox-php.Dockerfile); stronger than a licence claim in a comment,
+    because the file ships inside the artefact and the gate fails on it.
+    """
+    try:
+        document = json.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise SystemExit(f"license gate: unreadable PHP manifest {manifest}: {error}") from error
+    entries = document.get("packages") if isinstance(document, dict) else None
+    if not isinstance(entries, list) or not entries:
+        raise SystemExit(f"license gate: PHP manifest {manifest} declares no packages")
+    packages: list[Package] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise SystemExit(f"license gate: malformed entry in {manifest}")
+        name = str(entry.get("name", "")).strip()
+        version = str(entry.get("version", "")).strip()
+        license_text = str(entry.get("license", "")).strip()
+        if not name or not license_text:
+            raise SystemExit(f"license gate: entry without a name or a licence in {manifest}")
+        packages.append(
+            Package(ecosystem="php", name=name, version=version, license=license_text)
+        )
+    return packages
+
+
 def collect(backend_venv: Path | None, node_modules: Path | None) -> list[Package]:
     packages: list[Package] = []
     if backend_venv is not None:
@@ -250,14 +289,24 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backend-venv", type=Path, default=Path("backend/.venv"))
     parser.add_argument("--node-modules", type=Path, default=Path("frontend/node_modules"))
+    parser.add_argument(
+        "--php-manifest",
+        type=Path,
+        default=None,
+        help="a PHP image's own /opt/dioptra-php/licenses.json (implies --skip-python --skip-node)",
+    )
     parser.add_argument("--skip-python", action="store_true")
     parser.add_argument("--skip-node", action="store_true")
     args = parser.parse_args(argv)
 
-    packages = collect(
-        None if args.skip_python else args.backend_venv,
-        None if args.skip_node else args.node_modules,
-    )
+    if args.php_manifest is not None:
+        # A PHP image declares its own artefacts; nothing else is read there.
+        packages = read_php_manifest(args.php_manifest)
+    else:
+        packages = collect(
+            None if args.skip_python else args.backend_venv,
+            None if args.skip_node else args.node_modules,
+        )
     violations = evaluate(packages)
 
     print(f"license gate: checked {len(packages)} packages")

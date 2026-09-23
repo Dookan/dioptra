@@ -33,6 +33,8 @@ from app.sandbox import executor, results, workspace
 from app.sandbox.errors import SandboxError
 from app.workflow import authoring
 from app.workflow.ast.errors import AstError
+from app.workflow.ast.extract import declared_in_class
+from app.workflow.ast.source import load_source
 from app.workflow.design import FunctionRef, get_design
 from app.workflow.errors import (
     MutantUnknown,
@@ -77,6 +79,41 @@ class Outcome:
     duration_ms: int
     #: Survivors excused as equivalent BEFORE this run (shown, never counted).
     equivalent_mutants: list[dict[str, str]] = field(default_factory=list)
+    #: False when the mutation tool could never have produced a mutant for this
+    #: function (a free PHP function under Infection). The gate then decides on
+    #: the other three questions and every surface SAYS SO — a declared gap,
+    #: never a silent pass.
+    mutation_measured: bool = True
+
+
+#: Shown to the developer when the mutation tool produced no mutant at all AND
+#: the code was mutable, i.e. the tool broke. English like every other
+#: code-side string; the screen shows it as the ERRORED run's detail.
+NO_MUTANTS_DETAIL = "mutation produced no mutants: nothing about the tests was measured"
+
+#: Languages whose mutation tool only mutates code declared inside a class, so
+#: a free function yields no mutant however good or bad the tests are. Measured
+#: for Infection 0.35.4 on 2026-09-23 (tasks/phase7a-php.md); mutmut and
+#: Stryker mutate free functions, which is why this is a set and not a flag.
+CLASS_ONLY_MUTATION_LANGUAGES = frozenset({"php"})
+
+
+def mutation_is_measurable(analysis: Analysis, *, language: str, ref: FunctionRef) -> bool:
+    """Could the mutation tool have produced ANY mutant for this function?
+
+    Answered from the SOURCE before the run is scored, never inferred from an
+    empty result — "no mutants" must not be allowed to read as "nothing
+    survived" (docs/workflow-gates.md → E7 re-audit rules, question 4).
+    A source that cannot be read answers True, the conservative side: the run
+    is then scored on mutation like any other.
+    """
+    if language not in CLASS_ONLY_MUTATION_LANGUAGES:
+        return True
+    try:
+        source = load_source(analysis, ref.path)
+    except (AstError, OSError):
+        return True
+    return declared_in_class(source, language, ref.function, ref.line)
 
 
 def _errored(detail: str | None, *, duration_ms: int = 0) -> Outcome:
@@ -186,6 +223,24 @@ def verify_function(
             result.coverage, language=scaffold.language, module_file=attempt.module_file
         )
         mutation = results.parse_mutation(result.mutation)
+        # A run that generated ZERO mutants measured nothing about the tests,
+        # and "no survivor" would then read as a pass — the same fail-OPEN the
+        # missing-document check above exists for. Known cause in PHP:
+        # Infection only mutates code INSIDE A CLASS, so a free function yields
+        # total = 0 no matter how good or bad the suite is (measured
+        # 2026-09-23, tasks/phase7a-php.md → Open defects).
+        # ``None`` is NOT zero and must not trip this: mutmut's counts are best
+        # effort while its survivor list is the exact one
+        # (docker/sandbox/run-python.sh).
+        mutation_measured = True
+        if mutation.total == 0:
+            # `mmarin`, 2026-09-23: a function the tool CANNOT mutate is not a
+            # dead end — the gate decides on the other three questions and the
+            # gap is declared everywhere (run row, screen, report). A function
+            # it COULD have mutated and did not is still the tool breaking.
+            if mutation_is_measurable(analysis, language=scaffold.language, ref=ref):
+                return _errored(NO_MUTANTS_DETAIL, duration_ms=result.duration_ms)
+            mutation_measured = False
         failed = results.parse_failed_cases(result.junit)
         detail = results_strip(result.stderr)[-MAX_DETAIL_CHARS:] or None
         duration = result.duration_ms
@@ -248,6 +303,7 @@ def verify_function(
         surviving_mutants=survivors,
         assertion_free=assertion_free,
         failed_cases=failed,
+        mutation_measured=mutation_measured,
         detail=detail,
         duration_ms=duration,
         equivalent_mutants=excused_now,
@@ -348,6 +404,7 @@ def _record(
         equivalent_mutants=list(outcome.equivalent_mutants),
         assertion_free_cases=list(outcome.assertion_free),
         failed_cases=list(outcome.failed_cases),
+        mutation_measured=outcome.mutation_measured,
         detail=outcome.detail,
         duration_ms=outcome.duration_ms,
         created_by_username=actor.username,

@@ -23,6 +23,7 @@ LANGUAGE_BY_SUFFIX: dict[str, str] = {
     ".cts": "typescript",
     ".tsx": "tsx",
     ".py": "python",
+    ".php": "php",  # wave 2, phase 7a
 }
 
 

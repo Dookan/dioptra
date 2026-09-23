@@ -40,6 +40,20 @@ GATE_MESSAGE_KEYS: dict[str, str] = {
 }
 
 
+class FindingNotTriageable(WorkflowError):
+    """A verdict was posted on a finding in dependency code.
+
+    It is shown and reported, but it is not the analyst's to adjudicate and
+    the E3 gate never waits for it (`app/analysis/third_party.py`). Refusing
+    is the honest answer: silently storing a verdict nothing reads would let
+    an analyst spend a morning on Symfony for no effect.
+    """
+
+    status_code = 422
+    code = "finding_not_triageable"
+    message_key = "errors.workflow.findingNotTriageable"
+
+
 class GateClosed(WorkflowError):
     """The current stage's gate is not satisfied; ``reason`` names which condition."""
 

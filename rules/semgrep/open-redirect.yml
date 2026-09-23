@@ -32,3 +32,29 @@ rules:
       - metavariable-regex:
           metavariable: $URL
           regex: ^request\.(args|form|GET|POST|query_params|values)
+  - id: php-open-redirect
+    message: Redirect target taken from the request; validate against an allowlist of internal paths.
+    severity: WARNING
+    languages: [php]
+    metadata:
+      cwe: "CWE-601"
+      owasp: "A01:2021"
+      category: security
+      confidence: MEDIUM
+    patterns:
+      - pattern-either:
+          - pattern: header($TARGET, ...)
+          - pattern: redirect($TARGET, ...)
+          - pattern: Redirect::to($TARGET, ...)
+          - pattern: $R->away($TARGET, ...)
+      - metavariable-pattern:
+          metavariable: $TARGET
+          pattern-either:
+            - pattern: $_GET[...]
+            - pattern: $_POST[...]
+            - pattern: $_REQUEST[...]
+            - pattern: $A . $_GET[...]
+            - pattern: $A . $_POST[...]
+            - pattern: $A . $_REQUEST[...]
+            - pattern: $REQ->input(...)
+            - pattern: $A . $REQ->input(...)

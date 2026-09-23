@@ -35,6 +35,12 @@ dependencies = [
     "tree-sitter-javascript", # MIT — JS grammar (wave 1)
     "tree-sitter-typescript", # MIT — TS/TSX grammars (wave 1)
     "tree-sitter-python",     # MIT — Python grammar (wave 1)
+    # --- Phase 7a: language wave 2 (tasks/phase7-survey.md §3.1) ---
+    # MIT — PHP grammar. Declares tree-sitter~=0.24, inside the pin above.
+    # The pin's re-probe is per grammar, not global: the 0.26 heap corruption
+    # was a core-binding fault, so tests/test_ast_php.py carries its own
+    # large-function probe (test_large_functions_do_not_crash_the_process).
+    "tree-sitter-php",
 ]
 
 [dependency-groups]
@@ -127,6 +133,13 @@ only_mutate = [
     "app/inventory/documents.py",
     "app/inventory/sync.py",
     "app/audit/router.py",
+    # P7a close (PHP wave 2): the escaping boundary that turns audited text
+    # into generated PHP, the E6 inspector's own rules, and the SARIF severity
+    # decision. `ast/extract.py` is deliberately NOT here, following the
+    # existing shape of this list: it mutates DECISION surfaces, not parsers.
+    "app/workflow/scaffold/text.py",
+    "app/workflow/scaffold/inspect.py",
+    "app/analysis/normalizer.py",
 ]
 pytest_add_cli_args_test_selection = [
     "tests/test_gates.py",
@@ -143,4 +156,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_inventory_documents.py",
     "tests/test_inventory_hardening.py",
     "tests/test_audit_api.py",
+    "tests/test_scaffold.py",
+    "tests/test_scaffold_php.py",
+    "tests/test_normalizer.py",
 ]
