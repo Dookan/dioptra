@@ -30,7 +30,13 @@ from app.analysis.models import (
     ToolRun,
     ToolStatus,
 )
-from app.analysis.normalizer import NormalizationError, ToolReport, normalize, parse_sarif
+from app.analysis.normalizer import (
+    NormalizationError,
+    ToolReport,
+    normalize,
+    normalize_crypto,
+    parse_sarif,
+)
 from app.analysis.runners import default_runners
 from app.analysis.runners.base import WORK_DIR, ExecutionResult, Runner, RunnerSpec
 from app.analysis.runners.executor import build_executor
@@ -41,6 +47,7 @@ from app.core.errors import AppError
 from app.db.session import get_session_factory
 from app.ingest.detection import detect
 from app.ingest.git_source import shallow_clone
+from app.inventory.models import CryptoAsset
 
 logger = logging.getLogger("dioptra.pipeline")
 
@@ -193,6 +200,19 @@ def _execute(db: Session, analysis: Analysis, settings: Settings) -> None:
                 advisory=item.advisory,
                 references=list(item.references),
                 fingerprint=item.fingerprint,
+            )
+        )
+    # The CBOM rows (P5): the crypto-inventory results the normalizer set aside.
+    for asset in normalize_crypto(collected.reports, collected.roots):
+        db.add(
+            CryptoAsset(
+                analysis_id=analysis.id,
+                primitive=asset.primitive,
+                algorithm=asset.algorithm,
+                path=asset.path,
+                line=asset.line,
+                weak=asset.weak,
+                rule_id=asset.rule_id,
             )
         )
     if collected.sbom is not None:

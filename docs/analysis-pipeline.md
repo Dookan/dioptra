@@ -46,11 +46,11 @@ before normalization (the plan's day 7), so a normalizer bug never loses a
 tool's result.
 
 Languages (analysis runners and, since P3 day 14, the tree-sitter AST layer of E5): wave 1 JS/TS + Python (P1–P4); wave 2 PHP/Laravel + Java/Spring
-(P5, first cut under overrun); wave 3 Go + C#/.NET is out of scope for v1.0.0.
+**cut to a second cycle on 2026-09-22** (the plan's contingency; E2 still detects them, E4 refuses their functions); wave 3 Go + C#/.NET is out of scope for v1.0.0.
 
 ## Rule authoring (`rules/semgrep/`)
 
-- One YAML file per rule family; every rule carries `metadata: {cwe, owasp}`.
+- One YAML file per rule family; every SECURITY rule carries `metadata: {cwe, owasp}`. The CBOM inventory rules (`crypto-inventory.yml`, P5) carry `metadata.category: inventory` and no CWE/OWASP instead: a strong algorithm is not a weakness. Their ids start with `crypto-inventory-` and their message has the fixed shape `crypto-asset primitive=… algorithm=… weak=yes|no`, which the normalizer parses (`backend/tests/test_runners.py` pins both contracts).
 - Each rule ships with a `tests/` pair (positive + negative snippet).
 - Re-run the full ruleset against the anchor fixtures (the MINCYT form
   systems whose manual reports are the P1 success criterion) before merging
@@ -60,6 +60,10 @@ Languages (analysis runners and, since P3 day 14, the tree-sitter AST layer of E
 
 - SARIF in, internal Finding model out: `{rule, cwe, owasp, cvss, severity,
   path, line, snippet, mitigation, references}`.
+- **Inventory results are diverted, never findings**: a SAST result whose rule
+  id starts with `crypto-inventory-` becomes a `crypto_assets` row
+  (`normalize_crypto`, P5) and is skipped by `normalize`; a weak algorithm
+  reaches triage only through its own `weak-crypto.yml` rule.
 - **"Unknown CWE" is a valid state, not an error.** A Semgrep rule without a
   CWE (or a tool that emits none) yields a finding with `cwe = null` and an
   OWASP bucket of "unclassified"; it still reaches triage and the report.

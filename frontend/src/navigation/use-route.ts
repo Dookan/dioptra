@@ -1,7 +1,7 @@
 /**
  * Hash routing without a router dependency.
  *
- * Five destinations; a routing library would be a new dependency (license +
+ * Seven destinations plus the per-analysis screens; a routing library would be a new dependency (license +
  * rationale) for a switch statement. The hash keeps every screen bookmarkable
  * and survives a reload. Revisit when the workflow screens of P3 need nested
  * routes.
@@ -11,6 +11,8 @@ import { useCallback, useEffect, useState } from 'react';
 export type Route =
   | { kind: 'home' }
   | { kind: 'projects' }
+  | { kind: 'inventory' }
+  | { kind: 'audit' }
   | { kind: 'project'; id: string }
   | { kind: 'findings'; id: string; analysisId: string }
   | { kind: 'plan'; id: string; analysisId: string }
@@ -39,6 +41,8 @@ const ANALYSIS_KINDS: Record<
 
 export function parseHash(hash: string): Route {
   if (hash === '#/projects') return { kind: 'projects' };
+  if (hash === '#/inventory') return { kind: 'inventory' };
+  if (hash === '#/audit') return { kind: 'audit' };
   const nested = ANALYSIS.exec(hash);
   if (nested?.[1] !== undefined && nested[2] !== undefined) {
     const kind = ANALYSIS_KINDS[nested[3] ?? ''] ?? 'findings';
@@ -55,6 +59,10 @@ export function hrefFor(route: Route): string {
       return '#/';
     case 'projects':
       return '#/projects';
+    case 'inventory':
+      return '#/inventory';
+    case 'audit':
+      return '#/audit';
     case 'project':
       return `#/projects/${route.id}`;
     case 'findings':

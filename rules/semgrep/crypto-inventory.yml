@@ -1,0 +1,255 @@
+# Cryptographic INVENTORY rules (the CBOM's source — tasks/phase5-survey.md §6).
+#
+# These are not findings: a strong algorithm is not a weakness. Every rule here
+# has `metadata.category: inventory`, an id that starts with `crypto-inventory-`
+# and a message of the fixed shape
+#     crypto-asset primitive=<primitive> algorithm=$ALG weak=<yes|no>
+# which the normalizer parses and DIVERTS into `crypto_assets` instead of
+# `findings` (backend/app/analysis/normalizer.py::crypto_asset_from_message).
+# Weak algorithms are ALSO findings through weak-crypto.yml — same match, two
+# purposes, two rules, on purpose.
+rules:
+  - id: crypto-inventory-js-hash
+    message: "crypto-asset primitive=hash algorithm=$ALG weak=no"
+    severity: INFO
+    languages: [javascript, typescript]
+    metadata:
+      category: inventory
+      crypto: { primitive: hash }
+    patterns:
+      - pattern: $CRYPTO.createHash("$ALG", ...)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: (?i)^(sha-?(224|256|384|512)|sha3-(256|384|512)|blake2[bs](512|256)?)$
+  - id: crypto-inventory-js-weak-hash
+    message: "crypto-asset primitive=hash algorithm=$ALG weak=yes"
+    severity: INFO
+    languages: [javascript, typescript]
+    metadata:
+      category: inventory
+      crypto: { primitive: hash }
+    patterns:
+      - pattern: $CRYPTO.createHash("$ALG", ...)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: (?i)^(md5|md4|sha1|sha-1|ripemd160)$
+  - id: crypto-inventory-js-hmac
+    message: "crypto-asset primitive=mac algorithm=HMAC-$ALG weak=no"
+    severity: INFO
+    languages: [javascript, typescript]
+    metadata:
+      category: inventory
+      crypto: { primitive: mac }
+    patterns:
+      - pattern: $CRYPTO.createHmac("$ALG", ...)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: (?i)^(sha-?(224|256|384|512)|sha3-(256|384|512))$
+  - id: crypto-inventory-js-weak-hmac
+    message: "crypto-asset primitive=mac algorithm=HMAC-$ALG weak=yes"
+    severity: INFO
+    languages: [javascript, typescript]
+    metadata:
+      category: inventory
+      crypto: { primitive: mac }
+    patterns:
+      - pattern: $CRYPTO.createHmac("$ALG", ...)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: (?i)^(md5|sha1|sha-1)$
+  - id: crypto-inventory-js-cipher
+    message: "crypto-asset primitive=cipher algorithm=$ALG weak=no"
+    severity: INFO
+    languages: [javascript, typescript]
+    metadata:
+      category: inventory
+      crypto: { primitive: cipher }
+    patterns:
+      - pattern-either:
+          - pattern: $CRYPTO.createCipheriv("$ALG", ...)
+          - pattern: $CRYPTO.createDecipheriv("$ALG", ...)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: (?i)^(aes-(128|192|256)-(gcm|cbc|ctr|ccm|ocb)|chacha20-poly1305)$
+  - id: crypto-inventory-js-weak-cipher
+    message: "crypto-asset primitive=cipher algorithm=$ALG weak=yes"
+    severity: INFO
+    languages: [javascript, typescript]
+    metadata:
+      category: inventory
+      crypto: { primitive: cipher }
+    patterns:
+      - pattern-either:
+          - pattern: $CRYPTO.createCipheriv("$ALG", ...)
+          - pattern: $CRYPTO.createDecipheriv("$ALG", ...)
+          - pattern: $CRYPTO.createCipher("$ALG", ...)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: (?i)^(des|des-ede|des-ede3|des-ede3-cbc|rc4|rc2|bf|blowfish|aes-(128|192|256)-ecb)$
+  - id: crypto-inventory-js-jwt-signature
+    message: "crypto-asset primitive=signature algorithm=$ALG weak=no"
+    severity: INFO
+    languages: [javascript, typescript]
+    metadata:
+      category: inventory
+      crypto: { primitive: signature }
+    patterns:
+      - pattern-either:
+          - pattern: '$JWT.sign($P, $S, {..., algorithm: "$ALG", ...})'
+          - pattern: '$JWT.verify($T, $S, {..., algorithms: ["$ALG", ...], ...})'
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: ^(HS(256|384|512)|RS(256|384|512)|ES(256|384|512)|PS(256|384|512)|EdDSA)$
+  - id: crypto-inventory-js-keypair
+    message: "crypto-asset primitive=signature algorithm=$ALG weak=no"
+    severity: INFO
+    languages: [javascript, typescript]
+    metadata:
+      category: inventory
+      crypto: { primitive: signature }
+    patterns:
+      - pattern-either:
+          - pattern: $CRYPTO.generateKeyPair("$ALG", ...)
+          - pattern: $CRYPTO.generateKeyPairSync("$ALG", ...)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: (?i)^(rsa|rsa-pss|ec|ed25519|ed448|x25519|x448|dsa)$
+  - id: crypto-inventory-js-kdf
+    message: "crypto-asset primitive=kdf algorithm=$FUNC weak=no"
+    severity: INFO
+    languages: [javascript, typescript]
+    metadata:
+      category: inventory
+      crypto: { primitive: kdf }
+    patterns:
+      - pattern: $CRYPTO.$FUNC(...)
+      - metavariable-regex:
+          metavariable: $FUNC
+          regex: ^(pbkdf2|pbkdf2Sync|scrypt|scryptSync|hkdf|hkdfSync)$
+  - id: crypto-inventory-js-weak-protocol
+    message: "crypto-asset primitive=protocol algorithm=$PROTO weak=yes"
+    severity: INFO
+    languages: [javascript, typescript]
+    metadata:
+      category: inventory
+      crypto: { primitive: protocol }
+    patterns:
+      - pattern-either:
+          - pattern: |
+              { ..., secureProtocol: "$PROTO", ... }
+          - pattern: |
+              { ..., minVersion: "$PROTO", ... }
+      - metavariable-regex:
+          metavariable: $PROTO
+          regex: ^(SSLv2_method|SSLv3_method|TLSv1_method|TLSv1_1_method|TLSv1|TLSv1\.1)$
+  - id: crypto-inventory-py-hash
+    message: "crypto-asset primitive=hash algorithm=$ALG weak=no"
+    severity: INFO
+    languages: [python]
+    metadata:
+      category: inventory
+      crypto: { primitive: hash }
+    patterns:
+      - pattern-either:
+          - pattern: hashlib.$ALG(...)
+          - pattern: hashlib.new("$ALG", ...)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: (?i)^(sha224|sha256|sha384|sha512|sha3_(256|384|512)|blake2[bs])$
+  - id: crypto-inventory-py-weak-hash
+    message: "crypto-asset primitive=hash algorithm=$ALG weak=yes"
+    severity: INFO
+    languages: [python]
+    metadata:
+      category: inventory
+      crypto: { primitive: hash }
+    patterns:
+      - pattern-either:
+          - pattern: hashlib.$ALG(...)
+          - pattern: hashlib.new("$ALG", ...)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: (?i)^(md5|sha1)$
+  - id: crypto-inventory-py-hmac
+    message: "crypto-asset primitive=mac algorithm=HMAC-$ALG weak=no"
+    severity: INFO
+    languages: [python]
+    metadata:
+      category: inventory
+      crypto: { primitive: mac }
+    patterns:
+      - pattern: hmac.new($K, $M, hashlib.$ALG)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: (?i)^(sha224|sha256|sha384|sha512)$
+  - id: crypto-inventory-py-cipher
+    message: "crypto-asset primitive=cipher algorithm=$ALG weak=no"
+    severity: INFO
+    languages: [python]
+    metadata:
+      category: inventory
+      crypto: { primitive: cipher }
+    patterns:
+      - pattern-either:
+          - pattern: cryptography.hazmat.primitives.ciphers.algorithms.$ALG(...)
+          - pattern: algorithms.$ALG(...)
+          - pattern: Crypto.Cipher.$ALG.new(...)
+          - pattern: $ALG.new(...)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: ^(AES|AESGCM|AESCCM|ChaCha20|ChaCha20Poly1305|Camellia)$
+  - id: crypto-inventory-py-weak-cipher
+    message: "crypto-asset primitive=cipher algorithm=$ALG weak=yes"
+    severity: INFO
+    languages: [python]
+    metadata:
+      category: inventory
+      crypto: { primitive: cipher }
+    patterns:
+      - pattern-either:
+          - pattern: algorithms.$ALG(...)
+          - pattern: Crypto.Cipher.$ALG.new(...)
+          - pattern: $ALG.new(...)
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: ^(DES|DES3|TripleDES|ARC4|ARC2|RC4|Blowfish|IDEA|CAST5)$
+  - id: crypto-inventory-py-signature
+    message: "crypto-asset primitive=signature algorithm=$ALG weak=no"
+    severity: INFO
+    languages: [python]
+    metadata:
+      category: inventory
+      crypto: { primitive: signature }
+    patterns:
+      - pattern-either:
+          - pattern: jwt.encode($P, $K, algorithm="$ALG")
+          - pattern: jwt.decode($T, $K, algorithms=["$ALG", ...])
+      - metavariable-regex:
+          metavariable: $ALG
+          regex: ^(HS(256|384|512)|RS(256|384|512)|ES(256|384|512)|PS(256|384|512)|EdDSA)$
+  - id: crypto-inventory-py-kdf
+    message: "crypto-asset primitive=kdf algorithm=$FUNC weak=no"
+    severity: INFO
+    languages: [python]
+    metadata:
+      category: inventory
+      crypto: { primitive: kdf }
+    patterns:
+      - pattern-either:
+          - pattern: hashlib.$FUNC(...)
+          - pattern: $MOD.$FUNC(...)
+      - metavariable-regex:
+          metavariable: $FUNC
+          regex: ^(pbkdf2_hmac|scrypt|PBKDF2HMAC|Scrypt|Argon2id|PasswordHasher)$
+  - id: crypto-inventory-py-weak-protocol
+    message: "crypto-asset primitive=protocol algorithm=$PROTO weak=yes"
+    severity: INFO
+    languages: [python]
+    metadata:
+      category: inventory
+      crypto: { primitive: protocol }
+    patterns:
+      - pattern: ssl.$PROTO
+      - metavariable-regex:
+          metavariable: $PROTO
+          regex: ^(PROTOCOL_SSLv2|PROTOCOL_SSLv3|PROTOCOL_TLSv1|PROTOCOL_TLSv1_1)$

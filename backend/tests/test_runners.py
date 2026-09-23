@@ -393,6 +393,17 @@ def test_runner_paths_must_be_absolute(settings: Settings, tmp_path: Path) -> No
 # --- Own Semgrep rules: the contract every rule file must satisfy ----------------
 
 RULE_ID = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+CRYPTO_PRIMITIVES = {
+    "hash",
+    "cipher",
+    "mac",
+    "signature",
+    "kdf",
+    "random",
+    "protocol",
+    "certificate",
+}
+CRYPTO_MESSAGE = re.compile(r"^crypto-asset primitive=[a-z]+ algorithm=\S+ weak=(yes|no)$")
 CWE_TAG = re.compile(r"^CWE-\d{1,4}$")
 OWASP_TAG = re.compile(r"^A(0[1-9]|10):2021$")
 
@@ -416,6 +427,16 @@ def test_rule_metadata_contract(rule_file: Path) -> None:
         assert rule["severity"] in {"INFO", "WARNING", "ERROR"}, rule["id"]
         assert rule["languages"], rule["id"]
         metadata = rule["metadata"]
+        if metadata.get("category") == "inventory":
+            # CBOM inventory rules (P5): not findings, so no CWE/OWASP — the
+            # contract is the id prefix and the message shape the normalizer
+            # parses (rules/semgrep/crypto-inventory.yml header).
+            assert rule["id"].startswith("crypto-inventory-"), rule["id"]
+            assert rule["severity"] == "INFO", rule["id"]
+            assert metadata["crypto"]["primitive"] in CRYPTO_PRIMITIVES, rule["id"]
+            assert CRYPTO_MESSAGE.match(rule["message"]), rule["id"]
+            continue
+        assert not rule["id"].startswith("crypto-inventory-"), rule["id"]
         assert CWE_TAG.match(metadata["cwe"]), rule["id"]
         assert OWASP_TAG.match(metadata["owasp"]), rule["id"]
         assert metadata["category"] == "security", rule["id"]

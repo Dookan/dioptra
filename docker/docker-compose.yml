@@ -53,12 +53,17 @@ services:
       DIOPTRA_SEED_PASSWORD_CPEREZ: ${DIOPTRA_SEED_PASSWORD_CPEREZ:-}
       DIOPTRA_REDIS_URL: redis://valkey:6379/0
       DIOPTRA_WORKSPACE_ROOT: /var/lib/dioptra/workspaces
+      DIOPTRA_VULNDB_SPOOL_DIR: /var/lib/dioptra/vulndb
+      DIOPTRA_VULNDB_SYNC_ENABLED: ${DIOPTRA_VULNDB_SYNC_ENABLED:-true}
       # WeasyPrint's font cache must land on the tmpfs: the root is read-only.
       XDG_CACHE_HOME: /tmp
     volumes:
       # The API extracts uploads into the jail; the worker reads them. The API
       # NEVER gets the Docker socket — only the worker starts containers.
       - ${DIOPTRA_DATA_DIR:-/var/lib/dioptra}/workspaces:/var/lib/dioptra/workspaces
+      # A vulnerability dump uploaded through the panel waits here for the
+      # worker's import job; the API only spools it (P5, tasks/phase5-survey.md §2).
+      - ${DIOPTRA_DATA_DIR:-/var/lib/dioptra}/vulndb:/var/lib/dioptra/vulndb
     depends_on:
       postgres:
         condition: service_healthy
@@ -95,6 +100,13 @@ services:
       DIOPTRA_OSV_DB_DIR: /var/lib/dioptra/osv
       DIOPTRA_SANDBOX_IMAGE: dioptra-sandbox:latest
       DIOPTRA_SANDBOX_RUNS_ROOT: /var/lib/dioptra/runs
+      # The vulnerability mirror (P5). The sync job is the ONLY outbound
+      # connection of the whole stack, and it runs here, on the worker's
+      # schedule; set the flag to false on an air-gapped host and import the
+      # dump through the panel instead. Both endpoints are HTTPS-only settings.
+      DIOPTRA_VULNDB_SYNC_ENABLED: ${DIOPTRA_VULNDB_SYNC_ENABLED:-true}
+      DIOPTRA_VULNDB_SYNC_INTERVAL_HOURS: ${DIOPTRA_VULNDB_SYNC_INTERVAL_HOURS:-24}
+      DIOPTRA_VULNDB_SPOOL_DIR: /var/lib/dioptra/vulndb
       XDG_CACHE_HOME: /tmp
     volumes:
       # Bind mounts handed to `docker run` are resolved by the HOST daemon, so
@@ -119,6 +131,7 @@ services:
       - type: bind
         source: ${DIOPTRA_DATA_DIR:-/var/lib/dioptra}/runs
         target: /var/lib/dioptra/runs
+      - ${DIOPTRA_DATA_DIR:-/var/lib/dioptra}/vulndb:/var/lib/dioptra/vulndb
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
@@ -132,10 +145,14 @@ services:
     # JSON payloads and a job class that refuses every callable but the
     # pipeline: a write to Valkey must not become code execution in the one
     # process that holds the Docker socket (threat model → Accepted residuals).
+    # `--with-scheduler`: RQ's own scheduler runs the vulnerability sync at
+    # its interval (the job re-enqueues itself under a fixed id). No extra
+    # dependency, no cron container.
     command:
       [
         "rq", "worker", "--url", "redis://valkey:6379/0",
         "--serializer", "json", "--job-class", "app.core.queue.PipelineJob",
+        "--with-scheduler",
         "analysis",
       ]
     # The worker runs as uid 10001; the socket belongs to the host's docker

@@ -20,10 +20,16 @@ logger = logging.getLogger("dioptra.queue")
 
 PIPELINE_JOB = "app.analysis.pipeline.run_pipeline"
 VERIFY_JOB = "app.workflow.verify_job.run_verification_job"
+#: P5: the vulnerability mirror's sync (the platform's ONLY outbound
+#: connection) and the import of a dump the API spooled. Neither starts a
+#: container (tasks/phase5-survey.md §1).
+SYNC_JOB = "app.inventory.sync.run_sync_job"
+IMPORT_JOB = "app.inventory.sync.run_import_job"
 #: The ONLY callables the worker may execute. Adding one here is a security
 #: decision: the worker is the process holding the Docker socket.
-ALLOWED_JOBS = frozenset({PIPELINE_JOB, VERIFY_JOB})
+ALLOWED_JOBS = frozenset({PIPELINE_JOB, VERIFY_JOB, SYNC_JOB, IMPORT_JOB})
 QUEUE_NAME = "analysis"
+SYNC_JOB_ID = "vulndb-sync"
 
 
 class PipelineJob(Job):
@@ -117,3 +123,80 @@ def enqueue_verification(analysis_id: uuid.UUID, actor_username: str) -> None:
         VERIFY_JOB, str(analysis_id), actor_username, job_timeout=job_timeout, result_ttl=0
     )
     logger.info("enqueued verification analysis=%s", analysis_id)
+
+
+def _queue() -> Any:
+    from redis import Redis
+    from rq import Queue
+    from rq.serializers import JSONSerializer
+
+    settings = get_settings()
+    connection = Redis.from_url(settings.redis_url)
+    return Queue(
+        QUEUE_NAME, connection=connection, serializer=JSONSerializer, job_class=PipelineJob
+    )
+
+
+def enqueue_sync(
+    requested_by: str | None,
+    *,
+    delay_seconds: int = 0,
+    force: bool = False,
+    job_id: str | None = SYNC_JOB_ID,
+) -> None:
+    """Schedule the vulnerability-mirror sync.
+
+    A fixed ``job_id`` means scheduling it again REPLACES the pending one, so
+    however many API replicas kick it at start-up there is one pending sync.
+    The job's own reschedule passes the NEXT slot's id instead
+    (``inventory.sync.next_sync_job_id``): a successor under the running
+    job's id is deleted with it when the job finishes. ``delay_seconds``
+    needs the worker's own scheduler (``--with-scheduler``).
+    """
+    settings = get_settings()
+    if settings.queue_inline:
+        from app.inventory.sync import run_sync_job
+
+        if delay_seconds == 0:
+            run_sync_job(requested_by, force=force)
+        return
+    queue = _queue()
+    timeout = (
+        settings.vulndb_download_timeout_seconds
+        * (len(settings.vulndb_osv_ecosystems) + len(settings.vulndb_nvd_years) + 1)
+        + 3600
+    )
+    if delay_seconds > 0:
+        from datetime import timedelta
+
+        queue.enqueue_in(
+            timedelta(seconds=delay_seconds),
+            SYNC_JOB,
+            requested_by,
+            force=force,
+            job_id=job_id,
+            job_timeout=timeout,
+            result_ttl=0,
+        )
+    else:
+        queue.enqueue(
+            SYNC_JOB,
+            requested_by,
+            force=force,
+            job_id=job_id if not force else None,
+            job_timeout=timeout,
+            result_ttl=0,
+        )
+    logger.info("enqueued vulnerability sync delay=%ss", delay_seconds)
+
+
+def enqueue_import(token: str, kind: str, requested_by: str) -> None:
+    """Schedule the import of a spooled dump. The file MUST already be written."""
+    settings = get_settings()
+    if settings.queue_inline:
+        from app.inventory.sync import run_import_job
+
+        run_import_job(token, kind, requested_by)
+        return
+    _queue().enqueue(IMPORT_JOB, token, kind, requested_by, job_timeout=3600 * 2, result_ttl=0)
+    logger.info("enqueued vulnerability import token=%s kind=%s", token, kind)

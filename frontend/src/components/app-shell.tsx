@@ -24,12 +24,13 @@ interface Props {
   children: ReactNode;
 }
 
-type TabKey = 'home' | 'projects' | 'findings' | 'workflow' | 'report';
+type TabKey = 'home' | 'projects' | 'findings' | 'workflow' | 'report' | 'inventory' | 'audit';
 
 /**
  * Inicio and Proyectos always; Hallazgos, Workflow and Reporte (mockups 04,
  * 05 and 09) once the route names an analysis — they are meaningless without
- * one. Workflow opens the current stage's screen (E4 in P3).
+ * one; Inventario and Bitácora (mockups 11 and 10) always, after them, as
+ * every tabs bar of the mockups shows. Workflow opens the current stage's screen.
  */
 function tabsFor(route: Route, stage: string | undefined): { key: TabKey; route: Route }[] {
   const tabs: { key: TabKey; route: Route }[] = [
@@ -56,6 +57,7 @@ function tabsFor(route: Route, stage: string | undefined): { key: TabKey; route:
       { key: 'report', route: { kind: 'report', id, analysisId } },
     );
   }
+  tabs.push({ key: 'inventory', route: { kind: 'inventory' } }, { key: 'audit', route: { kind: 'audit' } });
   return tabs;
 }
 

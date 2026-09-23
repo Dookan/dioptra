@@ -33,8 +33,9 @@ normalization with CWE → OWASP and CVSS 3.1, and the institutional report as
 PDF / DOCX / Markdown / HTML. The work plan (`docs/work-plan-reference.html`,
 distilled in `docs/development-phases.md`) runs 2026-08-24 → 2026-09-18 and
 ends with release v1.0.0: P1 audit pipeline + institutional PDF, P2 findings
-UI, P3 workflow E1–E5, P4 sandbox + mutation re-audit, P5 software inventory,
-PHP/Java, self-audit.
+UI, P3 workflow E1–E5, P4 sandbox + mutation re-audit, P5 software inventory
+and self-audit. PHP/Laravel and Java/Spring were cut to a second cycle under
+the plan's own contingency: v1.0.0 ships JS/TS + Python.
 
 ## Run it
 

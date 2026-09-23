@@ -67,8 +67,11 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     throw new ApiError(response.status, code, messageKey, { context });
   }
 
+  // A 204, or a 202 that only acknowledges an enqueued job, carries no body.
   if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+  const text = await response.text();
+  if (text === '') return undefined as T;
+  return JSON.parse(text) as T;
 }
 
 function stringMap(value: unknown): Record<string, string> {

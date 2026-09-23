@@ -7,7 +7,8 @@ registered here: no stack trace, no driver message, no framework default page.
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -18,9 +19,11 @@ from starlette.responses import Response
 
 from app import __version__
 from app.analysis.router import router as analysis_router
+from app.audit.router import router as audit_router
 from app.auth.router import router as auth_router
 from app.core.config import get_settings
 from app.core.errors import AppError
+from app.inventory.router import router as inventory_router
 from app.projects.router import router as projects_router
 from app.reports.router import router as reports_router
 from app.workflow.router import router as findings_router
@@ -53,11 +56,34 @@ SECURITY_HEADERS = {
 }
 
 
+@asynccontextmanager
+async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Kick the vulnerability-mirror sync once at start-up (P5).
+
+    The job has a fixed id, so several replicas or restarts leave ONE pending
+    sync, and the job itself returns early when the mirror is fresh. A broker
+    that is not up yet must not keep the API from serving: the worker's own
+    reschedule covers it from the first sync on.
+    """
+    settings = get_settings()
+    if settings.vulndb_sync_enabled and not settings.queue_inline:
+        try:
+            from app.core.queue import (
+                enqueue_sync,  # noqa: PLC0415 — keep the import lazy for tests
+            )
+
+            enqueue_sync(None, delay_seconds=60)
+        except Exception:  # noqa: BLE001 — logged; start-up continues
+            logger.warning("could not schedule the vulnerability sync at start-up", exc_info=True)
+    yield
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
         title="Dioptra API",
         version=__version__,
+        lifespan=_lifespan,
         docs_url="/api/docs" if settings.env != "prod" else None,
         redoc_url=None,
         openapi_url="/api/openapi.json" if settings.env != "prod" else None,
@@ -118,6 +144,8 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(projects_router)
     app.include_router(analysis_router)
+    app.include_router(inventory_router)
+    app.include_router(audit_router)
     app.include_router(findings_router)
     app.include_router(workflow_router)
     app.include_router(reports_router)

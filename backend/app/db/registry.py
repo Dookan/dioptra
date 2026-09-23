@@ -11,6 +11,7 @@ from app.analysis.models import Analysis, CodeMetrics, Finding, RawToolOutput, S
 from app.audit.models import AuditLogEntry
 from app.auth.models import RefreshToken, User
 from app.db.base import Base
+from app.inventory.models import CryptoAsset, VulnDbSync, Vulnerability, VulnerabilityPackage
 from app.projects.models import Project, System
 from app.reports.models import ReportVersion
 from app.workflow.models import CaseDesign, TestPlan
@@ -21,6 +22,7 @@ __all__ = [
     "CaseDesign",
     "Base",
     "CodeMetrics",
+    "CryptoAsset",
     "Finding",
     "Project",
     "RawToolOutput",
@@ -31,4 +33,7 @@ __all__ = [
     "TestPlan",
     "ToolRun",
     "User",
+    "VulnDbSync",
+    "Vulnerability",
+    "VulnerabilityPackage",
 ]

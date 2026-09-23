@@ -43,7 +43,7 @@ Error contract: every failure is `{code, message_key}` (a stable i18n key, never
 
 ## Repository layout (target)
 
-- `backend/app/` — `auth/`, `ingest/`, `analysis/`, `workflow/` (stages, gates, brief, `scaffold/`, verify), `reports/`, `sandbox/` (E7 run directory, executor, result parsing), `audit/`, `inventory/` (P5: BOM store, vulnerability DB sync, correlation, statistics)
+- `backend/app/` — `auth/`, `ingest/`, `analysis/`, `workflow/` (stages, gates, brief, `scaffold/`, verify), `reports/`, `sandbox/` (E7 run directory, executor, result parsing), `audit/` (models, service, the read endpoint), `inventory/` (P5, built: `components` reads the stored SBOM, `versions` compares, `importers` parse the OSV/NVD dumps, `sync` is the worker-side job and the only outbound connection, `correlation` joins BOM ↔ CVE and projects the VEX state, `documents` emits CBOM/VEX/CSV, `service` computes the panel, `router` exposes it)
 - `backend/templates/` — institutional report Jinja2 templates (anchor: the manual MINCYT-form reports)
 - `frontend/src/` — `screens/`, `components/`, `theme/tokens.css`, `locales/{es,en}.json`
 - `rules/semgrep/` — our own SAST rules (OWASP-mapped, includes the no-CDN rule)

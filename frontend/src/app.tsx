@@ -9,7 +9,9 @@ import { useTranslation } from 'react-i18next';
 
 import { useAuth } from './auth/auth-context';
 import { useRoute } from './navigation/use-route';
+import { AuditScreen } from './screens/audit-screen';
 import { FindingsScreen } from './screens/findings-screen';
+import { InventoryScreen } from './screens/inventory-screen';
 import { HomeScreen } from './screens/home-screen';
 import { LoginScreen } from './screens/login-screen';
 import { PasswordChangeScreen } from './screens/password-change-screen';
@@ -40,6 +42,10 @@ function Authenticated(): React.ReactNode {
       return <VerificationScreen route={route} onNavigate={navigate} />;
     case 'report':
       return <ReportScreen route={route} onNavigate={navigate} />;
+    case 'inventory':
+      return <InventoryScreen route={route} onNavigate={navigate} />;
+    case 'audit':
+      return <AuditScreen route={route} onNavigate={navigate} />;
     case 'home':
       return <HomeScreen route={route} onNavigate={navigate} />;
   }

@@ -119,6 +119,30 @@ class Settings(BaseSettings):
     #: the runs filesystem.
     sandbox_max_file_bytes: int = Field(default=256 * 1024 * 1024, ge=1024 * 1024)
 
+    # --- Software inventory: the local vulnerability mirror (P5 day 18) ------
+    # The sync job is the ONLY outbound connection the platform ever opens,
+    # and it runs in the worker, never in a request (tasks/phase5-survey.md
+    # §2). Both endpoints are operator configuration: nothing in the API can
+    # change them, and a non-HTTPS value refuses to boot.
+    vulndb_sync_enabled: bool = True
+    #: Hours between two scheduled syncs; 0 runs only on request.
+    vulndb_sync_interval_hours: int = Field(default=24, ge=0, le=24 * 30)
+    vulndb_osv_base_url: str = "https://osv-vulnerabilities.storage.googleapis.com"
+    vulndb_nvd_base_url: str = "https://nvd.nist.gov/feeds/json/cve/2.0"
+    #: OSV ecosystems mirrored: the plan's language waves.
+    vulndb_osv_ecosystems: tuple[str, ...] = ("npm", "PyPI", "Packagist", "Maven", "Go")
+    #: NVD yearly feeds mirrored (``nvdcve-2.0-<year>.json.gz``); empty disables NVD.
+    vulndb_nvd_years: tuple[int, ...] = (2024, 2025, 2026)
+    #: Per-file cap for a downloaded or imported dump, compressed bytes.
+    vulndb_max_dump_bytes: int = Field(default=512 * 1024 * 1024, ge=1024)
+    vulndb_download_timeout_seconds: int = Field(default=300, ge=10)
+    #: Where an uploaded dump waits for the worker; shared by the API and the
+    #: worker like the jails (docker-compose.yml → DIOPTRA_DATA_DIR/vulndb).
+    vulndb_spool_dir: Path = Path("/var/lib/dioptra/vulndb")
+    #: The panel is factory-wide; past this many components across projects
+    #: the overview stops and says so.
+    max_inventory_components: int = Field(default=50_000, ge=100)
+
     @model_validator(mode="after")
     def _prod_requires_a_secure_refresh_cookie(self) -> Settings:
         """Refuse to boot a production instance that would leak the refresh token.
@@ -135,6 +159,15 @@ class Settings(BaseSettings):
             )
             raise ValueError(message)
         return self
+
+    @field_validator("vulndb_osv_base_url", "vulndb_nvd_base_url")
+    @classmethod
+    def _mirror_endpoints_are_https(cls, value: str) -> str:
+        cleaned = value.strip().rstrip("/")
+        if not cleaned.startswith("https://"):
+            message = "DIOPTRA_VULNDB_*_BASE_URL must be an https:// URL"
+            raise ValueError(message)
+        return cleaned
 
     @field_validator("jwt_secret")
     @classmethod

@@ -2,9 +2,10 @@
 
 > **Status: IN_PROGRESS — started 2026-09-22, the moment P4 closed. Deadline
 > ◆ "Release" 2026-09-18 (plan days 18–20), passed.** Tag v1.0.0 when the
-> Definition of Done below is met. Day 20 is the buffer. The plan-first survey
-> for day 18 (`tasks/phase5-survey.md`) has NOT been written yet, and it gates
-> the inventory edits.
+> Definition of Done below is met. Day 20 is the buffer. Survey
+> `tasks/phase5-survey.md` written and signed off 2026-09-22 (under `mmarin`'s
+> "bueno hagamos lo necesario para cerrar"); day 18 BUILT 2026-09-22;
+> **PHP/Java cut to a second cycle** (survey §9).
 
 ## Objective
 Add the software inventory of the factory (SBOM/CBOM/VEX + local CVE
@@ -14,7 +15,7 @@ the whole P0–P5 roadmap. Under overrun, PHP/Java is cut first; the inventory
 is never cut.
 
 ## Deliverables
-1. **Day 18 — software inventory** — `backend/app/inventory/`, `backend/alembic/versions/000N_inventory.py`, `frontend/src/screens/inventory-screen.tsx`
+1. **Day 18 — software inventory** — BUILT 2026-09-22: `backend/app/inventory/{models,components,versions,importers,sync,correlation,documents,service,router}.py`, `backend/alembic/versions/0009_inventory.py`, `rules/semgrep/crypto-inventory.yml`, `backend/app/audit/router.py`, `frontend/src/screens/{inventory,audit}-screen.tsx`
    - Plan-first gate applies (new ingestion surface for dump files and a
      scheduled outbound job): `tasks/phase5-survey.md` with `## Verdict`.
    - SBOM per project and version (reusing P1's stored CycloneDX 1.6 — never
@@ -37,6 +38,15 @@ is never cut.
    - Acceptance (plan): for a real project, SBOM valid against schema 1.6,
      CBOM with at least the detected algorithms, panel showing which
      components have open CVEs and which are out of version.
+   - **Decisions recorded** (survey §10): CBOM from our own Semgrep
+     crypto-inventory rules (18 rules, positive/negative pairs run in the
+     analysis image); OSV as the correlation source and NVD as enrichment
+     (CPE does not map onto PURLs); "outdated" = a newer version known to the
+     local copy; the sync is RQ's own scheduler with a self-rescheduling job
+     under a fixed id; roles as in `docs/roles-and-permissions.md`. The
+     audit-log READ (`GET /api/v1/audit`, the Bitácora screen) landed here
+     rather than on day 19 because the inventory's audit rows needed a
+     screen to be seen in.
 2. **Day 19 — wave 2, audit log, report sections** — `backend/app/workflow/ast/{php,java}.py`, `scaffold/{phpunit,junit}.py`, `rules/semgrep/{php,java}-*.yml`, `backend/app/audit/`, `backend/templates/`
    - PHP/Laravel and Java/Spring: detector, AST + brief, PHPUnit / JUnit
      scaffolds, own Semgrep rules, Infection + Pitest in the sandbox.
@@ -47,7 +57,10 @@ is never cut.
      (SBOM summary, open CVEs with VEX status, outdated components), Anexos
      (ASVS checklist, diagrams, pseudocode, test code, SBOM/CBOM attached).
    - **First task cut** if weeks 2–4 overran: the release then ships with
-     JS/TS + Python, PHP/Java goes to a second cycle.
+     JS/TS + Python, PHP/Java goes to a second cycle. **CUT APPLIED
+     2026-09-22** (survey §9): the PHP/Java detector, AST, scaffolds, rules
+     and mutation tools move to a second cycle; the rest of day 19 (audit
+     log, report sections) stays.
 3. **Day 20 — buffer, hardening, self-audit, release**
    - Buffer for S2–S4 overruns. Hardening review: security headers, rate
      limiting, refresh rotation (largely done in P0 — verify, do not redo).
@@ -73,12 +86,33 @@ is never cut.
   allowlist exceptions in the license gate.
 
 ## Definition of Done
-- [ ] `tasks/phase5-survey.md` written and signed off before the inventory edits
+- [x] `tasks/phase5-survey.md` written and signed off before the inventory edits (2026-09-22)
 - [ ] All deliverables implemented; ruff + mypy + oxlint + tsc clean
 - [ ] All specified tests passing (pytest / Vitest)
 - [ ] Mutation pass on correlation, VEX and audit modules (phase-close)
 - [ ] No secrets in diff (Gitleaks clean); locale parity check green
-- [ ] `/precommit` returned `READY TO COMMIT` (including mockup fidelity for the new screen)
+- [x] Day 18: `/precommit` returned `READY TO COMMIT` (2026-09-22) after the
+      panel's findings were applied and pinned. Security: the self-rescheduling
+      sync died after ONE run (a successor under the running job's fixed id is
+      deleted with it — reproduced against a real RQ worker; the successor
+      now carries the next slot's id), parser exceptions (`zipfile` method /
+      encryption / `zlib.error`, `RecursionError`) escaped the jobs instead of
+      becoming a row, the NVD reader was bounded on only two of four branches,
+      a broker-chosen `requested_by` reached the audit trail, a broker outage
+      at import left the spool file behind with a bare 500, an NVD record
+      could wipe an OSV row's packages, and the dump cap exceeded nginx's body
+      cap. Invariants: `docs/analysis-pipeline.md` and `docs/workflow-gates.md`
+      still described the pre-cut rules. Fidelity: `.panel ul` beat the CBOM
+      list, the reason form touched the cards, named-interpolation plurals,
+      a "CVSS" literal, "(worker)" jargon, `system` shown raw, a gendered
+      subtitle. Coverage adversary: 77 mutants, 25 survivors, the twelve
+      worth a test written (`csv_cell` per prefix, the queue allowlist, a
+      verdict never borrowed across packages, the panel button forcing a
+      fresh mirror, `download`'s cap and non-200 path, the OSV/NVD enrich
+      rule, OSV fallbacks, an empty feed refused, `by_severity` whole,
+      hostile justification in the screen, the role test never phoning home,
+      `first_fix_after` boundary)
+- [ ] Days 19–20: `/precommit` returned `READY TO COMMIT` (including mockup fidelity)
 - [ ] Day-18 acceptance met on a real project (SBOM 1.6-valid, CBOM, panel)
 - [ ] A real project walks E1–E8; sandbox escape tests negative
 - [ ] Self-audit executed: no high finding open without justification

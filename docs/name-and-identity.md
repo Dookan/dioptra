@@ -70,6 +70,7 @@ Single authoritative list. Anything not on it MUST NOT embed the product name.
 | i18n keys | `app.name`, `app.brandInitials` in `es.json` / `en.json` |
 | Browser tab title | `Dioptra` in `frontend/index.html` |
 | Favicon | `frontend/public/favicon.svg` — the `DP` mark, `aria-label="Dioptra"` |
+| CycloneDX tool credit | `metadata.tools.components[].name = "Dioptra"` in the CBOM and VEX documents (`backend/app/inventory/documents.py`) |
 
 Renaming again means changing this table first, then everything it lists; the
 environment prefix and the cookie name invalidate running sessions, and the

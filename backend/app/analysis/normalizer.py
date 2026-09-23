@@ -88,6 +88,90 @@ class NormalizedFinding:
     fingerprint: str
 
 
+#: Rule ids of the CBOM inventory rules (rules/semgrep/crypto-inventory.yml).
+#: Semgrep prefixes an id with the rule file's dotted path, so the LAST
+#: dotted segment is what carries the prefix.
+CRYPTO_RULE_PREFIX = "crypto-inventory-"
+_CRYPTO_MESSAGE = re.compile(
+    r"^crypto-asset primitive=(?P<primitive>[a-z]+) algorithm=(?P<algorithm>\S{1,80})"
+    r" weak=(?P<weak>yes|no)$"
+)
+MAX_CRYPTO_ASSETS = 2000
+
+
+@dataclass(frozen=True)
+class NormalizedCryptoAsset:
+    """One CBOM row: an algorithm the inventory rules saw at path:line."""
+
+    primitive: str
+    algorithm: str
+    path: str
+    line: int | None
+    weak: bool
+    rule_id: str
+
+
+def is_crypto_inventory_rule(rule_id: str) -> bool:
+    return rule_id.rsplit(".", 1)[-1].startswith(CRYPTO_RULE_PREFIX)
+
+
+def _algorithm_name(raw: str) -> str:
+    text = raw.strip().strip("\"'").upper().replace("_", "-")
+    return re.sub(
+        r"^(HMAC-)?SHA(?=(1|224|256|384|512)$)", lambda m: f"{m.group(1) or ''}SHA-", text
+    )[:80]
+
+
+def crypto_asset_from_message(
+    rule_id: str, message: str | None, path: str, line: int | None
+) -> NormalizedCryptoAsset | None:
+    """Parse the fixed message shape the inventory rules commit to; ``None`` otherwise."""
+    match = _CRYPTO_MESSAGE.match((message or "").strip())
+    if match is None:
+        return None
+    return NormalizedCryptoAsset(
+        primitive=match.group("primitive")[:40],
+        algorithm=_algorithm_name(match.group("algorithm")),
+        path=path,
+        line=line,
+        weak=match.group("weak") == "yes",
+        rule_id=rule_id[:200],
+    )
+
+
+def normalize_crypto(
+    reports: Sequence[ToolReport], roots: Sequence[str] = DEFAULT_ROOTS
+) -> list[NormalizedCryptoAsset]:
+    """Every crypto-inventory result of every SAST run, deduplicated by (path, line, algorithm)."""
+    assets: dict[tuple[str, int | None, str], NormalizedCryptoAsset] = {}
+    for report in reports:
+        if report.category is not ToolCategory.SAST:
+            continue
+        for run in _list(report.sarif.get("runs")):
+            if not isinstance(run, dict):
+                continue
+            for result in _list(run.get("results"))[:MAX_RESULTS_PER_RUN]:
+                if not isinstance(result, dict):
+                    continue
+                rule_id = _text(result.get("ruleId"), MAX_RULE_ID) or ""
+                if not is_crypto_inventory_rule(rule_id):
+                    continue
+                path, line, _snippet = _location(result, roots)
+                asset = crypto_asset_from_message(
+                    rule_id,
+                    _text(_dict(result.get("message")).get("text"), MAX_MESSAGE),
+                    path,
+                    line,
+                )
+                if asset is not None:
+                    assets.setdefault((asset.path, asset.line, asset.algorithm), asset)
+                if len(assets) >= MAX_CRYPTO_ASSETS:
+                    break
+    return sorted(
+        assets.values(), key=lambda a: (a.path, a.line if a.line is not None else -1, a.algorithm)
+    )
+
+
 def parse_sarif(text: str | bytes) -> dict[str, Any]:
     """Parse and structurally check a SARIF document."""
     try:
@@ -454,7 +538,12 @@ def _findings_for_run(
     for result in _list(run.get("results"))[:MAX_RESULTS_PER_RUN]:
         if not isinstance(result, dict):
             continue
-        rule = rules.get(_text(result.get("ruleId"), MAX_RULE_ID) or "", {})
+        rule_id = _text(result.get("ruleId"), MAX_RULE_ID) or ""
+        if is_crypto_inventory_rule(rule_id):
+            # A CBOM row, never a finding: a strong algorithm is not a weakness
+            # (normalize_crypto reads these; weak-crypto.yml makes the findings).
+            continue
+        rule = rules.get(rule_id, {})
         if tool == "gitleaks" or report.category is ToolCategory.SECRET:
             findings.append(_gitleaks_finding(tool, rule, result, roots))
         elif tool == "osv-scanner" or report.category is ToolCategory.SCA:
@@ -514,9 +603,13 @@ def normalize(
 
 __all__ = [
     "NormalizationError",
+    "NormalizedCryptoAsset",
     "NormalizedFinding",
     "ToolReport",
+    "crypto_asset_from_message",
+    "is_crypto_inventory_rule",
     "normalize",
+    "normalize_crypto",
     "normalize_path",
     "parse_sarif",
 ]

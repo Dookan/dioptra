@@ -1,6 +1,6 @@
 # Roles and permissions
 
-> **Status: IN_PROGRESS — roles, sessions and admin-only accounts (P0, `backend/app/auth/`), the E1–E2 rows (P1), the E3 triage / E8 edit-and-sign rows (P2), the E4 test-plan row, the E5 design row (diagram text, cases, approval), the per-stage transition roles (P3, `backend/app/workflow/{router,stages,design}.py`) the E6 test-writing row and the E7 verification row (P4, `backend/app/workflow/{authoring,verify}.py`) are enforced.**
+> **Status: IN_PROGRESS — roles, sessions and admin-only accounts (P0, `backend/app/auth/`), the E1–E2 rows (P1), the E3 triage / E8 edit-and-sign rows (P2), the E4 test-plan row, the E5 design row (diagram text, cases, approval), the per-stage transition roles (P3, `backend/app/workflow/{router,stages,design}.py`) the E6 test-writing row and the E7 verification row (P4, `backend/app/workflow/{authoring,verify}.py`), the inventory rows and the audit-log read (P5, `backend/app/inventory/router.py`, `backend/app/audit/router.py`) are enforced.**
 
 Usernames are initial + lastname, lowercase, no dots: `mmarin`, `cperez`,
 `amedina`. Roles are enforced on EVERY endpoint; the UI only mirrors them.
@@ -19,12 +19,18 @@ Usernames are initial + lastname, lowercase, no dots: `mmarin`, `cperez`,
 | Edit report sections (E8) | — | ✓ | — |
 | Sign/lock a report version | — | ✓ | — |
 | Export report (PDF/DOCX/Markdown) | ✓ | ✓ | ✓ (may download; "view" never meant a screen-only copy — the developer needs the findings to plan tests) |
-| Read audit log | ✓ | own projects | own actions |
+| Read the inventory panel; download SBOM / CBOM / VEX / CSV | ✓ | ✓ | ✓ (a vulnerable dependency is a malicious-case candidate at E5) |
+| Refresh the vulnerability mirror: request a sync, import a dump (written reason, audit row) | ✓ | ✓ | — |
+| VEX verdicts | — | via E3 triage only — no separate endpoint | — |
+| Read audit log (`GET /api/v1/audit`) | everything | own actions | own actions |
 | Close a stage (`POST …/stage/advance`) | E2 only | E2, E3 | E4–E7 |
 
-The software inventory (P5) has no rows yet: the work plan adds the module
-without a role matrix. The rows are written when P5 is designed
-(`tasks/phase5-survey.md`), not assumed before.
+The inventory rows were written at the P5 survey (`tasks/phase5-survey.md`
+§7) before the endpoints existed. **Deviation recorded**: the matrix used to
+say the analyst reads the audit log of "own projects"; v1.0.0 narrows that
+to "own actions", because a project → analyst ownership does not exist in
+the data model and inventing it on the last days would be a new
+authorization surface without a survey (scope-change log, 2026-09-22).
 
 ## Rules
 

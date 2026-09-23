@@ -1254,3 +1254,102 @@ button.card:focus-visible {
 .caserow .reason.bad {
   color: var(--err);
 }
+
+/* --- inventory (mockup 11) and audit log (mockup 10) ---------------------- */
+/* The vulnerability-database banner is informational, not a call to action:
+   the anchor paints it info. */
+.nextstep.info {
+  border-color: var(--info);
+  background: var(--info-bg);
+}
+
+.cols.inventory {
+  grid-template-columns: 330px 1fr;
+  margin-top: 16px;
+}
+
+/* The anchor colours the priority letter inline; tokens only here. */
+.prio.err {
+  color: var(--err);
+  background: var(--err-bg);
+}
+
+.prio.warn {
+  color: var(--warn);
+  background: var(--warn-bg);
+}
+
+.prio.info {
+  color: var(--info);
+  background: var(--info-bg);
+}
+
+.ck.err {
+  border-color: var(--err);
+  color: var(--err);
+}
+
+.panelhead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.panelhead h4 {
+  margin: 0;
+}
+
+.panelhead .radios {
+  margin-left: auto;
+  margin-top: 0;
+}
+
+/* A project row is selectable: the whole text block is the button. */
+.rowline .linklike {
+  all: unset;
+  cursor: pointer;
+  flex: 1;
+  display: block;
+}
+
+.rowline .linklike:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.rowline .sub.ok {
+  color: var(--ok);
+}
+
+.rowline .sub.bad,
+.checkline b.bad {
+  color: var(--err);
+}
+
+/* `.panel ul` (margin, indent, muted, 13px) would otherwise win over a bare
+   `.checks`: the anchor's CBOM lines sit flush in the panel, in ink. */
+.panel .checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+.panel .checks li {
+  margin: 0;
+}
+
+/* The written-reason form sits between the banner and the cards: the
+   anchor's rhythm there is 18px. */
+.panel.reason {
+  margin-bottom: 18px;
+}
+
+@media (max-width: 900px) {
+  .cols.inventory {
+    grid-template-columns: 1fr;
+  }
+}

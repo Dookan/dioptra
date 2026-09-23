@@ -136,6 +136,16 @@
       "unavailable": "The isolated environment is not available on this server.",
       "timeout": "The run exceeded its time limit and the container was stopped.",
       "resultsUnreadable": "The run's results could not be read."
+    },
+    "inventory": {
+      "failed": "The inventory action could not be completed.",
+      "dumpTooLarge": "The vulnerability-database file exceeds the maximum size.",
+      "dumpInvalid": "The file is not a valid OSV or NVD dump.",
+      "dumpKindUnknown": "Unrecognised format: OSV's all.zip or NVD's nvdcve-2.0-<year>.json(.gz) are accepted.",
+      "syncDisabled": "Synchronisation is disabled on this deployment: import the file by hand.",
+      "sbomMissing": "This analysis has no SBOM: the generator could not read its dependencies.",
+      "downloadFailed": "The vulnerability database could not be downloaded.",
+      "enqueueFailed": "The job could not be scheduled: the queue is not responding. Try again in a moment."
     }
   },
   "nav": {
@@ -144,7 +154,9 @@
     "projects": "Projects",
     "findings": "Findings",
     "report": "Report",
-    "workflow": "Workflow"
+    "workflow": "Workflow",
+    "inventory": "Inventory",
+    "audit": "Audit log"
   },
   "stepper": {
     "label": "Process stages",
@@ -598,5 +610,163 @@
       "label": "Go to the report →",
       "blocked": "Some functions still do not pass verification."
     }
+  },
+  "inventory": {
+    "title": "Software inventory",
+    "subtitle": "{{components}} components across {{projects}} projects. With known unresolved vulnerabilities: {{vulnerable}}. Out of date: {{outdated}}.",
+    "capped": "The list stopped at the panel's component cap; the remaining projects were not counted.",
+    "vulndb": {
+      "copyOf": "Vulnerability database: local copy of {{date}}",
+      "none": "Vulnerability database: no local copy yet",
+      "disabledNone": "Vulnerability database: no local copy and synchronisation disabled",
+      "bodySync": "OSV + NVD (CVE.org), synchronised every {{hours}} hours. If this deployment has no internet access, the file is imported by hand — an external service is never queried live.",
+      "bodyImportOnly": "OSV + NVD (CVE.org). This deployment does not synchronise: the database is imported by hand from a file downloaded elsewhere — an external service is never queried live.",
+      "syncNow": "Update the database now",
+      "import": "Import vulnerability database",
+      "reasonHint": "Recorded in the audit log under your name. The system performs the download or the file read in the background; this screen only schedules it.",
+      "fileLabel": "Dump file",
+      "fileHint": "Accepted: an OSV ecosystem all.zip, or an NVD nvdcve-2.0-<year>.json or .json.gz.",
+      "reasonLabel": "Why you are updating the database",
+      "confirmSync": "Enqueue the synchronisation",
+      "confirmImport": "Import the file",
+      "cancel": "Cancel"
+    },
+    "syncQueued": "Synchronisation enqueued. The copy's date will change when it finishes.",
+    "importQueued": "Import enqueued. The copy's date will change when it finishes.",
+    "cards": {
+      "open": {
+        "title": "With open vulnerabilities",
+        "meta": "Critical: {{critical}} · high: {{high}} · medium: {{medium}} · low: {{low}} · marked \"not affected\" with a justification: {{notAffected}}",
+        "components_one": "1 component",
+        "components_other": "{{count}} components",
+        "projects_one": "1 project",
+        "projects_other": "{{count}} projects"
+      },
+      "outdated": {
+        "title": "Out of date",
+        "count": "{{outdated}} of {{total}}",
+        "upToDate": "Up to date",
+        "meta": "Against the newest version known to the local copy: a fixed version in an advisory, or the one another factory project uses."
+      },
+      "licenses": {
+        "title": "Licences and cryptography",
+        "cbom": "CBOM: algorithms detected: {{algorithms}} · weak: {{weak}}",
+        "unlicensed_one": "1 without a licence",
+        "unlicensed_other": "{{count}} without a licence"
+      }
+    },
+    "byProject": {
+      "title": "By project",
+      "desc": "Every analysis keeps its own inventory, so the trend between versions is visible.",
+      "none": "No analysis has produced an SBOM yet."
+    },
+    "projectLine": "analysis {{ordinal}} · {{date}} · components: {{components}} · out of date: {{outdated}}",
+    "trend": {
+      "first": "first inventory of this project",
+      "same": "no change since the previous analysis",
+      "fewer_one": "against the previous analysis: 1 fewer CVE",
+      "fewer_other": "against the previous analysis: {{count}} fewer CVEs",
+      "more_one": "against the previous analysis: 1 new CVE",
+      "more_other": "against the previous analysis: {{count}} new CVEs"
+    },
+    "cveCount": "{{count}} CVE",
+    "download": {
+      "sbom": "Download SBOM (CycloneDX)",
+      "cbom": "Download CBOM",
+      "vex": "Download VEX",
+      "csv": "Download CSV"
+    },
+    "open": {
+      "title": "Components with open vulnerabilities",
+      "filterLabel": "Filter",
+      "filter": {
+        "all": "All",
+        "high": "High",
+        "unresolved": "Unresolved"
+      },
+      "none": "No component has a known vulnerability in the local copy.",
+      "hint": "\"Not affected\" is the analyst's decision with a written justification; it is recorded in the audit log and in the VEX document exported with the SBOM.",
+      "uncomparable_one": "1 component has a version that cannot be compared (a range or a link, for example) and was not correlated.",
+      "uncomparable_other": "{{count}} components have a version that cannot be compared (a range or a link, for example) and were not correlated."
+    },
+    "prio": {
+      "err": "H",
+      "warn": "M",
+      "info": "L"
+    },
+    "fixedIn": "fixed in {{version}}",
+    "whatToDo": "update and analyse again",
+    "vex": {
+      "exploitable": "Affected",
+      "not_affected": "Not affected",
+      "in_triage": "Unreviewed"
+    },
+    "crypto": {
+      "title": "Cryptography detected (CBOM)",
+      "none": "No cryptography was detected in the analysed code.",
+      "weak": "weak algorithm",
+      "primitive": {
+        "hash": "hash function",
+        "cipher": "cipher",
+        "mac": "authentication code",
+        "signature": "signature",
+        "kdf": "key derivation",
+        "random": "randomness",
+        "protocol": "protocol",
+        "certificate": "certificate"
+      },
+      "more_one": "and 1 more",
+      "more_other": "and {{count}} more"
+    },
+    "context_one": "Whole factory · 1 project",
+    "context_other": "Whole factory · {{count}} projects",
+    "cvss": "CVSS {{score}}",
+    "whatToDoLabel": "What to do?"
+  },
+  "audit": {
+    "title": "Audit log",
+    "subtitleAdmin": "Every action in one sentence: who did what and when. With the admin role you see the whole factory.",
+    "subtitleOwn": "Every action in one sentence: who did what and when. You see your own actions.",
+    "panel": "Audit log",
+    "windowLabel": "Period",
+    "window": {
+      "today": "Today",
+      "week": "Week",
+      "all": "All"
+    },
+    "loading": "Loading the audit log…",
+    "none": "No actions recorded in this period.",
+    "justification": "justification",
+    "outcome": {
+      "denied": "denied",
+      "error": "with an error"
+    },
+    "action": {
+      "auth.login": "signed in",
+      "auth.logout": "signed out",
+      "auth.refresh": "renewed their session",
+      "auth.password_change": "changed their password",
+      "authz.denied": "attempted an action their role does not allow",
+      "project.create": "registered a system",
+      "analysis.ingest.zip": "uploaded a system's code (ZIP)",
+      "analysis.ingest.git": "cloned a system's code (git)",
+      "finding.verdict.confirmed": "confirmed a finding as real",
+      "finding.verdict.false_positive": "discarded a finding as a false positive",
+      "report.edit": "edited a report section",
+      "report.sign": "signed a report version",
+      "stage.advance": "closed a workflow stage",
+      "testplan.save": "saved the test plan",
+      "design.diagram.edit": "edited a diagram's text",
+      "design.cases.save": "saved their test cases",
+      "design.cases.approve": "approved their test cases",
+      "tests.save": "saved their test file",
+      "verification.run": "sent their tests to verification",
+      "verification.reopen": "reopened the design of the functions that failed",
+      "vulndb.sync.request": "requested a vulnerability-database update",
+      "vulndb.import.request": "imported a vulnerability-database file",
+      "vulndb.sync": "synchronised the vulnerability database",
+      "vulndb.import": "loaded the imported file into the vulnerability database"
+    },
+    "systemActor": "System"
   }
 }

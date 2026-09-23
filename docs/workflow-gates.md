@@ -110,7 +110,7 @@ syntax errors inside the function → typed refusal.
 Built 2026-09-22 (`backend/app/workflow/scaffold/`). Deterministic only: file
 name, imports and one named case per APPROVED case, derived from the AST and
 from the design snapshot. Vitest for JS/TS and pytest for Python in P4;
-PHPUnit and JUnit in P5. **The scaffold never contains an assertion**, test
+PHPUnit and JUnit move to the second cycle with the PHP/Java cut (2026-09-22). **The scaffold never contains an assertion**, test
 data or an oracle. Per case it writes a `TODO(developer)` line and, above it,
 one comment per brief item that case declared, repeating the item's own text,
 its detail and its boundary values — the brief's INPUTS, which the developer

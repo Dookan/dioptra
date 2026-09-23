@@ -31,6 +31,10 @@ os.environ.setdefault("DIOPTRA_OSV_DB_DIR", tempfile.mkdtemp(prefix="dioptra-tes
 # P4: the E7 attempt directories. A real sandbox run is opt-in (marker
 # `sandbox`); everything else uses a fake executor and never starts a container.
 os.environ.setdefault("DIOPTRA_SANDBOX_RUNS_ROOT", tempfile.mkdtemp(prefix="dioptra-test-runs-"))
+# P5: where an uploaded vulnerability dump waits for the (inline) import job.
+# The sync job itself never reaches the network here: every test that runs it
+# replaces `app.inventory.sync.download` with a fixture writer.
+os.environ.setdefault("DIOPTRA_VULNDB_SPOOL_DIR", tempfile.mkdtemp(prefix="dioptra-test-vulndb-"))
 
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -91,6 +95,8 @@ def app(session_factory: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr("app.analysis.pipeline.get_session_factory", lambda: session_factory)
     # The E7 verification job opens its own session too, like the worker does.
     monkeypatch.setattr("app.workflow.verify_job.get_session_factory", lambda: session_factory)
+    # The inventory's sync and import jobs do the same (P5).
+    monkeypatch.setattr("app.inventory.sync.get_session_factory", lambda: session_factory)
 
     def override_get_db() -> Iterator[Session]:
         session = session_factory()

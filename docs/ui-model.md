@@ -1,6 +1,6 @@
 # UI model
 
-> **Status: IN_PROGRESS — tokens, both themes and i18n (P0), the projects screens (P1), the findings / report screens (P2), the E4 plan screen with the status bar, the E5 design screen (P3, 2026-09-22) the E6 test-writing screen and the E7 verification screen (P4, 2026-09-22) are built; Inventario is the target.** Visual anchor:
+> **Status: IN_PROGRESS — tokens, both themes and i18n (P0), the projects screens (P1), the findings / report screens (P2), the E4 plan screen with the status bar, the E5 design screen (P3, 2026-09-22) the E6 test-writing screen and the E7 verification screen (P4, 2026-09-22), the Inventario and Bitácora screens (P5, 2026-09-22) are built.** Visual anchor:
 > @docs/mockups/index.html (10 screens, approved 2026-08-17).
 
 ## Principles (from the approved mockups)
@@ -216,3 +216,41 @@ Radii: frames 14, cards 12, buttons 9, badges 5. Borders 1px hairline.
   inside the banner; the implementation keeps the reopen in the right panel
   because it needs a written reason first, which does not fit a banner
   button. That last one is `mmarin`'s call to overrule.
+
+## Phase 5 screens (2026-09-22)
+
+- Routes `#/inventory` (screen 11 "Inventario") and `#/audit` (screen 10,
+  its Bitácora half). The tabs bar shows **Inventario** and **Bitácora**
+  after Reporte on EVERY route, as every tabs bar of mockups 02–11 does.
+  Neither is a workflow screen: no stepper, no status-bar step.
+- **Inventario**: `pagehead` with the totals sentence verbatim from the
+  anchor ("N componentes en M proyectos. K tienen vulnerabilidades conocidas
+  sin resolver y J están fuera de versión."); the info-bordered `nextstep`
+  carries the local copy's date ("Base de vulnerabilidades: copia local del
+  …", or "todavía no hay copia local", or "sin copia local y sincronización
+  desactivada") and the two buttons, which open a written-reason field
+  before enqueuing — "Actualizar la base ahora" is absent when the operator
+  disabled the sync, and both are absent for the developer; the three
+  `cards` (open CVEs by severity and "no aplica" count; outdated with the
+  stepped progress bar and the note "frente a la última versión conocida en
+  la copia local"; licences as chips + the CBOM line); `cols` 330px/1fr with
+  "Por proyecto" rows (a row is a button that selects the project the four
+  download buttons act on; the trend line is `ok`/`bad` through tokens) and
+  the right panel "Componentes con vulnerabilidades abiertas" with the
+  Todos / Altas / Sin resolver `radio`s filtering on the client, one
+  `rowline` per match (severity letter in `.prio`, name, mono version,
+  project, CVE · CVSS · corregido en · the analyst's justification when "No
+  aplica"), the anchor's hint sentence verbatim, and the CBOM `checkline`s
+  (✓ or ! in `.ck`, mono algorithm, primitive in plain words, path:line,
+  "algoritmo débil"). Recorded deviations: a fourth download button
+  "Descargar VEX" (the plan lists VEX as an export; the anchor shows three);
+  the project row's version is "análisis N · date" — the platform has no
+  semantic version of the audited system, the anchor's "v1.3" is
+  illustrative; the "Usuarios" half of mockup 10 is not built (no endpoint,
+  not in the plan's day table — `tasks/phase5-survey.md` §8).
+- **Bitácora**: one panel, the Hoy / Semana / Todo `radio`s become the
+  `since` parameter; each row is `time · actor · sentence` with the target
+  and the written justification in `.sub`; the sentence is an i18n key per
+  action code, and an action the screen has no sentence for shows its code
+  in mono, never a blank. The server scopes the rows by role; the subtitle
+  says which scope the reader has.

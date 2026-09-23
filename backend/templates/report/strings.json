@@ -125,5 +125,18 @@
     "category": "Categoría",
     "count": "Cantidad"
   },
-  "date_format": "%d/%m/%Y"
+  "date_format": "%d/%m/%Y",
+  "inventory": {
+    "csv_headers": [
+      "Proyecto",
+      "Componente",
+      "Versión",
+      "Ecosistema",
+      "Licencias",
+      "PURL",
+      "CVE abiertos",
+      "Severidad máxima",
+      "Versión más nueva conocida"
+    ]
+  }
 }

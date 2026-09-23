@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.core.queue import PIPELINE_JOB, PipelineJob
+from app.core.queue import IMPORT_JOB, PIPELINE_JOB, SYNC_JOB, VERIFY_JOB, PipelineJob
 
 
 def _job(func_name: str) -> PipelineJob:
@@ -17,6 +17,11 @@ def _job(func_name: str) -> PipelineJob:
 
 def test_only_the_pipeline_callable_resolves() -> None:
     assert _job(PIPELINE_JOB).func.__name__ == "run_pipeline"
+    assert _job(VERIFY_JOB).func.__name__ == "run_verification_job"
+    # P5: the mirror's sync and import are the only other callables — a
+    # reverted allowlist would make the scheduled chain die with PermissionError.
+    assert _job(SYNC_JOB).func.__name__ == "run_sync_job"
+    assert _job(IMPORT_JOB).func.__name__ == "run_import_job"
 
 
 def test_callbacks_and_webhooks_from_the_broker_are_ignored() -> None:

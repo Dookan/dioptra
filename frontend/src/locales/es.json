@@ -136,6 +136,16 @@
       "unavailable": "El entorno aislado no está disponible en este servidor.",
       "timeout": "La ejecución superó el tiempo límite y se detuvo el contenedor.",
       "resultsUnreadable": "No se pudieron leer los resultados de la ejecución."
+    },
+    "inventory": {
+      "failed": "No se pudo completar la acción del inventario.",
+      "dumpTooLarge": "El archivo de la base de vulnerabilidades supera el tamaño máximo permitido.",
+      "dumpInvalid": "El archivo no es un volcado válido de OSV o NVD.",
+      "dumpKindUnknown": "Formato no reconocido: se admite el all.zip de OSV o el nvdcve-2.0-<año>.json(.gz) de NVD.",
+      "syncDisabled": "La sincronización está desactivada en este equipo: importa el archivo a mano.",
+      "sbomMissing": "Este análisis no tiene SBOM: el generador no pudo leer sus dependencias.",
+      "downloadFailed": "No se pudo descargar la base de vulnerabilidades.",
+      "enqueueFailed": "No se pudo programar el trabajo: la cola no responde. Intenta de nuevo en un momento."
     }
   },
   "nav": {
@@ -144,7 +154,9 @@
     "projects": "Proyectos",
     "findings": "Hallazgos",
     "report": "Reporte",
-    "workflow": "Workflow"
+    "workflow": "Workflow",
+    "inventory": "Inventario",
+    "audit": "Bitácora"
   },
   "stepper": {
     "label": "Etapas del proceso",
@@ -598,5 +610,163 @@
       "label": "Pasar al reporte →",
       "blocked": "Todavía hay funciones que no pasan la verificación."
     }
+  },
+  "inventory": {
+    "title": "Inventario de software",
+    "subtitle": "{{components}} componentes en {{projects}} proyectos. Con vulnerabilidades conocidas sin resolver: {{vulnerable}}. Fuera de versión: {{outdated}}.",
+    "capped": "La lista se cortó en el máximo de componentes por panel; los proyectos siguientes no se contaron.",
+    "vulndb": {
+      "copyOf": "Base de vulnerabilidades: copia local del {{date}}",
+      "none": "Base de vulnerabilidades: todavía no hay copia local",
+      "disabledNone": "Base de vulnerabilidades: sin copia local y sincronización desactivada",
+      "bodySync": "OSV + NVD (CVE.org), sincronizada cada {{hours}} horas. Si este equipo no tiene salida a internet, se importa el archivo a mano — nunca se consulta un servicio externo en vivo.",
+      "bodyImportOnly": "OSV + NVD (CVE.org). Este equipo no sincroniza: la base se importa a mano desde el archivo descargado en otro equipo — nunca se consulta un servicio externo en vivo.",
+      "syncNow": "Actualizar la base ahora",
+      "import": "Importar base de vulnerabilidades",
+      "reasonHint": "Queda en la bitácora con tu nombre. La descarga o la lectura del archivo la hace el sistema en segundo plano; esta pantalla solo la deja programada.",
+      "fileLabel": "Archivo del volcado",
+      "fileHint": "Admitido: el all.zip de un ecosistema de OSV, o un nvdcve-2.0-<año>.json o .json.gz de NVD.",
+      "reasonLabel": "Por qué actualizas la base",
+      "confirmSync": "Encolar la sincronización",
+      "confirmImport": "Importar el archivo",
+      "cancel": "Cancelar"
+    },
+    "syncQueued": "Sincronización encolada. La fecha de la copia cambiará cuando termine.",
+    "importQueued": "Importación encolada. La fecha de la copia cambiará cuando termine.",
+    "cards": {
+      "open": {
+        "title": "Con vulnerabilidades abiertas",
+        "meta": "Críticas: {{critical}} · altas: {{high}} · medias: {{medium}} · bajas: {{low}} · marcadas \"no aplica\" con justificación: {{notAffected}}",
+        "components_one": "1 componente",
+        "components_other": "{{count}} componentes",
+        "projects_one": "1 proyecto",
+        "projects_other": "{{count}} proyectos"
+      },
+      "outdated": {
+        "title": "Fuera de versión",
+        "count": "{{outdated}} de {{total}}",
+        "upToDate": "Al día",
+        "meta": "Frente a la última versión conocida en la copia local: una versión corregida en un aviso, o la que usa otro proyecto de la fábrica."
+      },
+      "licenses": {
+        "title": "Licencias y criptografía",
+        "cbom": "CBOM: algoritmos detectados: {{algorithms}} · débiles: {{weak}}",
+        "unlicensed_one": "1 sin licencia",
+        "unlicensed_other": "{{count}} sin licencia"
+      }
+    },
+    "byProject": {
+      "title": "Por proyecto",
+      "desc": "Cada análisis guarda su propio inventario; así se ve la tendencia entre versiones.",
+      "none": "Todavía ningún análisis produjo un SBOM."
+    },
+    "projectLine": "análisis {{ordinal}} · {{date}} · componentes: {{components}} · fuera de versión: {{outdated}}",
+    "trend": {
+      "first": "primer inventario de este proyecto",
+      "same": "sin cambios desde el análisis anterior",
+      "fewer_one": "frente al análisis anterior: 1 CVE menos",
+      "fewer_other": "frente al análisis anterior: {{count}} CVE menos",
+      "more_one": "frente al análisis anterior: 1 CVE nuevo",
+      "more_other": "frente al análisis anterior: {{count}} CVE nuevos"
+    },
+    "cveCount": "{{count}} CVE",
+    "download": {
+      "sbom": "Descargar SBOM (CycloneDX)",
+      "cbom": "Descargar CBOM",
+      "vex": "Descargar VEX",
+      "csv": "Descargar CSV"
+    },
+    "open": {
+      "title": "Componentes con vulnerabilidades abiertas",
+      "filterLabel": "Filtrar",
+      "filter": {
+        "all": "Todos",
+        "high": "Altas",
+        "unresolved": "Sin resolver"
+      },
+      "none": "Ningún componente con vulnerabilidades conocidas en la copia local.",
+      "hint": "\"No aplica\" es una decisión del analista con justificación escrita; queda en la bitácora y en el documento VEX que se exporta con el SBOM.",
+      "uncomparable_one": "1 componente tiene una versión que no se puede comparar (por ejemplo, un rango o un enlace) y no se cruzó.",
+      "uncomparable_other": "{{count}} componentes tienen una versión que no se puede comparar (por ejemplo, un rango o un enlace) y no se cruzaron."
+    },
+    "prio": {
+      "err": "A",
+      "warn": "M",
+      "info": "B"
+    },
+    "fixedIn": "corregido en {{version}}",
+    "whatToDo": "actualizar y volver a analizar",
+    "vex": {
+      "exploitable": "Aplica",
+      "not_affected": "No aplica",
+      "in_triage": "Sin revisar"
+    },
+    "crypto": {
+      "title": "Criptografía detectada (CBOM)",
+      "none": "No se detectó criptografía en el código analizado.",
+      "weak": "algoritmo débil",
+      "primitive": {
+        "hash": "función de resumen",
+        "cipher": "cifrado",
+        "mac": "código de autenticación",
+        "signature": "firma",
+        "kdf": "derivación de clave",
+        "random": "aleatoriedad",
+        "protocol": "protocolo",
+        "certificate": "certificado"
+      },
+      "more_one": "y 1 más",
+      "more_other": "y {{count}} más"
+    },
+    "context_one": "Toda la fábrica · 1 proyecto",
+    "context_other": "Toda la fábrica · {{count}} proyectos",
+    "cvss": "CVSS {{score}}",
+    "whatToDoLabel": "¿Qué hacer?"
+  },
+  "audit": {
+    "title": "Bitácora",
+    "subtitleAdmin": "Cada acción en una frase: quién hizo qué y cuándo. Con el rol de administración ves toda la fábrica.",
+    "subtitleOwn": "Cada acción en una frase: quién hizo qué y cuándo. Ves tus propias acciones.",
+    "panel": "Bitácora",
+    "windowLabel": "Periodo",
+    "window": {
+      "today": "Hoy",
+      "week": "Semana",
+      "all": "Todo"
+    },
+    "loading": "Cargando la bitácora…",
+    "none": "Sin acciones registradas en este periodo.",
+    "justification": "justificación",
+    "outcome": {
+      "denied": "denegada",
+      "error": "con error"
+    },
+    "action": {
+      "auth.login": "inició sesión",
+      "auth.logout": "cerró sesión",
+      "auth.refresh": "renovó su sesión",
+      "auth.password_change": "cambió su contraseña",
+      "authz.denied": "intentó una acción que su rol no permite",
+      "project.create": "registró un sistema",
+      "analysis.ingest.zip": "subió el código de un sistema (ZIP)",
+      "analysis.ingest.git": "clonó el código de un sistema (git)",
+      "finding.verdict.confirmed": "confirmó un hallazgo como real",
+      "finding.verdict.false_positive": "descartó un hallazgo como falso positivo",
+      "report.edit": "editó una sección del reporte",
+      "report.sign": "firmó una versión del reporte",
+      "stage.advance": "cerró una etapa del workflow",
+      "testplan.save": "guardó el plan de pruebas",
+      "design.diagram.edit": "editó el texto de un diagrama",
+      "design.cases.save": "guardó sus casos de prueba",
+      "design.cases.approve": "aprobó sus casos de prueba",
+      "tests.save": "guardó su archivo de tests",
+      "verification.run": "envió sus tests a verificación",
+      "verification.reopen": "reabrió el diseño de las funciones que fallaron",
+      "vulndb.sync.request": "pidió actualizar la base de vulnerabilidades",
+      "vulndb.import.request": "importó un archivo de la base de vulnerabilidades",
+      "vulndb.sync": "sincronizó la base de vulnerabilidades",
+      "vulndb.import": "cargó el archivo importado en la base de vulnerabilidades"
+    },
+    "systemActor": "Sistema"
   }
 }
