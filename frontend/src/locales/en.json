@@ -469,7 +469,17 @@
       "lockedTitle": "Plan closed",
       "lockedBody": "The plan stage is closed: the case design works on this plan and it cannot change."
     },
-    "incomplete": "Include at least one function and write your rationale ({{min}} characters or more)."
+    "incomplete": "Include at least one function and write your rationale ({{min}} characters or more).",
+    "filter": {
+      "label": "Search for a function or a file",
+      "placeholder": "for example: Helpers.php or uploadFile"
+    },
+    "showing": {
+      "capped": "Showing {{shown}} of {{total}} measured functions. Use the search box to reach the rest.",
+      "all": "Showing all {{total}} measured functions.",
+      "matches": "Showing {{total}} matches."
+    },
+    "noMatches": "No function matches what you searched for."
   },
   "design": {
     "title": "Case design",
@@ -649,7 +659,8 @@
     "equivalentReasonLabel": "Why this mutant is equivalent",
     "equivalentMarked": "Marked. Run and measure again so it is discounted.",
     "cancel": "Cancel",
-    "mutationNotMeasured": "We could not break this function on purpose: the mutation tool only works inside classes, and this one stands on its own. No survivors listed here does not mean your tests killed them."
+    "mutationNotMeasured": "We could not break this function on purpose: the mutation tool only works inside classes, and this one stands on its own. No survivors listed here does not mean your tests killed them.",
+    "criterionLines": "The percentages cover the whole file; the criterion was judged over lines {{from}}–{{to}}, which are this function's."
   },
   "inventory": {
     "title": "Software inventory",

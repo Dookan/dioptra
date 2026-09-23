@@ -68,71 +68,89 @@ function componentName(string $phar, string $relative): string
     return $phar . '/' . (count($parts) === 0 ? 'bundle' : implode('/', $parts));
 }
 
-$packages = [];
-$unclassified = [];
+/**
+ * Everything above is pure and importable; everything below RUNS.
+ *
+ * The split is not decoration: a script whose work happens at include time
+ * cannot be tested without doing that work, and `classify` is the function
+ * the licence gate's verdict actually rests on. Guarding the entry point is
+ * the PHP equivalent of Python's `if __name__ == "__main__"`, and it is what
+ * lets Dioptra's E6/E7 run against this file at all (phase 7a walk).
+ */
+function main(): int
+{
+    $packages = [];
+    $unclassified = [];
 
-foreach (['phpunit', 'infection'] as $tool) {
-    $path = "/opt/dioptra-php/{$tool}.phar";
-    $prefix = "phar://{$path}/";
-    foreach (new RecursiveIteratorIterator(new Phar($path)) as $file) {
-        $relative = str_replace($prefix, '', $file->getPathname());
-        // An unknown licence TEXT failed the build while an unknown licence
-        // FILE NAME was silently skipped — two ways of not knowing, one of
-        // them invisible. `COPYING` and `LICENSE.rst` now come in too, so both
-        // fail the same way.
-        if (preg_match('#(^|/)(LICEN[SC]E|COPYING)(\.(md|txt|rst))?$#i', $relative) !== 1) {
-            continue;
+    foreach (['phpunit', 'infection'] as $tool) {
+        $path = "/opt/dioptra-php/{$tool}.phar";
+        $prefix = "phar://{$path}/";
+        foreach (new RecursiveIteratorIterator(new Phar($path)) as $file) {
+            $relative = str_replace($prefix, '', $file->getPathname());
+            // An unknown licence TEXT failed the build while an unknown licence
+            // FILE NAME was silently skipped — two ways of not knowing, one of
+            // them invisible. `COPYING` and `LICENSE.rst` now come in too, so both
+            // fail the same way.
+            if (preg_match('#(^|/)(LICEN[SC]E|COPYING)(\.(md|txt|rst))?$#i', $relative) !== 1) {
+                continue;
+            }
+            $text = file_get_contents($file->getPathname());
+            if ($text === false) {
+                $unclassified[] = "{$tool}:{$relative} (unreadable)";
+                continue;
+            }
+            $families = classify($text);
+            if (count($families) !== 1) {
+                $unclassified[] = sprintf(
+                    '%s:%s (%s)',
+                    $tool,
+                    $relative,
+                    $families === [] ? 'unrecognised' : 'ambiguous: ' . implode(', ', $families),
+                );
+                continue;
+            }
+            $packages[] = [
+                'name' => componentName($tool, $relative),
+                // The phars do not carry a per-component version, so the version of
+                // the artefact that bundles it is the honest answer.
+                'version' => getenv(strtoupper($tool) . '_VERSION') ?: 'bundled',
+                'license' => $families[0],
+            ];
         }
-        $text = file_get_contents($file->getPathname());
-        if ($text === false) {
-            $unclassified[] = "{$tool}:{$relative} (unreadable)";
-            continue;
-        }
-        $families = classify($text);
-        if (count($families) !== 1) {
-            $unclassified[] = sprintf(
-                '%s:%s (%s)',
-                $tool,
-                $relative,
-                $families === [] ? 'unrecognised' : 'ambiguous: ' . implode(', ', $families),
-            );
-            continue;
-        }
-        $packages[] = [
-            'name' => componentName($tool, $relative),
-            // The phars do not carry a per-component version, so the version of
-            // the artefact that bundles it is the honest answer.
-            'version' => getenv(strtoupper($tool) . '_VERSION') ?: 'bundled',
-            'license' => $families[0],
-        ];
     }
-}
 
-if ($unclassified !== []) {
-    fwrite(STDERR, "licence text not recognised, refusing to write a manifest:\n");
-    foreach ($unclassified as $item) {
-        fwrite(STDERR, "  - {$item}\n");
+    if ($unclassified !== []) {
+        fwrite(STDERR, "licence text not recognised, refusing to write a manifest:\n");
+        foreach ($unclassified as $item) {
+            fwrite(STDERR, "  - {$item}\n");
+        }
+        exit(1);
     }
-    exit(1);
+
+    // The four top-level artefacts stay named explicitly: php and xdebug ship no
+    // LICENSE file inside a phar, and phpunit/infection are the bundles themselves.
+    array_unshift(
+        $packages,
+        ['name' => 'php', 'version' => getenv('PHP_VERSION') ?: '8.3', 'license' => 'PHP-3.01'],
+        ['name' => 'phpunit', 'version' => getenv('PHPUNIT_VERSION') ?: 'unknown', 'license' => 'BSD-3-Clause'],
+        ['name' => 'infection', 'version' => getenv('INFECTION_VERSION') ?: 'unknown', 'license' => 'BSD-3-Clause'],
+        ['name' => 'xdebug', 'version' => getenv('XDEBUG_VERSION') ?: 'unknown', 'license' => 'Xdebug-1.03'],
+    );
+
+    usort($packages, static fn(array $a, array $b): int => strcmp($a['name'], $b['name']));
+
+    $document = ['runtime' => 'php', 'packages' => $packages];
+    $json = json_encode($document, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($json === false) {
+        fwrite(STDERR, "could not encode the manifest\n");
+        exit(1);
+    }
+    file_put_contents('/opt/dioptra-php/licenses.json', $json . "\n");
+    fwrite(STDERR, sprintf("wrote %d packages\n", count($packages)));
+    return 0;
 }
 
-// The four top-level artefacts stay named explicitly: php and xdebug ship no
-// LICENSE file inside a phar, and phpunit/infection are the bundles themselves.
-array_unshift(
-    $packages,
-    ['name' => 'php', 'version' => getenv('PHP_VERSION') ?: '8.3', 'license' => 'PHP-3.01'],
-    ['name' => 'phpunit', 'version' => getenv('PHPUNIT_VERSION') ?: 'unknown', 'license' => 'BSD-3-Clause'],
-    ['name' => 'infection', 'version' => getenv('INFECTION_VERSION') ?: 'unknown', 'license' => 'BSD-3-Clause'],
-    ['name' => 'xdebug', 'version' => getenv('XDEBUG_VERSION') ?: 'unknown', 'license' => 'Xdebug-1.03'],
-);
-
-usort($packages, static fn(array $a, array $b): int => strcmp($a['name'], $b['name']));
-
-$document = ['runtime' => 'php', 'packages' => $packages];
-$json = json_encode($document, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-if ($json === false) {
-    fwrite(STDERR, "could not encode the manifest\n");
-    exit(1);
+// Only when this file is the program, never when a test requires it.
+if (PHP_SAPI === 'cli' && isset($argv[0]) && realpath($argv[0]) === realpath(__FILE__)) {
+    exit(main());
 }
-file_put_contents('/opt/dioptra-php/licenses.json', $json . "\n");
-fwrite(STDERR, sprintf("wrote %d packages\n", count($packages)));

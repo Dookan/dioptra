@@ -205,10 +205,22 @@ and each one is shown to the developer BY NAME, never as a score:
    rejected. Deliberately generous — whether the assertion is a GOOD one is
    question 4's answer, not this one's.
 3. **Coverage.** Measured in the sandbox and normalised to one shape for both
-   languages. The E4 criterion is applied to the module (`statements` ⊂
-   `decisions` ⊂ `paths`), AND every brief item's line is checked
-   individually: an item counts only when its line executed *and* its branch
-   was fully taken — a half-taken branch covers neither side.
+   languages. The E4 criterion is applied to **the planned function's own
+   lines** (`statements` ⊂ `decisions` ⊂ `paths`), AND every brief item's line
+   is checked individually: an item counts only when its line executed *and*
+   its branch was fully taken — a half-taken branch covers neither side.
+
+   **It used to be the whole module, and that made the gate unreachable**
+   (found by the phase-7a walk, 2026-09-23). A file holding three functions
+   where E4 planned one can never have "no missing line": the other two are
+   never executed by a test written for the first. Measured on Dioptra's own
+   `php-licenses.php` — five passing cases, every brief item covered, 8.8 %
+   statements, `coverage_short`. The span comes from the AST
+   (`verify.criterion_span`); when it cannot be resolved the whole module is
+   judged, which is the stricter fallback. The stored coverage stays the
+   module's true measurement and carries `criterion_lines`, so a screen or a
+   report can say what a percentage is about: the numbers are the module's,
+   the verdict is the function's.
 4. **Mutation.** Stryker (JS/TS) / mutmut (Python) over the module under test.
    A surviving mutant rejects the gate, and the developer is shown the exact
    mutant with its diff. **Equivalent mutants** (P5, found by the walk of the

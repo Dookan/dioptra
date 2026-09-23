@@ -14,7 +14,7 @@ import uuid
 from dataclasses import asdict
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from app.auth.deps import ActiveUser, AnalystUser, DeveloperUser, client_ip
@@ -33,6 +33,7 @@ from app.projects.schemas import (
     FindingOut,
     JustificationIn,
     PlannedFunctionIn,
+    RiskMatrixOut,
     RiskRowOut,
     ScaffoldOut,
     TestPlanIn,
@@ -97,10 +98,20 @@ def advance_stage(
     return analysis_out(analysis)
 
 
-@workflow_router.get("/risk-matrix", response_model=list[RiskRowOut])
-def get_risk_matrix(analysis_id: uuid.UUID, _user: ActiveUser, db: DbSession) -> list[RiskRowOut]:
+@workflow_router.get("/risk-matrix", response_model=RiskMatrixOut)
+def get_risk_matrix(
+    analysis_id: uuid.UUID,
+    _user: ActiveUser,
+    db: DbSession,
+    q: Annotated[str | None, Query(max_length=200)] = None,
+) -> RiskMatrixOut:
     analysis = service.get_analysis(db, analysis_id)
-    return [RiskRowOut(**asdict(row)) for row in risk_matrix(analysis)]
+    matrix = risk_matrix(analysis, q=q)
+    return RiskMatrixOut(
+        rows=[RiskRowOut(**asdict(row)) for row in matrix.rows],
+        total=matrix.total,
+        query=matrix.query,
+    )
 
 
 @workflow_router.get("/diagram", response_model=DiagramOut)

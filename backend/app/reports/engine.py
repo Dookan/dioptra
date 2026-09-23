@@ -313,6 +313,10 @@ def _docx_closure(doc: Any, context: dict[str, Any], strings: dict[str, Any]) ->
             # under the totals would otherwise read as a measured zero.
             add(sd["not_measured_note"].format(count=totals["mutation_not_measured"]))
         lbl = sd["labels"]
+        # Every format carries it or none does: the percentages are the file's
+        # while the verdict is the planned function's.
+        if any(f.get("criterion_lines") for f in debt["functions"]):
+            add(lbl["criterion_scope"])
         _docx_table(
             doc,
             [

@@ -389,6 +389,37 @@ final class EdadDioptraTest extends TestCase
 """
 
 
+PHP_STRONG = """<?php
+
+declare(strict_types=1);
+
+use PHPUnit\\Framework\\TestCase;
+
+require_once __DIR__ . '/' . 'Edad.php';
+
+final class EdadDioptraTest extends TestCase
+{
+    public function testC1_mayor(): void
+    {
+        $this->assertSame('mayor', Edad::obtener(2000));
+        $this->assertSame('mayor', Edad::obtener(2008));
+    }
+
+    public function testC2_menor(): void
+    {
+        $this->assertSame('menor', Edad::obtener(2009));
+        $this->assertSame('menor', Edad::obtener(2025));
+    }
+
+    public function testC3_anio_invalido(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        Edad::obtener(0);
+    }
+}
+"""
+
+
 def _php_scaffold() -> ScaffoldFile:
     return ScaffoldFile(
         filename="EdadDioptraTest.php",
@@ -527,3 +558,63 @@ def test_a_weak_php_suite_leaves_surviving_mutants(php_live: Settings, tmp_path:
         assert coverage.partial_branch_lines, "this suite takes one side of each branch"
     finally:
         workspace.discard(attempt)
+
+
+def _php_verify(settings: Settings, tmp_path: Path, content: str) -> object:
+    """Drive the REAL scoring path over a real PHP sandbox run.
+
+    `verify_function` is what the worker calls: it builds the attempt, runs the
+    container, parses the three documents and returns the verdict the gate
+    reads. Going through it — rather than asserting on `parse_mutation` — is
+    what makes this the phase's acceptance rather than a wiring check.
+    """
+    from app.workflow.design import FunctionRef
+    from app.workflow.models import CoverageCriterion
+    from app.workflow.verify import verify_function
+
+    jail = tmp_path / "phpjail_verify"
+    jail.mkdir(exist_ok=True)
+    (jail / "Edad.php").write_text(PHP_MODULE)
+    analysis = Analysis(workspace_path=str(jail))
+    return verify_function(
+        settings,
+        analysis=analysis,
+        ref=FunctionRef(path="Edad.php", function="obtener", line=None),
+        scaffold=_php_scaffold(),
+        content=content,
+        criterion=CoverageCriterion.DECISIONS,
+    )
+
+
+def test_a_surviving_infection_mutant_rejects_the_e7_gate(
+    php_live: Settings, tmp_path: Path
+) -> None:
+    """Phase 7a's acceptance, end to end and in BOTH directions.
+
+    `test_a_weak_php_suite_leaves_surviving_mutants` proves Infection produces
+    survivors; it does not prove the gate acts on them. This drives the same
+    real run through `verify_function`, which is the code the worker executes
+    and the only thing `gates.leave_verification` ever reads.
+
+    The strong half matters as much as the weak one: a gate that rejects
+    everything proves nothing either, and the three earlier "no mutants" bugs
+    of this chain (tasks/phase7a-php.md) all LOOKED like a pass.
+    """
+    from app.workflow.models import REASON_MUTANT_SURVIVED, VerificationStatus
+
+    weak = _php_verify(php_live, tmp_path, PHP_WEAK)
+    assert weak.mutation_measured is True, "a class IS mutable; a gap here would be a defect"
+    assert weak.surviving_mutants, "one assertion over one path must leave mutants alive"
+    assert REASON_MUTANT_SURVIVED in weak.reasons
+    assert weak.status is VerificationStatus.FAILED
+    # The developer is shown the mutant BY NAME, never a score.
+    assert any(m.get("mutant") or m.get("line") for m in weak.surviving_mutants)
+
+    strong = _php_verify(php_live, tmp_path, PHP_STRONG)
+    assert strong.mutation_measured is True
+    assert strong.status is VerificationStatus.PASSED, (
+        strong.reasons,
+        strong.surviving_mutants,
+        strong.detail,
+    )
+    assert not strong.surviving_mutants and strong.reasons == []

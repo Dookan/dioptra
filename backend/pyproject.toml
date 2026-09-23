@@ -125,6 +125,10 @@ only_mutate = [
     "app/workflow/triage.py",
     "app/workflow/test_plan.py",
     "app/workflow/verify.py",
+    # Added 2026-09-23: the E4 ranking decides what a developer can even
+    # SEE to plan, and the phase-7a walk showed a cap that hid a whole
+    # project's own code. A decision surface belongs under mutation.
+    "app/workflow/risk.py",
     "app/sandbox/results.py",
     # P5 close: correlation, VEX and the audit read (CLAUDE.md → Tests).
     "app/inventory/correlation.py",

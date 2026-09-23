@@ -1669,6 +1669,43 @@ button.card:focus-visible {
   background: var(--t3);
 }
 
+/* E4's search box. It is a way OUT of the cap, not a convenience: the server
+   filters BEFORE truncating, so this is how a developer reaches a function the
+   top 200 by score never shows them (phase-7a walk, 2026-09-23).
+
+   Layout ONLY — the control itself is the anchor's `.input`, worn by the
+   element. Authoring a second text-field contract here is how the same screen
+   ended up with a search box and a rationale textarea that did not match: the
+   bespoke version used `--line` on `--s1`, which is 1.02:1 against `--ground`
+   in light mode, i.e. no visible boundary at all (mockup-fidelity, 2026-09-23). */
+.filterbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 14px 0 6px;
+}
+
+.filterbar label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t2);
+}
+
+.filterbar .input {
+  flex: 1 1 260px;
+  width: auto;
+  min-width: 0;
+}
+
+/* `.sub` has no bare rule on purpose (see the note above `.card .sub`), so the
+   count line needs naming here or it renders as primary prose. */
+.filterbar + .sub {
+  font-size: 13px;
+  color: var(--t2);
+  margin: 0 0 12px;
+}
+
 /* The third-party section: present, readable, and visibly not the queue.
    It lives INSIDE the left pane rather than after the grid, so selecting one
    of its cards updates the detail panel beside it instead of one that has

@@ -18,7 +18,7 @@ from typing import Any
 
 from tree_sitter import Language, Node, Parser
 
-from app.workflow.ast.errors import FunctionNotFound, ParseFailed, TooDeep
+from app.workflow.ast.errors import AstError, FunctionNotFound, ParseFailed, TooDeep
 from app.workflow.ast.graph import Comparison, FlowEdge, FlowGraph, FlowNode, clip
 
 MAX_DEPTH = 40
@@ -294,6 +294,55 @@ def declared_in_class(source: bytes, language: str, name: str, line: int | None)
             return True
         parent = parent.parent
     return False
+
+
+def function_span(
+    source: bytes, language: str, name: str, line: int | None
+) -> tuple[int, int] | None:
+    """The 1-indexed first and last line of the named function, or ``None``.
+
+    E7 applies the E4 coverage criterion to these lines rather than to the
+    whole file. Measured on the phase-7a walk: a module with three functions
+    where E4 planned ONE could never satisfy "no missing line", because the
+    other two are never executed by a test written for the first — the gate
+    was unreachable by construction on any multi-function file.
+
+    ``None`` means "could not resolve", and the caller then keeps the whole
+    module, which is the STRICTER side: an unresolvable function must not
+    silently widen what counts as covered.
+    """
+    profile = PROFILES.get(language)
+    if profile is None:
+        return None
+    try:
+        root = parse(source, language)
+        function = find_function(root, name, line, profile)
+    except (FunctionNotFound, AstError):
+        return None
+    # An AMBIGUOUS resolution must land on the strict side too, not just an
+    # impossible one. `find_function` ranks by distance to ``line`` and, with no
+    # line, every same-named declaration ties at 0 and the FIRST one by position
+    # wins. An audited file that declares a trivial `obtener()` above the real
+    # one would then shrink the criterion to that stub's single line — which
+    # `statements` satisfies unconditionally. Found by the precommit security
+    # auditor on this very change, 2026-09-23: before it, the criterion was the
+    # one E7 question whose answer did not depend on picking the right node.
+    if line is None and _same_named_count(root, name, profile) > 1:
+        return None
+    return function.start_point.row + 1, function.end_point.row + 1
+
+
+def _same_named_count(root: Node, name: str, profile: Profile) -> int:
+    wanted = _bare_name(name)
+    count = 0
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        found = _named_function(node, profile)
+        if found is not None and _bare_name(found[0]) == wanted:
+            count += 1
+        stack.extend(node.children)
+    return count
 
 
 def _has_error(node: Node) -> bool:

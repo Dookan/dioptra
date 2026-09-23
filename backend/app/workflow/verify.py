@@ -33,7 +33,7 @@ from app.sandbox import executor, results, workspace
 from app.sandbox.errors import SandboxError
 from app.workflow import authoring
 from app.workflow.ast.errors import AstError
-from app.workflow.ast.extract import declared_in_class
+from app.workflow.ast.extract import declared_in_class, function_span
 from app.workflow.ast.source import load_source
 from app.workflow.design import FunctionRef, get_design
 from app.workflow.errors import (
@@ -84,6 +84,12 @@ class Outcome:
     #: the other three questions and every surface SAYS SO — a declared gap,
     #: never a silent pass.
     mutation_measured: bool = True
+    #: The line range the criterion was judged over — the planned function's
+    #: own. ``None`` means it could not be resolved and the WHOLE module was
+    #: judged instead, which is stricter. Stored beside the coverage so the
+    #: screen and the report can say what a percentage is about: the numbers
+    #: are the module's, the verdict is the function's.
+    criterion_lines: tuple[int, int] | None = None
 
 
 #: Shown to the developer when the mutation tool produced no mutant at all AND
@@ -114,6 +120,30 @@ def mutation_is_measurable(analysis: Analysis, *, language: str, ref: FunctionRe
     except (AstError, OSError):
         return True
     return declared_in_class(source, language, ref.function, ref.line)
+
+
+def criterion_span(
+    analysis: Analysis, *, language: str, ref: FunctionRef
+) -> tuple[int, int] | None:
+    """The lines the E4 criterion is judged over: the planned function's own.
+
+    Found by the phase-7a walk (2026-09-23). `_criterion_met` demanded that NO
+    line of the module be missing, so planning one function of a file that
+    holds three made the gate unreachable however good the tests were — the
+    other two functions are never executed by a test written for the first.
+    Measured on Dioptra's own `php-licenses.php`: five passing cases, every
+    brief item covered, and 8.8 % statements because two thirds of the file
+    was never the subject.
+
+    ``None`` when the span cannot be resolved, and the caller then judges the
+    WHOLE module, which is the stricter side — an unresolvable function must
+    never widen what counts as covered.
+    """
+    try:
+        source = load_source(analysis, ref.path)
+    except (AstError, OSError):
+        return None
+    return function_span(source, language, ref.function, ref.line)
 
 
 def _errored(detail: str | None, *, duration_ms: int = 0) -> Outcome:
@@ -160,19 +190,36 @@ def _brief_lines(scaffold_brief: dict[str, Any]) -> list[tuple[str, int | None]]
     return out
 
 
-def _criterion_met(criterion: CoverageCriterion, coverage: results.Coverage) -> bool:
-    """The E4 exigency, applied to the module under test.
+def _in_span(lines: frozenset[int], span: tuple[int, int] | None) -> frozenset[int]:
+    if span is None:
+        return lines
+    low, high = span
+    return frozenset(line for line in lines if low <= line <= high)
+
+
+def _criterion_met(
+    criterion: CoverageCriterion,
+    coverage: results.Coverage,
+    span: tuple[int, int] | None = None,
+) -> bool:
+    """The E4 exigency, applied to the PLANNED FUNCTION's lines.
 
     ``statements`` ⊂ ``decisions`` ⊂ ``paths``: each level keeps the previous
     one's requirement and adds its own. Brief items are checked regardless —
     that check is the plan's "each brief branch verified by line", not the
     criterion.
+
+    ``span`` is the function's own line range (`criterion_span`). Before the
+    phase-7a walk this was judged over the whole module, which made the gate
+    unreachable on any file holding more than the one function E4 planned.
+    ``None`` keeps the old, stricter module-wide behaviour, which is what an
+    unresolvable span must fall back to.
     """
-    if coverage.missing_lines:
+    if _in_span(coverage.missing_lines, span):
         return False
     if criterion is CoverageCriterion.STATEMENTS:
         return True
-    return not coverage.partial_branch_lines
+    return not _in_span(coverage.partial_branch_lines, span)
 
 
 def verify_function(
@@ -241,6 +288,9 @@ def verify_function(
             if mutation_is_measurable(analysis, language=scaffold.language, ref=ref):
                 return _errored(NO_MUTANTS_DETAIL, duration_ms=result.duration_ms)
             mutation_measured = False
+        # The criterion is judged over the function E4 planned, not over every
+        # line of the file it happens to live in (`criterion_span`).
+        span = criterion_span(analysis, language=scaffold.language, ref=ref)
         failed = results.parse_failed_cases(result.junit)
         detail = results_strip(result.stderr)[-MAX_DETAIL_CHARS:] or None
         duration = result.duration_ms
@@ -288,7 +338,7 @@ def verify_function(
         reasons.append(REASON_TESTS_FAILED)
     if assertion_free:
         reasons.append(REASON_ASSERTION_FREE)
-    if not _criterion_met(criterion, coverage):
+    if not _criterion_met(criterion, coverage, span):
         reasons.append(REASON_COVERAGE_SHORT)
     if uncovered:
         reasons.append(REASON_BRIEF_UNCOVERED)
@@ -304,6 +354,7 @@ def verify_function(
         assertion_free=assertion_free,
         failed_cases=failed,
         mutation_measured=mutation_measured,
+        criterion_lines=span,
         detail=detail,
         duration_ms=duration,
         equivalent_mutants=excused_now,
@@ -398,7 +449,15 @@ def _record(
         line=ref.line,
         status=outcome.status,
         reasons=list(outcome.reasons),
-        coverage=outcome.coverage.as_dict(),
+        # The span rides in the coverage blob rather than in a column of its
+        # own: it is read only for display, and a migration for a label the
+        # verdict does not depend on is not worth a schema change.
+        coverage={
+            **outcome.coverage.as_dict(),
+            "criterion_lines": list(outcome.criterion_lines)
+            if outcome.criterion_lines is not None
+            else None,
+        },
         uncovered_items=list(outcome.uncovered_items),
         surviving_mutants=list(outcome.surviving_mutants),
         equivalent_mutants=list(outcome.equivalent_mutants),

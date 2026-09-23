@@ -227,6 +227,9 @@
   {% endfor %}
   </tbody>
 </table>
+{% if test_debt.functions | selectattr('criterion_lines') | list %}
+<p class="note">{{ strings.test_debt.labels.criterion_scope }}</p>
+{% endif %}
 {% else %}
 <p>{{ strings.test_debt.no_plan }}</p>
 {% endif %}

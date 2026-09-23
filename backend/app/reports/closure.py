@@ -129,6 +129,11 @@ def test_debt_context(analysis: Analysis) -> dict[str, Any]:
                 "written": stored is not None and bool(stored.content.strip()),
                 "statement_percent": coverage.get("statement_percent"),
                 "branch_percent": coverage.get("branch_percent"),
+                # The percentages are the MODULE's while the verdict is the
+                # planned function's, so the document has to say which lines
+                # were judged — the same rule the mutation gap follows
+                # (docs/workflow-gates.md → E7 re-audit rules, question 3).
+                "criterion_lines": coverage.get("criterion_lines"),
                 "status": run.status.value if run is not None else None,
                 "status_label": _S["test_debt"]["status"][run.status.value]
                 if run is not None

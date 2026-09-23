@@ -233,7 +233,8 @@
       "yes": "Sí",
       "no": "No",
       "equivalent": "Equivalentes",
-      "not_measured": "no medida"
+      "not_measured": "no medida",
+      "criterion_scope": "Los porcentajes son del archivo completo; el criterio de cobertura se juzgó sobre las líneas propias de cada función planificada."
     },
     "criterion": {
       "statements": "sentencias",

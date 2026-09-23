@@ -469,7 +469,17 @@
       "lockedTitle": "Plan cerrado",
       "lockedBody": "La etapa de plan ya se cerró: el diseño de casos trabaja sobre este plan y no se puede cambiar."
     },
-    "incomplete": "Incluye al menos una función y escribe tu justificación ({{min}} caracteres o más)."
+    "incomplete": "Incluye al menos una función y escribe tu justificación ({{min}} caracteres o más).",
+    "filter": {
+      "label": "Buscar una función o un archivo",
+      "placeholder": "por ejemplo: Helpers.php o uploadFile"
+    },
+    "showing": {
+      "capped": "Mostrando {{shown}} de {{total}} funciones medidas. Usa el buscador para llegar a las que no caben.",
+      "all": "Mostrando las {{total}} funciones medidas.",
+      "matches": "Mostrando {{total}} coincidencias."
+    },
+    "noMatches": "Ninguna función coincide con lo que buscaste."
   },
   "design": {
     "title": "Diseño de casos",
@@ -649,7 +659,8 @@
     "equivalentReasonLabel": "Por qué este mutante es equivalente",
     "equivalentMarked": "Marcado. Vuelve a ejecutar y medir para que se descuente.",
     "cancel": "Cancelar",
-    "mutationNotMeasured": "No pudimos romper el código a propósito en esta función: la herramienta de mutación solo trabaja dentro de clases, y esta es una función suelta. Que no aparezcan sobrevivientes aquí no significa que tus tests los hayan matado."
+    "mutationNotMeasured": "No pudimos romper el código a propósito en esta función: la herramienta de mutación solo trabaja dentro de clases, y esta es una función suelta. Que no aparezcan sobrevivientes aquí no significa que tus tests los hayan matado.",
+    "criterionLines": "Los porcentajes son de todo el archivo; el criterio se juzgó sobre las líneas {{from}}–{{to}}, que son las de esta función."
   },
   "inventory": {
     "title": "Inventario de software",

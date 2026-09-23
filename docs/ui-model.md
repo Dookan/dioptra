@@ -302,6 +302,40 @@ Radii: frames 14, cards 12, buttons 9, badges 5. Borders 1px hairline.
   because it needs a written reason first, which does not fit a banner
   button. That last one is `mmarin`'s call to overrule.
 
+## Plan de pruebas (E4) — búsqueda y el tope dicho en voz alta, 2026-09-23
+
+- The ranking shows at most `MAX_ROWS` (200) of the measured functions, and
+  the screen now **says which**: "Mostrando 200 de 5000 funciones medidas. Usa
+  el buscador para llegar a las que no caben." When nothing was cut it says so
+  too, so the sentence is never a warning the reader learns to ignore.
+- A **search box** above the ranking filters by path or function name. The
+  filter is the SERVER's (`GET …/risk-matrix?q=`), applied before the cap and
+  debounced by 250 ms — a client-side `rows.filter` could only narrow what
+  already survived truncation, which is precisely the function the developer
+  cannot see.
+- **Why** (phase-7a walk, 2026-09-23): a real Laravel application measured
+  **5 000 functions**, and the 200 highest-scoring were ALL hand-vendored
+  JavaScript (`public/Datatables/…`, minified jQuery). The developer could not
+  reach a single function of their own team's code through the UI, and nothing
+  on screen said anything was missing. The ranking also puts dependency
+  directories last now, but that alone does not fix it: a library copied into
+  `public/` by hand is not in a dependency directory and no path rule can know
+  it is one. The count and the search box are what fix it.
+- The field wears the anchor's `.input` contract; `.filterbar` carries layout
+  only. Authoring a second text-field style here is what first produced a
+  search box whose fill was `--s1` on `--ground` — **1.02:1** in light mode,
+  i.e. no visible boundary — beside a rationale textarea with the anchor's
+  metrics on the same screen (mockup-fidelity, 2026-09-23). The count line
+  needed `.filterbar + .sub`, because `.sub` deliberately has no bare rule.
+- The selection is held as a map of the chosen functions, NOT as keys
+  intersected with what is on screen: the filter changes `rows`, so the old
+  shape silently dropped a ticked function from the saved plan when the
+  developer searched again (invariant checker, 2026-09-23).
+- Recorded deviation: mockup 05 draws the ranking with no search box and no
+  count, because the anchor's example project has a handful of functions. This
+  follows the product's own `.sub` + `role="status"` pattern, like the findings
+  pager.
+
 ## Hallazgos (E3) — paginación, 2026-09-23
 
 - The list paints **25 findings at a time**, with a pager underneath

@@ -181,6 +181,21 @@ class RiskRowOut(BaseModel):
     level: str
 
 
+class RiskMatrixOut(BaseModel):
+    """The ranked rows AND what the cap left out.
+
+    A bare list could not say "200 of 5000", and on a real tree that silence
+    hid every function of the audited team's own code behind hand-vendored
+    libraries (phase-7a walk, 2026-09-23).
+    """
+
+    rows: list[RiskRowOut]
+    #: Matched before the cap — `len(rows)` is what survived it.
+    total: int
+    #: The filter the server applied, normalised, so the screen can echo it.
+    query: str
+
+
 class PlannedFunctionIn(BaseModel):
     path: str = Field(min_length=1, max_length=1024)
     function: str = Field(min_length=1, max_length=200)

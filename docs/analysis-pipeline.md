@@ -47,8 +47,8 @@ tool's result.
 
 Languages (analysis runners and, since P3 day 14, the tree-sitter AST layer of
 E5): wave 1 JS/TS + Python (P1–P4). Wave 2 was **cut to a second cycle on
-2026-09-22** and is being built there: **PHP/Laravel is IN PROGRESS since
-2026-09-23** (`tasks/phase7a-php.md`) — the AST layer parses `.php`, so E4 now
+2026-09-22** and is being built there: **PHP/Laravel is DONE (2026-09-23,
+`tasks/phase7a-php.md`)** — the AST layer parses `.php`, so E4 now
 plans PHP functions, E5 briefs them, E6 scaffolds them as PHPUnit and E7 runs
 them in their own sandbox image; **Java/Spring has not started** (phase 7b,
 same survey), so E4 still refuses its functions like any the AST cannot parse.

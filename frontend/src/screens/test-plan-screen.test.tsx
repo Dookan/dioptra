@@ -59,11 +59,14 @@ function analysis(stage: string) {
   };
 }
 
-const MATRIX = [
+const MATRIX_ROWS = [
   { path: 'src/validators.js', function: 'validateForm', line: 10, ccn: 12, nloc: 40, findings: 1, max_severity: 'high', score: 72, level: 'high' },
   { path: 'src/billing/discount.js', function: 'calculateDiscount', line: 20, ccn: 5, nloc: 18, findings: 1, max_severity: 'medium', score: 20, level: 'high' },
   { path: 'src/utils.js', function: 'formatDate', line: 3, ccn: 2, nloc: 6, findings: 0, max_severity: null, score: 2, level: 'low' },
 ];
+
+/** The endpoint answers rows + what the cap left out, so the screen can say so. */
+const MATRIX = { rows: MATRIX_ROWS, total: MATRIX_ROWS.length, query: '' };
 
 const NO_PLAN = { status: 404, body: { code: 'test_plan_not_found', message_key: 'errors.workflow.testPlanNotFound' } };
 
@@ -281,5 +284,137 @@ describe('test plan screen', () => {
     expect(screen.queryByRole('button', { name: es.plan.include })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: es.plan.saveAndDesign })).not.toBeInTheDocument();
     expect(screen.getByLabelText(es.plan.rationaleLabel)).toBeDisabled();
+  });
+
+  it('says how many functions the cap left out, and the filter asks the server', async () => {
+    // The cap is the server's and so is the filter: a client-side `rows.filter`
+    // could only narrow what already survived truncation, which is exactly the
+    // function the developer cannot see. Found by the phase-7a walk on a real
+    // Laravel tree — 5 000 functions measured, the top 200 all vendored JS.
+    const calls = renderPlan('developer', 'plan', {
+      [`/api/v1/analyses/${ANALYSIS_ID}/risk-matrix`]: {
+        status: 200,
+        body: { rows: MATRIX_ROWS, total: 5000, query: '' },
+      },
+      [`/api/v1/analyses/${ANALYSIS_ID}/risk-matrix?q=Helpers`]: {
+        status: 200,
+        body: { rows: [], total: 0, query: 'helpers' },
+      },
+    });
+    const user = await signIn('cperez');
+
+    expect(
+      await screen.findByText(fill(es.plan.showing.capped, { shown: 3, total: 5000 })),
+    ).toBeInTheDocument();
+
+    const matrixCalls = () =>
+      calls.mock.calls.filter(([url]) => String(url).includes('/risk-matrix'));
+    // ONE request on mount, not two. The load effect already fetched the
+    // unfiltered matrix; the debounced effect used to re-ask for it 250 ms
+    // later, recomputing a 5 000-function ranking twice per screen open.
+    expect(matrixCalls()).toHaveLength(1);
+
+    await user.type(screen.getByLabelText(es.plan.filter.label), 'Helpers');
+    await waitFor(() => {
+      expect(
+        calls.mock.calls.some(([url]) => String(url).includes('/risk-matrix?q=Helpers')),
+      ).toBe(true);
+    });
+    // Seven keystrokes, ONE extra request: the debounce is the point, so the
+    // COUNT is asserted, not merely that some call carried the query.
+    expect(matrixCalls()).toHaveLength(2);
+
+    expect(await screen.findByText(es.plan.noMatches)).toBeInTheDocument();
+    // An empty result says ONE thing. The first version of this assertion
+    // named `showing.all`, which the ternary cannot pick while a filter is
+    // active — it could never have failed (coverage adversary, 2026-09-23).
+    // The count line must be absent altogether, so assert on the role.
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+    // Clearing the box restores the full list. `lastQuery` is what makes this
+    // work: without it the effect compares '' to a never-updated '' and
+    // returns early, so the search would be a one-way door.
+    await user.clear(screen.getByLabelText(es.plan.filter.label));
+    await waitFor(() => {
+      expect(matrixCalls()).toHaveLength(3);
+    });
+    expect(await screen.findByText('validateForm()')).toBeInTheDocument();
+  });
+
+  it('says nothing about counts when no function was measured at all', async () => {
+    renderPlan('developer', 'plan', {
+      [`/api/v1/analyses/${ANALYSIS_ID}/risk-matrix`]: {
+        status: 200,
+        body: { rows: [], total: 0, query: '' },
+      },
+    });
+    await signIn('cperez');
+    expect(await screen.findByText(es.plan.noFunctions)).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('saves a function that was ticked before a filter hid it', async () => {
+    // The defect this guards: `save()` used to build the plan from `rows`,
+    // which the search box turned into "the last filtered page". Ticking a
+    // function and then searching again dropped it silently, and the server
+    // only refuses a FULLY empty plan (invariant checker, 2026-09-23).
+    const stored = {
+      id: 'plan-1',
+      analysis_id: ANALYSIS_ID,
+      criterion: 'decisions',
+      rationale: 'Motivo suficiente aqui.',
+      functions: [{ path: 'src/validators.js', function: 'validateForm', line: 10, ccn: 12 }],
+      created_by_username: 'cperez',
+      created_at: '2026-09-23T10:00:00Z',
+      updated_at: '2026-09-23T10:00:00Z',
+    };
+    const calls = renderPlan('developer', 'plan', {
+      [`/api/v1/analyses/${ANALYSIS_ID}/risk-matrix?q=utils`]: {
+        status: 200,
+        body: { rows: [MATRIX_ROWS[2]], total: 1, query: 'utils' },
+      },
+      // NO_PLAN until the PUT lands, or the row would arrive pre-selected and
+      // the test would tick nothing.
+      [`/api/v1/analyses/${ANALYSIS_ID}/test-plan`]: () =>
+        calls.mock.calls.some(
+          ([url, init]: unknown[]) =>
+            String(url).endsWith('/test-plan') &&
+            (init as RequestInit | undefined)?.method === 'PUT',
+        )
+          ? { status: 200, body: stored }
+          : NO_PLAN,
+      [`/api/v1/analyses/${ANALYSIS_ID}/stage/advance`]: { status: 200, body: analysis('design') },
+    });
+    const user = await signIn('cperez');
+
+    const ranking = await screen.findByRole('list', { name: es.plan.rankingLabel });
+    const [first] = within(ranking).getAllByRole('listitem');
+    await user.click(within(first!).getByRole('button', { name: es.plan.include }));
+
+    // Now filter it off the screen entirely.
+    await user.type(screen.getByLabelText(es.plan.filter.label), 'utils');
+    // Wait for the debounced response to replace the list, not just for the
+    // keystrokes: the point is to save AFTER the row left the screen.
+    await waitFor(() => {
+      expect(screen.queryByText('validateForm()')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('formatDate()')).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(es.plan.rationaleLabel), 'Motivo suficiente aqui.');
+    await user.click(screen.getByRole('button', { name: es.plan.saveAndDesign }));
+    await user.type(
+      screen.getByLabelText(es.workflow.advance.reasonLabel),
+      'Plan acordado con el analista.',
+    );
+    await user.click(screen.getByRole('button', { name: es.plan.saveAndDesign }));
+
+    await waitFor(() => {
+      const body = bodyOf(calls, `/api/v1/analyses/${ANALYSIS_ID}/test-plan`, 'PUT') as {
+        functions: unknown[];
+      } | null;
+      expect(body?.functions).toEqual([
+        { path: 'src/validators.js', function: 'validateForm', line: 10 },
+      ]);
+    });
   });
 });

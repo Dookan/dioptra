@@ -20,7 +20,7 @@ def test_ranking_score_and_levels(db: Session) -> None:
             make_finding(2, path="src/billing.js", severity=Severity.LOW),
         ],
     )
-    rows = risk_matrix(analysis)
+    rows = risk_matrix(analysis).rows
     assert [row.function for row in rows] == ["validateForm", "calculateDiscount", "formatDate"]
     validate, discount, fmt = rows
     # ccn 12 × (1 + 1 finding) × criticality 3 (high)
@@ -37,7 +37,7 @@ def test_false_positives_do_not_count(db: Session) -> None:
     dropped = make_finding(0, path="src/utils.js", severity=Severity.CRITICAL)
     dropped.verdict = Verdict.FALSE_POSITIVE
     analysis = seed_done_analysis(db, [dropped])
-    fmt = next(row for row in risk_matrix(analysis) if row.function == "formatDate")
+    fmt = next(row for row in risk_matrix(analysis).rows if row.function == "formatDate")
     assert fmt.findings == 0 and fmt.max_severity is None and fmt.score == 2
 
 
@@ -52,7 +52,7 @@ def test_medium_level_and_ties_are_stable(db: Session) -> None:
     analysis = seed_done_analysis(
         db, [make_finding(0, path="b.js", severity=Severity.INFO)], functions=functions
     )
-    rows = risk_matrix(analysis)
+    rows = risk_matrix(analysis).rows
     # b.js: 4 × 2 × 1 = 8 → medium; the a.js pair ties at 4 and orders by path then line.
     assert [(r.function, r.score, r.level) for r in rows] == [
         ("two", 8, "medium"),
@@ -69,13 +69,16 @@ def test_level_thresholds_are_pinned_from_both_sides() -> None:
 
 def test_no_metrics_means_no_rows_and_the_cap_holds(db: Session) -> None:
     empty = Analysis()
-    assert risk_matrix(empty) == []
+    assert risk_matrix(empty).rows == [] and risk_matrix(empty).total == 0
     many = [
         {"path": "x.js", "function": f"f{i}", "line": i, "nloc": 1, "ccn": 1}
         for i in range(MAX_ROWS + 50)
     ]
     analysis = seed_done_analysis(db, [], functions=many)
-    assert len(risk_matrix(analysis)) == MAX_ROWS
+    matrix = risk_matrix(analysis)
+    assert len(matrix.rows) == MAX_ROWS
+    # The cap must SAY what it left out — a bare list could not.
+    assert matrix.total > MAX_ROWS
 
 
 def test_risk_matrix_endpoint_is_readable_by_every_role(
@@ -88,6 +91,85 @@ def test_risk_matrix_endpoint_is_readable_by_every_role(
         )
         assert response.status_code == 200, response.text
         body = response.json()
-        assert len(body) == len(FUNCTIONS)
-        assert body[0]["function"] == "validateForm" and body[0]["max_severity"] == "high"
-        assert body[-1]["max_severity"] is None
+        assert len(body["rows"]) == len(FUNCTIONS)
+        assert body["total"] == len(FUNCTIONS) and body["query"] == ""
+        assert body["rows"][0]["function"] == "validateForm"
+        assert body["rows"][0]["max_severity"] == "high"
+        assert body["rows"][-1]["max_severity"] is None
+
+
+def test_the_teams_own_code_ranks_before_dependency_code(db: Session) -> None:
+    """A dependency tree must not be able to push the team's work off the cap.
+
+    Found on the phase-7a walk: a real Laravel application measured 5 000
+    functions and the 200 highest-scoring were all vendored JavaScript, so the
+    E4 screen offered the developer nothing of their own to plan.
+    """
+    analysis = seed_done_analysis(db, [make_finding(0, path="node_modules/big/index.js")])
+    metrics = analysis.metrics
+    assert metrics is not None
+    # The dependency function outscores everything of the team's by construction.
+    metrics.functions = [
+        {
+            "path": "node_modules/big/index.js",
+            "function": "huge",
+            "line": 1,
+            "nloc": 900,
+            "ccn": 99,
+        },
+        *FUNCTIONS,
+    ]
+    db.commit()
+
+    rows = risk_matrix(analysis).rows
+    assert rows[0].path != "node_modules/big/index.js", "dependency code led the ranking"
+    assert rows[-1].path == "node_modules/big/index.js"
+    # Worst-first still holds INSIDE the team's own group.
+    own = [row.function for row in rows if not row.path.startswith("node_modules/")]
+    assert own == ["validateForm", "calculateDiscount", "formatDate"]
+
+
+def test_the_filter_reaches_a_function_the_cap_would_hide(db: Session) -> None:
+    """The filter applies BEFORE the cap; that is what makes it a way out."""
+    analysis = seed_done_analysis(db, [])
+    metrics = analysis.metrics
+    assert metrics is not None
+    metrics.functions = [
+        {
+            "path": f"public/lib/vendored-{i}.js",
+            "function": f"f{i}",
+            "line": 1,
+            "nloc": 5,
+            "ccn": 50,
+        }
+        for i in range(MAX_ROWS + 50)
+    ] + [{"path": "app/Helpers.php", "function": "bestSeller", "line": 9, "nloc": 4, "ccn": 1}]
+    db.commit()
+
+    # Hand-vendored libraries are NOT in a dependency directory, so nothing in
+    # the ranking saves this function — only the filter does.
+    unfiltered = risk_matrix(analysis)
+    assert len(unfiltered.rows) == MAX_ROWS
+    assert unfiltered.total == MAX_ROWS + 51
+    assert all(row.path != "app/Helpers.php" for row in unfiltered.rows)
+
+    found = risk_matrix(analysis, q="helpers")
+    assert [row.function for row in found.rows] == ["bestSeller"]
+    assert found.total == 1 and found.query == "helpers"
+    # The function NAME matches too, not only the path.
+    assert [row.function for row in risk_matrix(analysis, q="BESTSELL").rows] == ["bestSeller"]
+
+
+def test_the_endpoint_passes_the_filter_through(
+    client: TestClient, db: Session, analyst: User
+) -> None:
+    analysis = seed_done_analysis(db, [])
+    response = client.get(
+        f"/api/v1/analyses/{analysis.id}/risk-matrix",
+        params={"q": "billing"},
+        headers=login(client, analyst.username),
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert [row["function"] for row in body["rows"]] == ["calculateDiscount"]
+    assert body["total"] == 1 and body["query"] == "billing"

@@ -188,6 +188,9 @@ Existe código comentado en los siguientes archivos del sistema:
 {% if test_debt.totals.mutation_not_measured %}
 {{ strings.test_debt.not_measured_note.format(count=test_debt.totals.mutation_not_measured) | md }}
 {% endif %}
+{% if test_debt.functions | selectattr('criterion_lines') | list %}
+{{ strings.test_debt.labels.criterion_scope | md }}
+{% endif %}
 {% else %}
 {{ strings.test_debt.no_plan | md }}
 {% endif %}

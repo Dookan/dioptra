@@ -504,3 +504,43 @@ def test_the_markdown_escapes_the_rationale_and_fences_the_test_code(
     markdown = engine.render_markdown(analysis, project)
     assert "Primero \\| la tabla \\*y\\* esto" in markdown
     assert markdown.count("````\n") == 2, "a fence longer than the three backticks inside"
+
+
+def test_the_report_says_which_lines_the_criterion_judged_in_every_format(
+    db: Session, tmp_path: Path
+) -> None:
+    """A module percentage beside a function verdict has to say which is which.
+
+    The E7 criterion is judged over the planned function's own lines while the
+    printed percentages remain the whole file's, so without this sentence a
+    signed report can show "PASSED · 8.8 % de sentencias" and mean two
+    different scopes in one row (precommit security auditor, 2026-09-23).
+    Checked in every format, because the same omission already happened once
+    with the mutation-gap sentence.
+    """
+    analysis = _with_workflow(db, tmp_path / "jail")
+    run = analysis.verification_runs[0]
+    run.coverage = {**run.coverage, "criterion_lines": [3, 7]}
+    db.commit()
+    db.refresh(analysis)
+
+    debt = closure.test_debt_context(analysis)
+    assert debt["functions"][0]["criterion_lines"] == [3, 7]
+
+    project = ingest_service.get_project(db, analysis.project_id)
+    needle = "el criterio de cobertura se juzgó"
+    html = engine.render_html(analysis, project)
+    assert needle in html
+    markdown = engine.render_markdown(analysis, project)
+    assert needle in markdown
+    docx = engine.render_docx(analysis, project)
+    with zipfile.ZipFile(io.BytesIO(docx)) as archive:
+        document = archive.read("word/document.xml").decode("utf-8")
+    assert "se juzgó" in document
+
+    # And a run whose span could not be resolved says nothing, because the
+    # whole module WAS judged there — the sentence would be false.
+    run.coverage = {k: v for k, v in run.coverage.items() if k != "criterion_lines"}
+    db.commit()
+    db.refresh(analysis)
+    assert needle not in engine.render_html(analysis, project)

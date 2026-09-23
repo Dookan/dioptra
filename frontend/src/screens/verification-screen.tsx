@@ -57,6 +57,17 @@ function RunCard({ run, onMarkEquivalent, busy = false }: RunCardProps): React.R
           branches: run.coverage.branch_percent ?? 0,
         })}
       </p>
+      {/* The percentages above are the MODULE's, the verdict is the planned
+          function's. Saying so is the same rule the mutation gap follows:
+          declared on every surface, never a silent pass. */}
+      {Array.isArray(run.coverage.criterion_lines) && (
+        <p className="sub">
+          {t('verify.criterionLines', {
+            from: run.coverage.criterion_lines[0],
+            to: run.coverage.criterion_lines[1],
+          })}
+        </p>
+      )}
       {run.reasons.map((reason) => (
         <p key={reason} className="reason bad">
           {t(`verify.reason.${reason}`)}

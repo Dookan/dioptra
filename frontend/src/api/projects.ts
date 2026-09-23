@@ -106,6 +106,10 @@ export interface Finding {
   description: string;
   impact: string;
   mitigation: string[];
+  /** In a dependency directory: shown and reported, but not the analyst's to
+   *  adjudicate — the E3 gate never waits for it and the server refuses a
+   *  verdict on it (`finding_not_triageable`). */
+  third_party: boolean;
   verdict: Verdict | null;
   verdict_justification: string | null;
   verdict_by_username: string | null;
@@ -322,10 +326,28 @@ export function advanceStage(
   });
 }
 
-export function getRiskMatrix(accessToken: string, analysisId: string): Promise<RiskRow[]> {
-  return apiFetch<RiskRow[]>(`/analyses/${encodeURIComponent(analysisId)}/risk-matrix`, {
-    accessToken,
-  });
+export interface RiskMatrix {
+  rows: RiskRow[];
+  /** How many functions matched BEFORE the cap: the screen has to be able to
+   *  say "200 de 5000". On a real Laravel tree the 200 highest-scoring were all
+   *  hand-vendored JavaScript and the developer could reach none of their own
+   *  code, with nothing on screen saying so (phase-7a walk, 2026-09-23). */
+  total: number;
+  /** The filter the server applied, normalised. */
+  query: string;
+}
+
+/** The ranked rows AND what the cap left out — see `RiskMatrix`. */
+export function getRiskMatrix(
+  accessToken: string,
+  analysisId: string,
+  query?: string,
+): Promise<RiskMatrix> {
+  const search = query ? `?q=${encodeURIComponent(query)}` : '';
+  return apiFetch<RiskMatrix>(
+    `/analyses/${encodeURIComponent(analysisId)}/risk-matrix${search}`,
+    { accessToken },
+  );
 }
 
 /** Resolves null when no plan exists yet (404 is a state here, not an error). */
@@ -495,6 +517,11 @@ export interface VerificationRun extends PlannedFunction {
     partial_branch_lines?: number[];
     covered_branches?: number;
     total_branches?: number;
+    /** The lines the E4 criterion was judged over — the planned function's own.
+     *  The percentages above are the whole module's, so a surface that prints
+     *  one must be able to say which. `null` when the span could not be
+     *  resolved and the whole module was judged (the stricter fallback). */
+    criterion_lines?: [number, number] | null;
   };
   uncovered_items: string[];
   surviving_mutants: { id: string; line: string; mutant: string }[];

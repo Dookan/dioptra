@@ -1,7 +1,9 @@
 # Task: Phase 7a — PHP / Laravel (language wave 2, first half)
 
-> **Status: IN_PROGRESS — started 2026-09-23. Deliverables 1–6 built and
-> verified END TO END, mutation included.** Second cycle, after the
+> **Status: DONE — 2026-09-23. Deliverables 1–6 built and verified END TO END,
+> and the phase was closed by a WALK rather than by assertion: a real Laravel
+> application through E1–E6 and Dioptra's own PHP through E7, which found two
+> defects that were fixed before closing (see the Definition of Done).** Second cycle, after the
 > `v1.0.0` tag. Survey: `tasks/phase7-survey.md`, signed off by `mmarin`
 > 2026-09-23 (§7.1 one sandbox image per language, §7.2 PHP first).
 > Phase **7b (Java)** is covered by the same survey and MUST NOT start before
@@ -125,9 +127,28 @@ contingency created on 2026-09-22.
   flag to make a PHP test pass; reading the audited tree's own runner config.
 
 ## Definition of Done
-- [ ] All deliverables implemented; ruff + mypy + oxlint + tsc clean
-- [ ] All specified tests passing (pytest / Vitest), hostile-input cases included
+- [x] All deliverables implemented; ruff + mypy + oxlint clean, and the type
+      check is now the REAL one: `npx tsc --noEmit` checks nothing in this
+      repo (the root tsconfig is `files: []` with project references), so
+      every earlier report of it was vacuous. `tsc -b` is the command, and
+      running it found `Finding.third_party` missing from the frontend type
+      with four call sites using it — already committed in `1b5795e`, fixed
+      here. `scripts/ci.sh` has always run `tsc -b`, so CI was never blind:
+      the hole was in the command I was verifying with, not in the gate
+- [x] All specified tests passing (pytest / Vitest), hostile-input cases
+      included; the live sandbox suite covers the PHP image behind the
+      `sandbox` marker
 - [x] Mutation pass on the touched surface (phase-close) — mutmut, 2026-09-23.
+      **Scope stated honestly**: the full pass below ran BEFORE the two walk
+      fixes, so it did not cover `verify.py`'s criterion span or `risk.py` at
+      all (`risk.py` was not even a target — it is now, added to
+      `pyproject.toml`). Those two surfaces carry HAND-RUN mutants instead,
+      each verified to turn a test red: `_in_span` → identity, `criterion_span`
+      → `None`, the ambiguity guard removed, the sort key without
+      `is_third_party`, the filter after the cap, `total` counted post-cap, and
+      the router dropping `q` — the last four run independently by the QA
+      verifier. A full re-run over both modules is the next phase's first
+      mutmut job, not a claim made here.
       The target list in `pyproject.toml` gained this phase's three decision
       surfaces (`scaffold/text.py`, `scaffold/inspect.py`, `analysis/normalizer.py`)
       beside the P3/P4/P5 ones: **5 301 mutants, 4 151 killed, 902 survived,
@@ -178,7 +199,19 @@ contingency created on 2026-09-22.
       balloon lifts PHP's own `memory_limit` first, or it would hit that instead
       of the container's. Ten of the eleven checked both ways; the balloon's
       negative control is not run because removing `--memory` would balloon the host
-- [ ] A surviving Infection mutant demonstrably rejects the E7 gate
+- [x] A surviving Infection mutant demonstrably rejects the E7 gate — 2026-09-23,
+      `backend/tests/test_sandbox_live.py::test_a_surviving_infection_mutant_rejects_the_e7_gate`,
+      run against `dioptra-sandbox-php:latest`. It drives `verify.verify_function`,
+      which is the code the WORKER runs and the only thing
+      `gates.leave_verification` ever reads — not `parse_mutation`, which would
+      only prove the wiring. **Both directions**, because a gate that rejects
+      everything proves nothing either: a one-assertion suite over `Edad::obtener`
+      comes back `FAILED` with `mutant_survived` and the survivors named, and a
+      three-case suite over the same class comes back `PASSED` with none and no
+      reasons. `mutation_measured` is True on both — a class IS mutable, so a
+      declared gap here would itself be a defect. This is the check the three
+      earlier wiring bugs of this chain would each have failed while LOOKING
+      like a pass
 - [x] Licence gate green for the PHP image — 2026-09-23. The image WRITES a
       manifest of what it installed (`/opt/dioptra-php/licenses.json`, built from
       the same pinned `ARG`s its artefacts are verified against) and
@@ -197,21 +230,76 @@ contingency created on 2026-09-22.
       artefact's, which the phars make the only honest answer. Verified both
       ways on the rebuilt image: the real manifest passes, the same manifest
       with one `Commercial` entry appended exits 1
-- [ ] No secrets in diff (Gitleaks clean); locale parity check green
-- [ ] `/precommit` returned `READY TO COMMIT`
-- [ ] A real PHP project walks **E1–E6** on the dev instance, and **E7 on a
-      self-contained module**. Relaxed from "E1–E7 on a real project" by
-      `mmarin` 2026-09-23, with the reason recorded: the sandbox installs
-      nothing of the audited project (the v1.0.0 non-goal), and **every PHP
-      class in the Laravel project available here imports the framework** —
-      checked, zero framework-free classes, the only free functions live in
-      Blade templates E4 never plans. So no real Laravel codebase can reach E7
-      today. This is the precedent P5 already set: its own E1–E8 walk ran on
-      Dioptra's tree because the MINCYT frontend could not reach E7 either
-      (`tasks/phase5-closure.md`). Ingesting a toy PHP library purely to tick
-      this box would be the opposite of what the box is for
-- [ ] Docs updated; CLAUDE.md phase status + `docs/development-phases.md`:
-      Phase 7a → DONE with date and commit
+- [x] No secrets in diff; locale parity check green — 2026-09-23. Gitleaks
+      reports the same THREE pre-existing hits the P5 self-audit already
+      discarded with a written justification (our own `hardcoded-secrets`
+      rule fixtures, which exist to make the rule fire, and the sandbox
+      test's exfiltration canary); none is introduced by this phase, and a
+      scan of the staged patch alone reports none. `no_cdn_check.py` green
+- [x] `/precommit` returned `READY TO COMMIT` — two full rounds. The first
+      (the wave itself) is recorded below. The second, on the closing diff,
+      earned its keep: the coverage adversary found that `_in_span` had
+      BOTH endpoints unpinned — and since `function_span` is inclusive, a
+      one-line function has `low == high`, so a `<` at the low end empties
+      the span and the criterion passes unconditionally, a fail-OPEN in a
+      gate; that `criterion_span`'s failure path had no test at all, where
+      narrowing its `except` made the verification job RAISE instead of
+      falling back; and that the plan-selection fix had no test, so
+      reverting it left all 101 frontend tests green. The invariant checker
+      found the defect the search box introduced (a ticked function dropped
+      from the saved plan once a filter hid it), the security auditor found
+      that an AMBIGUOUS span resolved to the first same-named declaration
+      and that `criterion_lines` was stored with no surface reading it, and
+      mockup fidelity found the search box was a bespoke control at 1.02:1
+      contrast instead of the anchor's `.input`. All fixed and each pinned
+      by a test verified to go red under the mutant
+- [x] A real PHP project walks **E1–E6** on the dev instance, and **E7 on a
+      self-contained module** — done 2026-09-23 against the dev database, every
+      step through the service layer with the real roles and gates (the seed
+      passwords are the operator's, so the HTTP login was not available to the
+      agent; the gate-through-the-API proof is `tests/test_gates.py`, which
+      skips every gate with no UI in the loop).
+      **E1–E6 on `otroprevi`** (Laravel, 687 findings): E3 closed with 257
+      written verdicts — 189 confirmed, 68 discarded — by rule family, because
+      the judgement genuinely repeats (the `.env` with live credentials and the
+      mass assignment in `RegisterController` confirmed; the 62 aciertos inside
+      `public/Datatables/1.10.21` and the four in minified jQuery discarded as
+      third-party code the team did not write; the 21 external `<script>`/`<link>`
+      of the team's own Blade views confirmed under the no-CDN norm; the 164
+      advisories confirmed as dependency debt). E4 planned three of the team's
+      own PHP functions — `PoliciesController::uploadFile` (ccn 6),
+      `RedirectIfAuthenticated::handle`, `Helper::best_seller_month` — and the
+      AST briefed all three from real Laravel source, resolving `Class::method`
+      names, giving a `switch` one item per case label and loops an enter/skip
+      pair. E5 approved 13 cases; E6 stored three PHPUnit files written by hand
+      over the scaffolds and `leave_tests` opened after PARSING them. The
+      analysis stays at E6 by design: every one of these needs the framework,
+      which the sandbox never installs.
+      **E7 on `docker/sandbox/php-licenses.php`**, Dioptra's own shipped code —
+      the generator whose verdict gates the PHP image's licences, the same
+      precedent P5 set walking its own `scaffold/text.py::slug`. Three runs:
+      two honest failures, the E7 → E5 loop reopening the design, and a PASS
+      with the gate open. `mutation_measured` is False throughout and says so:
+      `componentName` is a free function Infection cannot mutate, which is
+      exactly the declared gap this phase exists to make visible
+- [x] **Two defects the walk found, both fixed before this phase closed** — the
+      point of walking rather than asserting. (1) The E4 risk matrix returned
+      the top 200 of 5 000 measured functions and on this project all 200 were
+      hand-vendored JavaScript, so the developer could reach none of their own
+      code and nothing said so; it now ranks dependency directories last, takes
+      a server-side `?q=` filter applied before the cap, and reports the total
+      so the screen can say "Mostrando 200 de 5000". (2) The E7 coverage
+      criterion was judged over the whole MODULE, so planning one function of a
+      three-function file could never pass; it is now judged over the planned
+      function's lines, falling back to the module when the span cannot be
+      resolved. Both are in `docs/development-phases.md` → Scope-change log
+- [x] Docs updated; CLAUDE.md phase status + `docs/development-phases.md`
+      both say Phase 7a → DONE (2026-09-23), and `docs/analysis-pipeline.md`
+      no longer says IN PROGRESS. `docs/workflow-gates.md` carries the
+      function-scoped criterion, `docs/ui-model.md` the E4 search box and
+      the count line, and the scope-change log both walk defects and the
+      `GET …/risk-matrix` 1.x contract change. The closing commit hash is
+      recorded in the follow-up commit, as P5 did in `df80ebe`
 
 ## Progress (2026-09-23)
 

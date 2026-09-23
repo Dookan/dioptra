@@ -1091,3 +1091,147 @@ def test_the_loop_guards_the_adversary_found_unpinned(
             justification="Cambia solo el texto del registro.",
             source_ip=None,
         )
+
+
+def test_the_criterion_is_judged_over_the_planned_function_not_the_module() -> None:
+    """A line missing OUTSIDE the planned function must not close the gate.
+
+    Before this, `_criterion_met` demanded that no line of the whole file be
+    missing, which made the gate unreachable on any module holding more than
+    the one function E4 planned — measured on Dioptra's own `php-licenses.php`
+    (three functions, one planned, 8.8 % statements, `coverage_short`).
+
+    Both directions are pinned here because the shipped suite could see
+    neither: its only fixture holds ONE function, where span-filtered and
+    module-wide judging agree, so removing the filter left all 737 tests green
+    (QA verifier, 2026-09-23).
+    """
+    from app.sandbox.results import Coverage
+    from app.workflow.models import CoverageCriterion
+    from app.workflow.verify import _criterion_met
+
+    coverage = Coverage(
+        executed_lines=frozenset({10, 11}),
+        missing_lines=frozenset({40}),
+        partial_branch_lines=frozenset({41}),
+        total_branches=4,
+        covered_branches=2,
+    )
+    span = (9, 14)
+    # Line 40 and its half-taken branch are in a function nobody planned.
+    assert _criterion_met(CoverageCriterion.STATEMENTS, coverage, span) is True
+    assert _criterion_met(CoverageCriterion.DECISIONS, coverage, span) is True
+    # With no span the WHOLE module is judged — the old behaviour, and the side
+    # an unresolvable function must fall back to.
+    assert _criterion_met(CoverageCriterion.STATEMENTS, coverage, None) is False
+    assert _criterion_met(CoverageCriterion.DECISIONS, coverage, None) is False
+    # And a gap INSIDE the span still closes it, whatever the criterion.
+    inside = Coverage(
+        executed_lines=frozenset({10}),
+        missing_lines=frozenset({13}),
+        partial_branch_lines=frozenset(),
+        total_branches=2,
+        covered_branches=2,
+    )
+    assert _criterion_met(CoverageCriterion.STATEMENTS, inside, span) is False
+    # A half-taken branch inside the span passes `statements` and fails
+    # `decisions`, which is what makes the two criteria different at all.
+    half = Coverage(
+        executed_lines=frozenset({10, 11, 12, 13, 14}),
+        missing_lines=frozenset(),
+        partial_branch_lines=frozenset({11}),
+        total_branches=2,
+        covered_branches=1,
+    )
+    assert _criterion_met(CoverageCriterion.STATEMENTS, half, span) is True
+    assert _criterion_met(CoverageCriterion.DECISIONS, half, span) is False
+
+    # BOTH ENDPOINTS, because the span is inclusive at both ends and the
+    # fixtures above sit strictly inside it — so neither bound was ever the
+    # deciding value (coverage adversary, 2026-09-23). The smallest real case
+    # is the one that bites: `function_span` includes the declaration line and
+    # the closing line, so a one-line function has `low == high`, and a `<` at
+    # the low end would EMPTY the span and make the criterion pass
+    # unconditionally. That is a fail-open in a gate, not an off-by-one.
+    def _missing(line: int) -> Coverage:
+        return Coverage(
+            executed_lines=frozenset({10}),
+            missing_lines=frozenset({line}),
+            partial_branch_lines=frozenset(),
+            total_branches=0,
+            covered_branches=0,
+        )
+
+    assert _criterion_met(CoverageCriterion.STATEMENTS, _missing(9), span) is False
+    assert _criterion_met(CoverageCriterion.STATEMENTS, _missing(14), span) is False
+    assert _criterion_met(CoverageCriterion.STATEMENTS, _missing(9), (9, 9)) is False
+    # Just outside either end is still outside.
+    assert _criterion_met(CoverageCriterion.STATEMENTS, _missing(8), span) is True
+    assert _criterion_met(CoverageCriterion.STATEMENTS, _missing(15), span) is True
+
+
+def test_the_span_refuses_to_resolve_an_ambiguous_function() -> None:
+    """Ambiguity lands on the strict side, like an unresolvable name does.
+
+    `find_function` ranks by distance to the line and, with no line, every
+    same-named declaration ties and the first by position wins. An audited file
+    that declares a trivial stub above the real function would otherwise shrink
+    the criterion to that stub's single line — which `statements` satisfies
+    unconditionally (precommit security auditor, 2026-09-23).
+    """
+    from app.workflow.ast.extract import function_span
+
+    source = b"""<?php
+class A { public static function obtener(): string { return "x"; } }
+function obtener(int $a): string {
+    if ($a > 0) { return "p"; }
+    return "n";
+}
+"""
+    assert function_span(source, "php", "obtener", None) is None
+    # A line disambiguates, so the span resolves and the fix still applies.
+    assert function_span(source, "php", "obtener", 3) == (3, 6)
+    # One declaration, no line: nothing is ambiguous, so it still resolves.
+    single = b"<?php\nfunction solo(int $a): int {\n    return $a;\n}\n"
+    assert function_span(single, "php", "solo", None) == (2, 4)
+
+
+def test_the_run_records_the_lines_the_criterion_was_judged_over(
+    db: Session, developer: User, tmp_path: Path
+) -> None:
+    """The verdict is the function's; every printed percentage is the module's.
+
+    So the row has to carry which lines were judged, or no surface can say what
+    a number is about.
+    """
+    analysis = _analysis(db, tmp_path)
+    run = _run(db, analysis, developer, _result())
+    assert run.coverage["criterion_lines"] == [3, 7], run.coverage
+
+
+def test_the_span_falls_back_to_the_whole_module_when_the_source_is_unreadable(
+    tmp_path: Path,
+) -> None:
+    """Every failure path answers ``None``, which judges the WHOLE module.
+
+    Narrowing `criterion_span`'s `except (AstError, OSError)` to `except OSError`
+    left the entire suite green, yet it is reachable on ordinary hostile-input
+    paths: `load_source` raises `FunctionNotFound` for a path that resolves
+    outside the jail or no longer exists, and `SourceTooLarge` above 512 KiB —
+    both `AstError`, neither an `OSError`. The mutant made `verify_function`
+    RAISE instead of falling back, which takes down the verification job
+    (coverage adversary, 2026-09-23).
+    """
+    from app.workflow.design import FunctionRef
+    from app.workflow.verify import criterion_span
+
+    ref = FunctionRef(path="gone.php", function="obtener", line=None)
+    # The file is not there: an AstError, and the answer is the strict side.
+    assert criterion_span(Analysis(workspace_path=str(tmp_path)), language="php", ref=ref) is None
+    # No workspace at all.
+    assert criterion_span(Analysis(), language="php", ref=ref) is None
+    # A path that tries to leave the jail never resolves either.
+    escape = FunctionRef(path="../../etc/passwd", function="obtener", line=None)
+    assert (
+        criterion_span(Analysis(workspace_path=str(tmp_path)), language="php", ref=escape) is None
+    )

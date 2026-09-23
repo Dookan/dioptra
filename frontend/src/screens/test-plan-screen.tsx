@@ -5,7 +5,7 @@
  * "Guardar plan y diseñar los casos →". The ranking comes from the server
  * (`GET …/risk-matrix`); this screen never computes risk.
  */
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ApiError } from '../api/client';
@@ -28,7 +28,13 @@ interface Props {
   onNavigate: (route: Route) => void;
 }
 
-function keyOf(row: { path: string; function: string; line: number | null }): string {
+interface PlannedKey {
+  path: string;
+  function: string;
+  line: number | null;
+}
+
+function keyOf(row: PlannedKey): string {
   return `${row.path}::${row.function}::${String(row.line ?? '')}`;
 }
 
@@ -45,8 +51,24 @@ export function TestPlanScreen({ route, onNavigate }: Props): React.ReactNode {
   const [project, setProject] = useState<Project | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [rows, setRows] = useState<RiskRow[] | null>(null);
+  // How many functions matched before the cap, and the filter that reaches
+  // the ones it hides. A real Laravel tree measured 5 000 functions whose
+  // top 200 by score were all hand-vendored JavaScript, so the developer
+  // could not select a single one of their own (phase-7a walk).
+  const [total, setTotal] = useState(0);
+  const [filter, setFilter] = useState('');
+  const filterId = useId();
+  //: The query whose result is on screen, so the debounced effect can tell a
+  //: real change from the mount it would otherwise duplicate.
+  const lastQuery = useRef('');
   const [plan, setPlan] = useState<TestPlan | null>(null);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // The selection carries each row's identity, not just its key. It used to be
+  // a Set<string> intersected with `rows` at save time, which was harmless while
+  // `rows` was always the whole capped matrix — the search box made it the LAST
+  // FILTERED PAGE, so ticking a function and then searching again dropped it
+  // from the saved plan with nothing on screen saying so, and the server only
+  // refuses a fully empty plan (invariant checker, 2026-09-23).
+  const [selected, setSelected] = useState<Map<string, PlannedKey>>(new Map());
   const [criterion, setCriterion] = useState<CoverageCriterion>('decisions');
   const [rationale, setRationale] = useState('');
   const [busy, setBusy] = useState(false);
@@ -68,10 +90,18 @@ export function TestPlanScreen({ route, onNavigate }: Props): React.ReactNode {
         if (cancelled) return;
         setProject(loadedProject);
         setAnalysis(loadedAnalysis);
-        setRows(matrix);
+        setRows(matrix.rows);
+        setTotal(matrix.total);
         setPlan(loadedPlan);
         if (loadedPlan !== null) {
-          setSelected(new Set(loadedPlan.functions.map(keyOf)));
+          setSelected(
+            new Map(
+              loadedPlan.functions.map((row) => [
+                keyOf(row),
+                { path: row.path, function: row.function, line: row.line },
+              ]),
+            ),
+          );
           setCriterion(loadedPlan.criterion);
           setRationale(loadedPlan.rationale);
         }
@@ -86,6 +116,40 @@ export function TestPlanScreen({ route, onNavigate }: Props): React.ReactNode {
     };
   }, [accessToken, route.id, route.analysisId]);
 
+  // The filter is applied by the SERVER, before the cap — that is the whole
+  // point of it, so it cannot be a client-side `rows.filter`. Debounced so a
+  // typed word is one request rather than one per keystroke.
+  useEffect(() => {
+    if (accessToken === null) return;
+    const typed = filter.trim();
+    // The load effect already fetched the unfiltered matrix, so re-asking for
+    // it 250 ms later recomputed a 5 000-function ranking twice per screen
+    // open. A REF rather than reading `rows`: `rows` changes on every fetch, so
+    // depending on it would re-run this effect forever, and oxlint is right to
+    // refuse a guard that reads state the dependency array does not declare.
+    if (typed === lastQuery.current) return;
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api
+        .getRiskMatrix(accessToken, route.analysisId, typed || undefined)
+        .then((matrix) => {
+          if (cancelled) return;
+          lastQuery.current = typed;
+          setRows(matrix.rows);
+          setTotal(matrix.total);
+        })
+        .catch((error: unknown) => {
+          if (!cancelled) {
+            setErrorKey(error instanceof ApiError ? error.messageKey : 'errors.internal');
+          }
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [accessToken, route.analysisId, filter]);
+
   const isDeveloper = user?.role === 'developer';
   const atPlan = analysis?.stage === 'plan';
   const pastPlan = analysis !== null && stageIndex(analysis.stage) > stageIndex('plan');
@@ -96,10 +160,10 @@ export function TestPlanScreen({ route, onNavigate }: Props): React.ReactNode {
 
   function toggle(row: RiskRow): void {
     setSelected((current) => {
-      const next = new Set(current);
+      const next = new Map(current);
       const key = keyOf(row);
       if (next.has(key)) next.delete(key);
-      else next.add(key);
+      else next.set(key, { path: row.path, function: row.function, line: row.line });
       return next;
     });
     setSavedAt(null);
@@ -111,9 +175,9 @@ export function TestPlanScreen({ route, onNavigate }: Props): React.ReactNode {
     setBusy(true);
     setErrorKey(null);
     try {
-      const functions = rows
-        .filter((row) => selected.has(keyOf(row)))
-        .map((row) => ({ path: row.path, function: row.function, line: row.line }));
+      // From the SELECTION, never from `rows`: what is on screen right now is
+      // whatever the last filter returned, and a plan must not depend on that.
+      const functions = [...selected.values()];
       const stored = await api.saveTestPlan(accessToken, route.analysisId, {
         criterion,
         rationale: collapsedRationale,
@@ -167,8 +231,30 @@ export function TestPlanScreen({ route, onNavigate }: Props): React.ReactNode {
               </div>
             </div>
           </section>
+          <div className="filterbar">
+            <label htmlFor={filterId}>{t('plan.filter.label')}</label>
+            <input
+              id={filterId}
+              className="input"
+              type="search"
+              value={filter}
+              placeholder={t('plan.filter.placeholder')}
+              onChange={(event) => {
+                setFilter(event.target.value);
+              }}
+            />
+          </div>
+          {rows.length > 0 && (
+            <p className="sub" role="status">
+              {rows.length < total
+                ? t('plan.showing.capped', { shown: rows.length, total })
+                : filter.trim()
+                  ? t('plan.showing.matches', { total })
+                  : t('plan.showing.all', { total })}
+            </p>
+          )}
           {rows.length === 0 ? (
-            <p className="hint">{t('plan.noFunctions')}</p>
+            <p className="hint">{filter ? t('plan.noMatches') : t('plan.noFunctions')}</p>
           ) : (
             <ol className="ranking" aria-label={t('plan.rankingLabel')}>
               {rows.map((row, index) => {
