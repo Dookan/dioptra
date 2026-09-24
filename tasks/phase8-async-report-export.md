@@ -1,8 +1,10 @@
 # Task: Phase 8 — The PDF export becomes asynchronous
 
-> **Status: IN_PROGRESS — opened 2026-09-23 (second cycle). Survey
-> `tasks/phase8-survey.md` signed off by `mmarin` the same day (§7.1–§7.5
-> answered).** Not part of the work plan's P0–P5 roadmap: it answers a freeze
+> **Status: DONE — closed 2026-09-24; built in `a96233a`, the immediate
+> feedback and `scripts/dev.sh workers` in `9e21b6d`, the mutation pass in
+> `fbc5f64`, the status in the commit that carries this line. Opened
+> 2026-09-23 (second cycle). Survey `tasks/phase8-survey.md` signed off by
+> `mmarin` the same day (§7.1–§7.5 answered).** Not part of the work plan's P0–P5 roadmap: it answers a freeze
 > `mmarin` reported on a real Laravel analysis (516-page PDF, ~50 s).
 
 ## Objective
@@ -179,8 +181,8 @@ and legible.
       feedback until the server answered — fixed in the same commit
 - [x] `docs/{report-format,threat-model,roles-and-permissions,ui-model,standards-mapping}.md`
       and the scope-change log updated
-- [ ] CLAUDE.md phase status + `docs/development-phases.md`: Phase 8 → DONE
-      with date and commit
+- [x] CLAUDE.md phase status + `docs/development-phases.md`: Phase 8 → DONE
+      with date and commit (2026-09-24, `a96233a`, `9e21b6d`, `fbc5f64`)
 
 ## Non-goals (explicit)
 - A faster render; excluding third-party findings from the report (§7.4, NO).
