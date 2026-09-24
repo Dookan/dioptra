@@ -585,6 +585,7 @@ def test_the_sweep_judges_each_state_by_its_own_clock(db: Session, analyst: User
     assert rendering.status is ReportJobStatus.RUNNING
     # Only a whole retention window in the queue abandons a waiting job.
     assert forgotten.status is ReportJobStatus.ERRORED and forgotten.detail == "abandoned"
+    assert forgotten.finished_at is not None
     assert stats.abandoned == 1
 
 
@@ -608,6 +609,9 @@ def test_the_sweep_keeps_an_old_live_file_and_never_follows_a_link(
     link = settings.report_spool_dir / f"{uuid.uuid4()}.pdf"
     link.symlink_to(target)
     ancient = time.time() - 3 * 3600
+    # Old on BOTH sides: stat() follows a link, so a fresh target would hide a
+    # sweep that forgot to skip links behind the "too young" guard.
+    os.utime(target, (ancient, ancient))
     os.utime(link, (ancient, ancient), follow_symlinks=False)
     try:
         stats = jobs.sweep(db, settings)
@@ -767,3 +771,302 @@ def test_an_existing_file_is_never_overwritten(
         assert planted.read_bytes() == b"planted"
     finally:
         planted.unlink(missing_ok=True)
+
+
+# --- phase-8 mutmut pass: the survivors that were real gaps -------------------------
+
+
+@pytest.fixture
+def rendered_versions(monkeypatch: pytest.MonkeyPatch) -> list[tuple[int | None, int]]:
+    """Replace WeasyPrint; remember WHICH version each render was asked for, and
+    how many versions it was given for the report's version-control table."""
+    seen: list[tuple[int | None, int]] = []
+
+    def render(*_args: Any, version: Any = None, versions: Any = (), **_kwargs: Any) -> bytes:
+        seen.append((version.number if version is not None else None, len(versions)))
+        return FAKE_PDF
+
+    monkeypatch.setattr(engine, "render_pdf", render)
+    return seen
+
+
+def _three_versions(db: Session, analysis: Any, analyst: User) -> None:
+    """v1 baseline, v2 and v3 edited: with only two, `history[1]` IS the newest."""
+    from app.reports import versions
+
+    for text in ("Texto propio del analista.", "Segunda redacción del analista."):
+        versions.save_sections(
+            db,
+            analysis=analysis,
+            actor=analyst,
+            sections={"introduction": text},
+            change_summary="Edición de la introducción.",
+            source_ip=None,
+        )
+    db.commit()
+
+
+def test_the_worker_renders_the_version_it_was_asked_for(
+    client: TestClient,
+    analyst: User,
+    db: Session,
+    rendered_versions: list[tuple[int | None, int]],
+) -> None:
+    analysis = seed_done_analysis(db, [make_finding(1)])
+    _three_versions(db, analysis, analyst)
+    headers = login(client, analyst.username)
+
+    pinned = client.post(
+        f"/api/v1/analyses/{analysis.id}/report/jobs", json={"version": 1}, headers=headers
+    ).json()
+    assert pinned["version"] == 1 and pinned["format"] == "pdf"
+    taken = client.get(f"/api/v1/report-jobs/{pinned['id']}/download", headers=headers)
+    assert taken.status_code == 200
+    current = _start(client, analysis.id, headers).json()
+    assert current["version"] is None
+
+    # The pinned job renders v1; "the current one" resolves to the NEWEST, v3.
+    # Both get the whole history for the version-control table.
+    assert rendered_versions == [(1, 3), (3, 3)]
+    targets = [row.target for row in _rows(db, "report.export")]
+    assert targets == [
+        f"{analysis.id} job={pinned['id']} v=1",
+        f"{analysis.id} job={current['id']} v=3",
+    ]
+    requests = [row.target for row in _rows(db, "report.export.request")]
+    assert requests == [f"{analysis.id} pdf v=1", f"{analysis.id} pdf v=current"]
+
+
+def test_every_audit_row_names_its_actor_fully(
+    client: TestClient, analyst: User, other_analyst: User, db: Session, fake_render: list[int]
+) -> None:
+    analysis = seed_done_analysis(db, [make_finding(1)])
+    headers = login(client, analyst.username)
+    job_id = _start(client, analysis.id, headers).json()["id"]
+    stranger = login(client, other_analyst.username)
+    assert client.get(f"/api/v1/report-jobs/{job_id}", headers=stranger).status_code == 404
+    taking = client.get(f"/api/v1/report-jobs/{job_id}/download", headers=stranger)
+    assert taking.status_code == 404
+    download = client.get(f"/api/v1/report-jobs/{job_id}/download", headers=headers)
+    assert download.headers["content-disposition"].endswith('.pdf"')
+
+    (request,) = _rows(db, "report.export.request")
+    (worker,) = _rows(db, "report.export")
+    (taken,) = _rows(db, "report.export.download")
+    denials = _rows(db, "authz.denied")
+    assert len(denials) == 2  # the peek and the attempt to take it
+    for row in (request, taken):
+        assert row.actor_id == analyst.id and row.actor_role == "analyst"
+        assert row.source_ip == "testclient"
+    assert taken.target == f"{analysis.id} job={job_id}"
+    # The worker's row takes the actor from the job ROW.
+    assert worker.actor_username == analyst.username and worker.actor_id == analyst.id
+    for denied in denials:
+        assert denied.actor_id == other_analyst.id and denied.actor_role == "analyst"
+        assert denied.outcome is AuditOutcome.DENIED and denied.source_ip == "testclient"
+
+
+def test_a_failed_render_row_says_what_failed_and_nothing_else(
+    client: TestClient, analyst: User, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def broken(*_args: Any, **_kwargs: Any) -> bytes:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(engine, "render_pdf", broken)
+    analysis = seed_done_analysis(db, [make_finding(1)])
+    job = _start(client, analysis.id, login(client, analyst.username)).json()
+    (row,) = _rows(db, "report.export")
+    assert row.target == f"{analysis.id} job={job['id']} render_failed"
+    stored = db.get(ReportJob, uuid.UUID(job["id"]))
+    assert stored is not None
+    db.refresh(stored)
+    assert stored.finished_at is not None and stored.started_at is not None
+
+
+def test_mine_is_the_callers_newest_and_only_the_callers(
+    client: TestClient,
+    analyst: User,
+    other_analyst: User,
+    db: Session,
+    held: list[Any],
+) -> None:
+    _job(db, other_analyst.username)
+    headers = login(client, analyst.username)
+    assert client.get("/api/v1/report-jobs/mine", headers=headers).json() is None
+    older = _job(
+        db,
+        analyst.username,
+        status=ReportJobStatus.DONE,
+        created_at=utc_now() - timedelta(minutes=5),
+        finished_at=utc_now() - timedelta(minutes=4),
+    )
+    analysis = seed_done_analysis(db, [make_finding(1)])
+    newest = _start(client, analysis.id, headers).json()
+    assert newest["ahead"] == 1  # the other analyst's queued job is ahead
+    mine = client.get("/api/v1/report-jobs/mine", headers=headers).json()
+    assert mine["id"] == newest["id"] != str(older.id)
+
+
+def test_a_lone_queued_job_has_nobody_ahead(
+    client: TestClient, analyst: User, db: Session, held: list[Any]
+) -> None:
+    _job(db, "jlopez", status=ReportJobStatus.DONE, created_at=utc_now() - timedelta(hours=1))
+    analysis = seed_done_analysis(db, [make_finding(1)])
+    job = _start(client, analysis.id, login(client, analyst.username)).json()
+    assert job["status"] == "queued" and job["ahead"] == 0
+
+
+def test_a_broker_outage_closes_only_its_own_job(
+    client: TestClient, analyst: User, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    other = _job(db, "jlopez")
+
+    def down(*_args: Any, **_kwargs: Any) -> None:
+        raise ConnectionError("valkey is down")
+
+    monkeypatch.setattr(queue, "enqueue_report", down)
+    analysis = seed_done_analysis(db, [make_finding(1)])
+    assert _start(client, analysis.id, login(client, analyst.username)).status_code == 503
+    mine = db.scalars(
+        select(ReportJob).where(ReportJob.requested_by_username == analyst.username)
+    ).one()
+    db.refresh(other)
+    db.refresh(mine)
+    assert other.status is ReportJobStatus.QUEUED
+    assert mine.status is ReportJobStatus.ERRORED and mine.finished_at is not None
+
+
+def test_finishing_one_render_leaves_the_others_running(
+    db: Session,
+    analyst: User,
+    fake_render: list[int],
+    held: list[Any],
+    session_factory: sessionmaker[Session],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(jobs, "get_session_factory", lambda: session_factory)
+    elsewhere = _job(db, "jlopez", status=ReportJobStatus.RUNNING, started_at=utc_now())
+    two_hours = utc_now() - timedelta(hours=2)
+    lost = _job(db, "cperez", created_at=two_hours, enqueued_at=two_hours)
+    mine = _job(db, analyst.username)
+    jobs.run_report_job(str(mine.id))
+    for row in (elsewhere, mine):
+        db.refresh(row)
+    assert mine.status is ReportJobStatus.DONE and mine.finished_at is not None
+    assert elsewhere.status is ReportJobStatus.RUNNING
+    # The claim's sweep found the lost job, and the worker enqueued it again.
+    assert held == [(lost.id, 0)]
+
+
+def test_the_sweep_touches_only_what_each_rule_names(db: Session, analyst: User) -> None:
+    settings = get_settings()
+    long_ago = utc_now() - timedelta(hours=settings.report_job_retention_hours + 1)
+    fresh = _job(db, analyst.username)
+    two_hours = utc_now() - timedelta(hours=2)
+    lost = _job(db, "jlopez", created_at=two_hours, enqueued_at=two_hours)
+    old_error = _job(
+        db, "cperez", status=ReportJobStatus.ERRORED, detail="render_failed", finished_at=long_ago
+    )
+    # A DONE job whose file is already gone must not crash the sweep.
+    fileless = _job(db, "amedina", status=ReportJobStatus.DONE, finished_at=long_ago)
+    before = fresh.enqueued_at
+    jobs.sweep(db, settings)
+    db.commit()
+    for row in (fresh, lost, old_error, fileless):
+        db.refresh(row)
+    assert fresh.enqueued_at == before  # only the lost one is re-stamped
+    assert lost.enqueued_at > two_hours
+    assert old_error.status is ReportJobStatus.ERRORED and old_error.detail == "render_failed"
+    assert fileless.status is ReportJobStatus.EXPIRED
+
+
+def test_a_missing_artefact_is_said_and_recorded(
+    client: TestClient, analyst: User, db: Session, fake_render: list[int]
+) -> None:
+    headers = login(client, analyst.username)
+    analysis = seed_done_analysis(db, [make_finding(1)])
+    job_id = _start(client, analysis.id, headers).json()["id"]
+    jobs.artefact_path(get_settings(), uuid.UUID(job_id)).unlink()
+    response = client.get(f"/api/v1/report-jobs/{job_id}/download", headers=headers)
+    assert response.status_code == 409 and response.json()["code"] == "report_job_not_ready"
+    row = db.get(ReportJob, uuid.UUID(job_id))
+    assert row is not None
+    db.refresh(row)
+    assert row.status is ReportJobStatus.EXPIRED and row.detail == "artefact_missing"
+
+
+def test_the_spool_is_created_private_and_the_cap_is_inclusive(
+    client: TestClient,
+    analyst: User,
+    db: Session,
+    fake_render: list[int],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spool = tmp_path / "not" / "yet" / "there"
+    monkeypatch.setattr(get_settings(), "report_spool_dir", spool)
+    # Exactly at the cap is allowed; only past it is refused.
+    monkeypatch.setattr(get_settings(), "report_spool_max_bytes", max(len(FAKE_PDF), 1024 * 1024))
+    filler_size = get_settings().report_spool_max_bytes - len(FAKE_PDF)
+    spool.mkdir(parents=True, mode=0o700)
+    (spool / "filler").write_bytes(b"x" * filler_size)
+    target = tmp_path / "outside.bin"
+    target.write_bytes(b"y" * 4096)
+    (spool / "link").symlink_to(target)  # a link is not counted as spool content
+    analysis = seed_done_analysis(db, [make_finding(1)])
+    job = _start(client, analysis.id, login(client, analyst.username)).json()
+    assert job["status"] == "done", job
+
+    fresh = tmp_path / "fresh" / "spool"
+    monkeypatch.setattr(get_settings(), "report_spool_dir", fresh)
+    other = seed_done_analysis(db, [make_finding(1)])
+    client.get(f"/api/v1/report-jobs/{job['id']}/download", headers=login(client, analyst.username))
+    assert _start(client, other.id, login(client, analyst.username)).json()["status"] == "done"
+    assert oct(fresh.stat().st_mode & 0o777) == "0o700"
+
+
+def test_elapsed_time_stops_when_the_job_finishes() -> None:
+    start = utc_now() - timedelta(minutes=2)
+    finished = ReportJob(started_at=start, finished_at=start + timedelta(seconds=50))
+    assert jobs.elapsed_seconds(finished) == 50
+    instant = ReportJob(started_at=start, finished_at=start)
+    assert jobs.elapsed_seconds(instant) == 0
+    running = ReportJob(started_at=start)
+    assert jobs.elapsed_seconds(running, now=start + timedelta(seconds=7)) == 7
+
+
+def test_the_sweep_counts_every_stray_and_none_without_a_spool(
+    db: Session, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings = get_settings()
+    monkeypatch.setattr(settings, "report_spool_dir", tmp_path / "absent")
+    assert jobs.sweep(db, settings).strays == 0
+    spool = tmp_path / "spool"
+    spool.mkdir()
+    monkeypatch.setattr(settings, "report_spool_dir", spool)
+    ancient = time.time() - 3 * 3600
+    for _ in range(3):
+        stray = spool / f"{uuid.uuid4()}.pdf"
+        stray.write_bytes(b"x")
+        os.utime(stray, (ancient, ancient))
+    assert jobs.sweep(db, settings).strays == 3
+    assert list(spool.iterdir()) == []
+
+
+def test_the_spool_cap_adds_up_every_file(
+    client: TestClient,
+    analyst: User,
+    db: Session,
+    fake_render: list[int],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cap = 1024 * 1024
+    monkeypatch.setattr(get_settings(), "report_spool_max_bytes", cap)
+    spool = _spool()
+    spool.mkdir(parents=True, exist_ok=True)
+    # Neither file alone reaches the cap; together, with the new PDF, they pass it.
+    for _ in range(2):
+        (spool / f"{uuid.uuid4()}.pdf").write_bytes(b"x" * (cap // 2 - 2))
+    analysis = seed_done_analysis(db, [make_finding(1)])
+    job = _start(client, analysis.id, login(client, analyst.username)).json()
+    assert job["status"] == "errored" and job["detail"] == "spool_full"

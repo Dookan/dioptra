@@ -144,6 +144,9 @@ only_mutate = [
     "app/workflow/scaffold/text.py",
     "app/workflow/scaffold/inspect.py",
     "app/analysis/normalizer.py",
+    # Phase 8 close: the asynchronous PDF export — the one-per-person rule,
+    # the sweep, the claim under the cap and the ownership check.
+    "app/reports/jobs.py",
 ]
 pytest_add_cli_args_test_selection = [
     "tests/test_gates.py",
@@ -163,4 +166,6 @@ pytest_add_cli_args_test_selection = [
     "tests/test_scaffold.py",
     "tests/test_scaffold_php.py",
     "tests/test_normalizer.py",
+    "tests/test_report_jobs.py",
+    "tests/test_queue.py",
 ]

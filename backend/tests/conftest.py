@@ -119,6 +119,20 @@ def app(session_factory: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch)
     return application
 
 
+@pytest.fixture(autouse=True)
+def _private_report_spool(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every test gets its own PDF spool (phase 8).
+
+    One directory for the whole session let a file left by one test — a PDF
+    nobody downloaded, a filler — change what the next one saw: the phase-8
+    mutation pass counted mutants as killed that only a neighbour's leftovers
+    had killed.
+    """
+    from app.core.config import get_settings  # noqa: PLC0415
+
+    monkeypatch.setattr(get_settings(), "report_spool_dir", tmp_path / "report-spool")
+
+
 @pytest.fixture
 def client(app: FastAPI) -> Iterator[TestClient]:
     with TestClient(app, raise_server_exceptions=False) as test_client:

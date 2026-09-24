@@ -137,12 +137,46 @@ and legible.
 - [x] `tasks/phase8-survey.md` signed off before any edit (2026-09-23)
 - [x] All deliverables implemented; ruff + mypy + oxlint + `tsc -b` clean (2026-09-23; `mypy app tests` was red at `HEAD` before this diff and is green with it)
 - [x] All specified tests passing (pytest full suite; Vitest 112)
-- [ ] Mutation pass on `app/reports/jobs.py` (phase-close)
+- [x] Mutation pass on `app/reports/jobs.py` (phase-close), mutmut 3.8,
+      2026-09-24, with `test_report_jobs.py` + `test_queue.py` (both now in
+      `[tool.mutmut]`): **708 mutants — 538 killed (76 %) in the first pass,
+      598 (84.5 %) after it.** The first pass's survivors were read one by
+      one; the behavioural ones became tests, and several were not small:
+      `/report-jobs/mine` without its username filter returned ANOTHER
+      person's job, `_finish` without its id filter closed EVERY running
+      render, an enqueue failure without its id filter errored other people's
+      queued jobs, the worker ignored the requested version and — with only two
+      versions in any fixture — `history[1]` was indistinguishable from the
+      newest, the sweep crashed on a DONE row whose file was already gone, and
+      no audit row of the feature had its actor id, role or source IP
+      asserted. **The pass also found a test-isolation defect**: the PDF spool
+      was ONE directory for the whole session, so a PDF one test left behind
+      killed mutants in another; a second pass showed those "kills" as
+      survivors. Every test now gets its own spool (autouse fixture in
+      `conftest.py`). The 110 survivors left, all classified: 49 log messages,
+      14 the `detail` of a typed error (log-only; the client sees
+      `{code, message_key}`), 12 the PostgreSQL advisory lock (the SQLite suite
+      cannot observe it; exercised on real PostgreSQL during the panel), 11
+      typing or ORM no-ops (`cast`, `synchronize_session`), 6 `missing_ok` on a
+      path that exists, 5 exact-timestamp boundaries, and 13 more: two
+      unreachable (a RUNNING job always has `started_at`; the race branch's
+      winner never vanishes), two redundant filters (the ids are already
+      QUEUED), two log conditions, two `continue`→`break` whose effect depends
+      on directory order, two one-byte / exact-mtime boundaries, the
+      one-per-person pre-check (the partial unique index gives the same typed
+      409, proven by the lost-race test), and `format` twice (the model's
+      default fills it)
 - [x] No secrets in diff (Gitleaks clean); locale parity check green
 - [x] `/precommit` returned `READY TO COMMIT` (2026-09-23, two rounds: the first raised two decisions — the socket-less report worker and re-enqueue instead of abandon, both `mmarin`'s "lo recomendado" — plus a lost-race 500, sixteen surviving mutants and the live-region defects, all fixed; the second round came back CLEAN / HOLDS)
-- [ ] Walked on the dev instance with the real worker: the large analysis's
+- [x] Walked on the dev instance with the real worker: the large analysis's
       PDF requested, the toast followed across screens, the file downloaded
-      and gone from the spool
+      and gone from the spool — confirmed by `mmarin` 2026-09-24 with
+      `scripts/dev.sh workers` (`9e21b6d`): a real Valkey and the report
+      worker with `ReportWorkerJob`, run on the HOST. That the Compose
+      `report-worker` has no Docker socket rests on the allowlist tests and a
+      live run of both job classes against Valkey (each refused the other's
+      job), not on a Compose walk. The walk also found that the click gave no
+      feedback until the server answered — fixed in the same commit
 - [x] `docs/{report-format,threat-model,roles-and-permissions,ui-model,standards-mapping}.md`
       and the scope-change log updated
 - [ ] CLAUDE.md phase status + `docs/development-phases.md`: Phase 8 → DONE
