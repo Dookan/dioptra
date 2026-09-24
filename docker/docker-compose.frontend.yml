@@ -1,0 +1,24 @@
+# Frontend host of a TWO-HOST deployment (docs/deployment/README.md).
+#
+#   DIOPTRA_API_UPSTREAM=http://<backend-ip>:8000 \
+#     docker compose -f docker/docker-compose.frontend.yml up -d --build
+#
+# Standalone on purpose: it needs none of the backend's secrets, so none of
+# them ever has to exist on this host. nginx serves the bundle and forwards
+# /api/ to the backend, so the browser sees ONE origin — which is what keeps
+# the refresh cookie SameSite=Strict and the CSP `default-src 'self'`.
+
+name: dioptra-frontend
+
+services:
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+    environment:
+      DIOPTRA_API_UPSTREAM: ${DIOPTRA_API_UPSTREAM:?DIOPTRA_API_UPSTREAM is required, e.g. http://10.0.0.20:8000}
+    ports:
+      - "${DIOPTRA_HTTP_PORT:-8080}:8080"
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped

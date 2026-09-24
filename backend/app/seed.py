@@ -4,7 +4,7 @@ Development convenience only. It refuses to run against a production
 configuration, takes every password from the environment (no defaults, ever),
 and marks each account so the operator MUST change the password on first login.
 
-    DIOPTRA_ENV=dev DIOPTRA_SEED_PASSWORD_AMEDINA=... uv run python -m app.seed
+    DIOPTRA_ENV=dev DIOPTRA_SEED_PASSWORD_SROSALES=... uv run python -m app.seed
 """
 
 from __future__ import annotations
@@ -23,9 +23,9 @@ from app.db.session import get_session_factory
 logger = logging.getLogger("dioptra.seed")
 
 SEED_ACCOUNTS = (
-    ("amedina", "Ana Medina", Role.ADMIN),
+    ("srosales", "Saile Rosales", Role.ADMIN),
     ("mmarin", "Moises Marin", Role.ANALYST),
-    ("cperez", "Carla Perez", Role.DEVELOPER),
+    ("pperez", "Pepito Perez", Role.DEVELOPER),
 )
 
 

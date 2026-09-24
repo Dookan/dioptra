@@ -1,0 +1,32 @@
+# The external database's CA, for sslmode=verify-full (docs/deployment/README.md
+# → external database). Add it AFTER docker-compose.external-db.yml:
+#
+#   docker compose -f docker/docker-compose.yml -f docker/docker-compose.backend.yml \
+#                  -f docker/docker-compose.external-db.yml \
+#                  -f docker/docker-compose.external-db-ca.yml up -d --build
+#
+# DIOPTRA_DB_SSLROOTCERT is the host path of the CA certificate (PEM) that
+# signed the PostgreSQL server's certificate. It is mounted read-only and named
+# through libpq's own PGSSLROOTCERT, so no URL changes.
+#
+# Its own file on purpose: libpq verifies the server whenever a root CA file
+# EXISTS, even under sslmode=require or prefer, so mounting one by default
+# would break a same-host database with a self-signed certificate. Unset, the
+# variable stops `docker compose`; an unreadable or wrong CA stops the
+# connection. Both fail closed.
+
+x-db-ca: &db-ca
+  environment:
+    PGSSLROOTCERT: /etc/dioptra/db-ca.crt
+  volumes:
+    # Long syntax: a colon in the path or in the message cannot split the mount.
+    - type: bind
+      source: ${DIOPTRA_DB_SSLROOTCERT:?DIOPTRA_DB_SSLROOTCERT is required (the host path of the database server's CA certificate)}
+      target: /etc/dioptra/db-ca.crt
+      read_only: true
+
+services:
+  migrate: *db-ca
+  api: *db-ca
+  worker: *db-ca
+  report-worker: *db-ca

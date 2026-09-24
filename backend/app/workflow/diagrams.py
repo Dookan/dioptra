@@ -18,11 +18,31 @@ from typing import Any
 
 from app.workflow.ast.graph import FlowGraph
 
-NODE_WIDTH = 190
-NODE_HEIGHT = 46
-COLUMN_GAP = 40
+# Sized for a label of up to three lines (two in a diamond, whose usable
+# width narrows away from its centre). At 190×46 a 60-character label ran
+# out of its shape on one line (`mmarin`, 2026-09-24); the screen and the
+# report annex now wrap it inside these bounds.
+NODE_WIDTH = 220
+NODE_HEIGHT = 60
+COLUMN_GAP = 60
 ROW_GAP = 60
-MARGIN = 20
+MARGIN = 30
+#: A decision is drawn wider than its box, by this much on each side: a diamond
+#: loses width away from its centre, and at the box's own width a two-line
+#: condition did not fit. The column gap and the margin leave room for it.
+DIAMOND_OVERHANG = 20
+DIAMOND_KINDS = frozenset({"decision", "loop"})
+
+#: Characters per line and lines per shape, measured for the screen's 11px
+#: monospace (~6.6px a character, the widest face either renderer uses; the
+#: report's sans-serif is narrower, so what fits here fits there).
+_FIT: dict[str, tuple[int, int]] = {
+    "decision": (22, 2),
+    "loop": (22, 2),
+    "return": (27, 3),
+    "throw": (27, 3),
+}
+_FIT_DEFAULT = (30, 3)
 
 _SHAPES: dict[str, tuple[str, str]] = {
     "start": ("([", "])"),
@@ -68,6 +88,36 @@ def to_mermaid(graph: FlowGraph) -> str:
     return "\n".join(lines) + "\n"
 
 
+def label_lines(label: str, kind: str) -> list[str]:
+    """The label broken into the lines its shape can hold, ``…`` when it cannot.
+
+    Deterministic, word-wise, and a word longer than a line is cut rather than
+    left to run out of the shape. The full label stays in ``label`` (the screen
+    shows it on hover) and in the Mermaid text.
+    """
+    per_line, max_lines = _FIT.get(kind, _FIT_DEFAULT)
+    lines: list[str] = []
+    current = ""
+    for word in label.split():
+        rest = word
+        while rest:
+            joined = f"{current} {rest}" if current else rest
+            if len(joined) <= per_line:
+                current, rest = joined, ""
+            elif current:
+                lines.append(current)
+                current = ""
+            else:
+                lines.append(rest[:per_line])
+                rest = rest[per_line:]
+    if current:
+        lines.append(current)
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+        lines[-1] = lines[-1][: per_line - 1].rstrip() + "…"
+    return lines
+
+
 @dataclass(frozen=True)
 class PlacedNode:
     id: str
@@ -78,6 +128,8 @@ class PlacedNode:
     y: int
     width: int
     height: int
+    #: ``label`` wrapped to fit the shape (``label_lines``); what both renderers draw.
+    lines: list[str]
 
 
 @dataclass(frozen=True)
@@ -122,6 +174,28 @@ def _rows(graph: FlowGraph) -> dict[str, int]:
     return depth
 
 
+def edge_label_position(edge: PlacedEdge) -> tuple[float, float, str]:
+    """Where an edge's label goes: ``(x, y, text-anchor)``.
+
+    Both branches of a decision leave from the same point, so a label placed
+    on the first segment drew "sí" and "no" on top of each other (2026-09-24).
+    A branch that turns sideways carries its label on its OWN horizontal run,
+    so the two sides of one decision can never meet.
+    """
+    (x0, y0) = edge.points[0]
+    if not edge.back and len(edge.points) >= 3:
+        (x1, y1), (x2, _) = edge.points[1], edge.points[2]
+        if x2 != x1:
+            return ((x1 + x2) / 2, y1 - 5, "middle")
+    (x1, y1) = edge.points[1] if len(edge.points) > 1 else (x0, y0)
+    return ((x0 + x1) / 2 + 6, (y0 + y1) / 2 - 4, "start")
+
+
+def _right_edge(node: PlacedNode) -> int:
+    overhang = DIAMOND_OVERHANG if node.kind in DIAMOND_KINDS else 0
+    return node.x + node.width + overhang
+
+
 def layout(graph: FlowGraph) -> Layout:
     depth = _rows(graph)
     by_row: dict[int, list[str]] = {}
@@ -146,18 +220,21 @@ def layout(graph: FlowGraph) -> Layout:
             y=y,
             width=NODE_WIDTH,
             height=NODE_HEIGHT,
+            lines=label_lines(node.label, node.kind),
         )
     edges: list[PlacedEdge] = []
     for edge in graph.edges:
         source, target = placed[edge.source], placed[edge.target]
         back = depth[edge.target] <= depth[edge.source]
         if back:
-            side = source.x + source.width
+            # Leave and re-enter at the drawn edge of the shape, past a diamond's overhang.
+            side = _right_edge(source)
+            outside = source.x + source.width + COLUMN_GAP // 2
             points = [
                 (side, source.y + source.height // 2),
-                (side + COLUMN_GAP // 2, source.y + source.height // 2),
-                (side + COLUMN_GAP // 2, target.y + target.height // 2),
-                (target.x + target.width, target.y + target.height // 2),
+                (outside, source.y + source.height // 2),
+                (outside, target.y + target.height // 2),
+                (_right_edge(target), target.y + target.height // 2),
             ]
         else:
             start = (source.x + source.width // 2, source.y + source.height)

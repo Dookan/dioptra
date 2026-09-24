@@ -1,0 +1,61 @@
+# PostgreSQL installed OUTSIDE Docker — on this same host or on its own server
+# (docs/deployment/README.md → external database). Combine it with the other
+# files, e.g. on a backend host:
+#
+#   docker compose -f docker/docker-compose.yml -f docker/docker-compose.backend.yml \
+#                  -f docker/docker-compose.external-db.yml up -d --build
+#
+# Set in .env: DIOPTRA_DB_HOST (the server's address, or host.docker.internal
+# when PostgreSQL runs on the Docker host itself), DIOPTRA_DB_PORT, and
+# DIOPTRA_DB_SSLMODE — MANDATORY here, never defaulted: `prefer` falls back to
+# plain text without a word, so the operator has to choose. On another machine
+# use `verify-full` and add docker-compose.external-db-ca.yml with the server's
+# CA (`require` encrypts but never checks who answers). `PGSSLMODE` below is
+# libpq's own variable, set to the same value the URLs carry; it exists so an
+# unset DIOPTRA_DB_SSLMODE stops `docker compose` instead of defaulting.
+#
+# The owner role, the database and the `dioptra_app` runtime role must exist
+# BEFORE the first start: the bundled container creates them on its first
+# init, an external server does not (the guide has the statements).
+
+services:
+  # Never started: a profile nobody enables.
+  postgres:
+    profiles: ["bundled-db-only"]
+
+  migrate:
+    environment:
+      PGSSLMODE: ${DIOPTRA_DB_SSLMODE:?DIOPTRA_DB_SSLMODE is required with an external database (verify-full for another machine)}
+    depends_on: !reset {}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  api:
+    environment:
+      PGSSLMODE: ${DIOPTRA_DB_SSLMODE:?DIOPTRA_DB_SSLMODE is required with an external database (verify-full for another machine)}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  worker:
+    environment:
+      PGSSLMODE: ${DIOPTRA_DB_SSLMODE:?DIOPTRA_DB_SSLMODE is required with an external database (verify-full for another machine)}
+    depends_on: !override
+      valkey:
+        condition: service_healthy
+      analysis-image:
+        condition: service_completed_successfully
+      sandbox-image:
+        condition: service_completed_successfully
+      sandbox-php-image:
+        condition: service_completed_successfully
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  report-worker:
+    environment:
+      PGSSLMODE: ${DIOPTRA_DB_SSLMODE:?DIOPTRA_DB_SSLMODE is required with an external database (verify-full for another machine)}
+    depends_on: !override
+      valkey:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

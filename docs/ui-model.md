@@ -241,6 +241,25 @@ Added to `docs/mockups/index.html` on 2026-08-28, same tokens and principles:
   under the drawing is the server's interchange text (English tokens
   `true`/`false`/`Start`) while the drawing is translated — `mmarin`'s call
   whether the anchor's Spanish Mermaid sample should be matched.
+- **Diseño de casos, second pass (2026-09-24, `mmarin`)** — recorded
+  deviations from screen 06: `.cols.design` is two EQUAL columns, not the
+  anchor's `380px 1fr` — the anchor draws a toy diagram that fits 380 px,
+  a real function's is 690 px or wider and the developer saw a sliver of it
+  behind two scrollbars; the diagram frame is as tall as the window allows
+  (`max-height` relative to the viewport) and scrolls inside itself with
+  token-coloured scrollbars (the `.scrollpane` recipe); node labels are
+  WRAPPED by the server to fit their shape (`PlacedNode.lines`, bounded lines
+  and characters per shape) with the full label as the hover `<title>`, and
+  loops get the same diamond overhang as decisions; the "sí"/"no" edge labels
+  sit on each branch's own horizontal run. The picture is still ours and the
+  brief is still computed from the AST. **Needs an on-screen look in both
+  themes**: text scaled down on a very wide diagram, diamonds at the frame's
+  edge, the frame's scrollbar against the page's on a laptop-height window.
+- **The stage buttons move the person on** (2026-09-24): after the server
+  accepts "Guardar plan y diseñar los casos →", "Pasar a escribir los tests
+  →", "Pasar a ejecutar y medir →" and the E7 → E8 advance, the screen
+  navigates to the one the arrow names. Only after the server's answer: a
+  refused transition stays on the screen with its reason.
 - The findings screen hides the verdict form once the analysis has left
   E3 (the server refuses with `stage_locked`; the UI mirrors it).
 - The status bar uses the mockups' long-form stage names (`statusbar.stage.*`:

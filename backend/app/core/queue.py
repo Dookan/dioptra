@@ -14,6 +14,12 @@ from typing import Any
 
 from rq.job import Job
 
+# Every mapped class, before a job runs. The API process imports them all
+# through its routers, so an inline queue never noticed; a worker imports only
+# the job's own module, and the first query then failed on a relationship
+# named by string (`Analysis.test_plan` → "TestPlan") that nothing had loaded
+# — the job died and the analysis stayed QUEUED forever (found 2026-09-24).
+import app.db.registry  # noqa: F401
 from app.core.config import get_settings
 
 logger = logging.getLogger("dioptra.queue")

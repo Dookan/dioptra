@@ -485,7 +485,12 @@ class _Builder:
 
     def _condition_label(self, node: Node, keyword: str) -> str:
         condition = node.child_by_field_name("condition")
-        text = _text(condition).strip("()") if condition is not None else ""
+        text = _text(condition) if condition is not None else ""
+        # Only the ONE pair JS/PHP/Java wrap a condition in. `strip("()")` ate
+        # every parenthesis at either end, so Python's `not isinstance(x, int)`
+        # was drawn as `not isinstance(x, int` (found 2026-09-24).
+        if condition is not None and condition.type == "parenthesized_expression":
+            text = text[1:-1].strip()
         return clip(f"{keyword} {text}".strip())
 
     def _if(self, node: Node, pending: list[tuple[str, str]]) -> list[tuple[str, str]]:

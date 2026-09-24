@@ -155,6 +155,8 @@ export interface PlacedNode extends FlowNode {
   y: number;
   width: number;
   height: number;
+  /** The label wrapped by the server to fit its shape (`diagrams.label_lines`). */
+  lines: string[];
 }
 
 export interface PlacedEdge extends FlowEdge {

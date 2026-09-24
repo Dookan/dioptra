@@ -341,7 +341,11 @@ export function TestPlanScreen({ route, onNavigate }: Props): React.ReactNode {
                   label={t('plan.saveAndDesign')}
                   ready={complete}
                   blockedHint={t('plan.incomplete', { min: MIN_RATIONALE })}
-                  onAdvanced={setAnalysis}
+                  onAdvanced={(next) => {
+                    // The button's arrow promises the next screen: go there.
+                    setAnalysis(next);
+                    onNavigate({ kind: 'design', id: route.id, analysisId: route.analysisId });
+                  }}
                   beforeAdvance={save}
                 />
                 <button

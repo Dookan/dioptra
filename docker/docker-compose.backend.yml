@@ -1,0 +1,24 @@
+# Backend host of a TWO-HOST deployment (docs/deployment/README.md).
+#
+#   docker compose -f docker/docker-compose.yml -f docker/docker-compose.backend.yml up -d --build
+#
+# Everything but the frontend runs here: the API, both workers, PostgreSQL,
+# Valkey and the analysis / sandbox images. The api, the worker and the
+# report-worker SHARE $DIOPTRA_DATA_DIR (the jail, the PDF spool, the dump
+# spool), which is why they cannot be split across hosts.
+#
+# The API is published on ONE interface of this host, never on 0.0.0.0: set
+# DIOPTRA_API_BIND to the backend's LAN address and let the firewall accept
+# port 8000 from the frontend host only — in the DOCKER-USER chain: ufw and
+# INPUT rules never see a Docker-published port (docs/deployment/README.md §4).
+# The browser never talks to it.
+
+services:
+  api:
+    ports:
+      - "${DIOPTRA_API_BIND:?DIOPTRA_API_BIND is required: this host's LAN address}:${DIOPTRA_API_PORT:-8000}:8000"
+
+  # The frontend runs on its own host (docker-compose.frontend.yml); a profile
+  # nobody enables keeps `up` from starting a second copy here.
+  frontend:
+    profiles: ["single-host-only"]

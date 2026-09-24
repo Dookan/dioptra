@@ -299,7 +299,7 @@ becomes reachable.
 - [ ] Proven by test that with `DIOPTRA_MAIL_ENABLED=false` (the default) the
       platform opens no SMTP connection and every admin action still works —
       the air-gapped factory is the baseline, not the exception
-- [ ] Walked by hand on the dev instance: `amedina` creates an account, it
+- [ ] Walked by hand on the dev instance: `srosales` creates an account, it
       changes its password at first login, gets its role changed, is disabled
       and re-enabled, and every step reads as a sentence in Bitácora
 - [ ] `docs/roles-and-permissions.md`, `docs/ui-model.md`,

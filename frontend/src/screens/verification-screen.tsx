@@ -289,7 +289,11 @@ export function VerificationScreen({ route, onNavigate }: Props): React.ReactNod
                 label={t('verify.advance.label')}
                 ready={allPassed}
                 blockedHint={t('verify.advance.blocked')}
-                onAdvanced={setAnalysis}
+                onAdvanced={(next) => {
+                  // The button's arrow promises the next screen: go there.
+                  setAnalysis(next);
+                  onNavigate({ kind: 'report', id: route.id, analysisId: route.analysisId });
+                }}
               />
             )}
           </section>

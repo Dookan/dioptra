@@ -79,11 +79,11 @@ const PLAN = {
 
 function diagram(editedText: string | null) {
   const nodes = [
-    { id: 'n0', kind: 'start', label: 'validateForm', line: 10, x: 135, y: 20, width: 190, height: 46 },
-    { id: 'n1', kind: 'decision', label: `if ${HOSTILE}`, line: 11, x: 135, y: 126, width: 190, height: 46 },
-    { id: 'n2', kind: 'return', label: 'return false;', line: 11, x: 20, y: 232, width: 190, height: 46 },
-    { id: 'n4', kind: 'process', label: 'x -= 1', line: 12, x: 250, y: 232, width: 190, height: 46 },
-    { id: 'n3', kind: 'end', label: '', line: 13, x: 135, y: 338, width: 190, height: 46 },
+    { id: 'n0', kind: 'start', label: 'validateForm', line: 10, x: 135, y: 20, width: 190, height: 46, lines: ['validateForm'] },
+    { id: 'n1', kind: 'decision', label: `if ${HOSTILE}`, line: 11, x: 135, y: 126, width: 190, height: 46, lines: [`if ${HOSTILE}`] },
+    { id: 'n2', kind: 'return', label: 'return false;', line: 11, x: 20, y: 232, width: 190, height: 46, lines: ['return false;'] },
+    { id: 'n4', kind: 'process', label: 'x -= 1', line: 12, x: 250, y: 232, width: 190, height: 46, lines: ['x -= 1'] },
+    { id: 'n3', kind: 'end', label: '', line: 13, x: 135, y: 338, width: 190, height: 46, lines: [''] },
   ];
   return {
     path: 'src/validators.js',
@@ -520,5 +520,20 @@ describe('case design screen', () => {
     await signIn('mmarin');
     expect(await screen.findByRole('alert')).toHaveTextContent(es.errors.ast.parseFailed);
     expect(screen.queryByRole('button', { name: es.design.mermaid.edit })).not.toBeInTheDocument();
+  });
+
+  it('lands on the test-writing screen once the stage advances', async () => {
+    renderDesign('developer', 'design', {
+      [BRIEF_URL]: { status: 200, body: briefState(FULL_CASES, 'cperez') },
+      [STATES_URL]: { status: 200, body: states('cperez', 'cperez') },
+      [`/api/v1/analyses/${ANALYSIS_ID}/stage/advance`]: { status: 200, body: analysis('tests') },
+    });
+    const user = await signIn('cperez');
+    await user.click(await screen.findByRole('button', { name: es.design.advance.label }));
+    await user.type(screen.getByLabelText(es.workflow.advance.reasonLabel), 'Casos aprobados en todas.');
+    await user.click(screen.getByRole('button', { name: es.design.advance.label }));
+    await waitFor(() => {
+      expect(globalThis.location.hash).toBe(`#/projects/${PROJECT_ID}/analyses/${ANALYSIS_ID}/tests`);
+    });
   });
 });

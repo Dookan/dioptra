@@ -69,10 +69,31 @@ jobs:
         run: uv run --project backend python scripts/license_gate.py
       - name: No CDN in the built bundle
         run: uv run --project backend python scripts/no_cdn_check.py --dist frontend/dist
-      - name: No secrets in the repository
-        uses: gitleaks/gitleaks-action@v2
+      # The Gitleaks BINARY (MIT), not gitleaks/gitleaks-action: the action
+      # ships under a proprietary EULA that requires a paid key for
+      # organisation repositories (CLAUDE.md → Hard Rules, free licences only).
+      # Same version and checksum check as docker/analysis.Dockerfile.
+      - name: Install Gitleaks (MIT, pinned, checksum verified)
         env:
-          GITLEAKS_CONFIG: .gitleaks.toml
+          GITLEAKS_VERSION: "8.28.0"
+        run: |
+          set -eu
+          cd "$RUNNER_TEMP"
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          curl -fsSLO "${base}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSLO "${base}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          grep " gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz\$" "gitleaks_${GITLEAKS_VERSION}_checksums.txt" | sha256sum -c -
+          tar -xzf "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" gitleaks
+          mkdir -p "$RUNNER_TEMP/bin"
+          install -m 0755 gitleaks "$RUNNER_TEMP/bin/gitleaks"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/gitleaks" version
+      # Two passes, as in scripts/ci.sh: the working tree and the full history
+      # (checkout above uses fetch-depth: 0).
+      - name: No secrets in the repository
+        run: |
+          gitleaks dir . --config .gitleaks.toml --redact --no-banner
+          gitleaks git . --config .gitleaks.toml --redact --no-banner
 
   migrations:
     runs-on: ubuntu-latest

@@ -6,6 +6,11 @@
 #   scripts/dev.sh seed       # also creates the three seed accounts first
 #   scripts/dev.sh workers    # a real queue: Valkey + the two RQ workers
 #                             # (arguments combine: `scripts/dev.sh seed workers`)
+#   scripts/dev.sh reset      # WIPE the development data and start from zero:
+#                             # stops a previous run, recreates the database,
+#                             # empties the queue and the data directories
+#                             # (the local OSV data is kept), then seeds.
+#                             # Asks first; `reset workers` combines as well.
 #
 # Production is `docker compose -f docker/docker-compose.yml up --build`
 # (README → Run it); this script exists so a dev session is one command.
@@ -22,13 +27,19 @@ cd "$(dirname "$0")/.."
 
 SEED=0
 WORKERS=0
+RESET=0
 for arg in "$@"; do
   case "$arg" in
     seed) SEED=1 ;;
     workers) WORKERS=1 ;;
-    *) echo "unknown argument: $arg (expected: seed, workers)" >&2; exit 2 ;;
+    reset) RESET=1; SEED=1 ;;
+    *) echo "unknown argument: $arg (expected: seed, workers, reset)" >&2; exit 2 ;;
   esac
 done
+
+# The accounts `app.seed` creates (backend/app/seed.py → SEED_ACCOUNTS), for
+# the banner at the end. Keep the two lists in step.
+SEED_USERS=("srosales admin" "mmarin analyst" "pperez developer")
 
 PG_CONTAINER="${DIOPTRA_DEV_PG:-dioptra-dev-pg}"
 PG_PORT="${DIOPTRA_DEV_PG_PORT:-55432}"
@@ -81,11 +92,6 @@ export DIOPTRA_VULNDB_SPOOL_DIR="$DATA/vulndb"
 export DIOPTRA_REPORT_SPOOL_DIR="$DATA/reports"
 export DIOPTRA_VULNDB_SYNC_ENABLED=false
 
-(cd backend && uv run alembic upgrade head)
-if [ "$SEED" = 1 ]; then
-  (cd backend && uv run python -m app.seed)
-fi
-
 # A previous run of THIS script left behind (Ctrl+C in a lost terminal) is
 # the only thing allowed to be on our two ports; anything else is reported.
 free_port() {
@@ -103,6 +109,54 @@ free_port() {
   done
   sleep 1
 }
+# The RQ workers of a previous run of THIS checkout: they hold database
+# connections and would pick up jobs against a database that no longer exists.
+stop_old_workers() {
+  local pid
+  for pid in $(pgrep -f "rq worker .*--job-class app\.core\.queue\." || true); do
+    if [ "$(readlink "/proc/$pid/cwd" 2>/dev/null)" = "$PWD/backend" ]; then
+      echo "stopping an old worker (pid $pid)"
+      kill "$pid" 2>/dev/null || true
+    fi
+  done
+}
+
+if [ "$RESET" = 1 ]; then
+  if [ "$DIOPTRA_ENV" = "prod" ]; then
+    echo "reset refused: DIOPTRA_ENV=prod — this command is for development only" >&2
+    exit 1
+  fi
+  echo "reset: this ERASES every project, analysis, report, audit row and account"
+  echo "       in the database 'dioptra' of $PG_CONTAINER, the queue, and"
+  echo "       $DATA/{workspaces,runs,reports,vulndb}. The local OSV data is kept."
+  if [ -t 0 ]; then
+    read -r -p "Type 'delete' to continue: " answer
+    [ "$answer" = "delete" ] || { echo "reset cancelled; nothing was touched"; exit 1; }
+  elif [ "${DIOPTRA_DEV_RESET_YES:-}" != "1" ]; then
+    echo "reset needs a terminal to confirm, or DIOPTRA_DEV_RESET_YES=1" >&2
+    exit 1
+  fi
+  free_port 8000 "app.main:create_app"
+  free_port 5173 "vite"
+  stop_old_workers
+  # WITH (FORCE) closes any connection still open (a psql, a stray process).
+  docker exec "$PG_CONTAINER" psql -q -U dioptra -d postgres \
+    -c "DROP DATABASE IF EXISTS dioptra WITH (FORCE);" -c "CREATE DATABASE dioptra OWNER dioptra;"
+  VALKEY_CONTAINER="${DIOPTRA_DEV_VALKEY:-dioptra-dev-valkey}"
+  if docker ps --format '{{.Names}}' | grep -qx "$VALKEY_CONTAINER"; then
+    docker exec "$VALKEY_CONTAINER" valkey-cli FLUSHALL >/dev/null
+  fi
+  for dir in workspaces runs reports vulndb; do
+    find "$DATA/$dir" -mindepth 1 -delete
+  done
+  echo "reset: done — migrating and seeding a fresh database"
+fi
+
+(cd backend && uv run alembic upgrade head)
+if [ "$SEED" = 1 ]; then
+  (cd backend && uv run python -m app.seed)
+fi
+
 free_port 8000 "app.main:create_app"
 free_port 5173 "vite"
 
@@ -144,8 +198,10 @@ if [ "$WORKERS" = 1 ]; then
   echo "Queue: Valkey on 127.0.0.1:$VALKEY_PORT, workers on 'analysis' and 'reports'; PDFs wait in $DATA/reports"
 fi
 echo "Accounts (passwords from .env; every seeded account must change it on first login):"
-printf '  %-8s %-10s %s\n' amedina admin "${DIOPTRA_SEED_PASSWORD_AMEDINA:-<DIOPTRA_SEED_PASSWORD_AMEDINA not set>}"
-printf '  %-8s %-10s %s\n' mmarin  analyst "${DIOPTRA_SEED_PASSWORD_MMARIN:-<DIOPTRA_SEED_PASSWORD_MMARIN not set>}"
-printf '  %-8s %-10s %s\n' cperez  developer "${DIOPTRA_SEED_PASSWORD_CPEREZ:-<DIOPTRA_SEED_PASSWORD_CPEREZ not set>}"
+for entry in "${SEED_USERS[@]}"; do
+  read -r user role <<<"$entry"
+  var="DIOPTRA_SEED_PASSWORD_${user^^}"
+  printf '  %-9s %-10s %s\n' "$user" "$role" "${!var:-<$var not set>}"
+done
 echo "  (if you already changed a password in the UI, the new one applies, not this)"
 wait

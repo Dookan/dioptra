@@ -190,7 +190,11 @@ export function TestWritingScreen({ route, onNavigate }: Props): React.ReactNode
                   written: totalWritten,
                   count: totalCases,
                 })}
-                onAdvanced={setAnalysis}
+                onAdvanced={(next) => {
+                  // The button's arrow promises the next screen: go there.
+                  setAnalysis(next);
+                  onNavigate({ kind: 'verify', id: route.id, analysisId: route.analysisId });
+                }}
               />
             )}
           </section>

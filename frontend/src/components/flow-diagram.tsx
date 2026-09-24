@@ -18,6 +18,12 @@ interface Props {
 /** Edge labels the builder emits as words; anything else (a `case …`) is source text. */
 const EDGE_WORDS = new Set(['true', 'false', 'loop', 'except', 'default']);
 
+/** Mirrors `diagrams.DIAMOND_OVERHANG`: a decision is drawn wider than its box. */
+const DIAMOND_OVERHANG = 20;
+
+/** Baseline to baseline of a wrapped label at the diagram's 11px. */
+const LINE_HEIGHT = 12;
+
 function nodeShape(node: PlacedNode, clipId: string): React.ReactNode {
   const { x, y, width, height, kind } = node;
   const cx = x + width / 2;
@@ -31,7 +37,7 @@ function nodeShape(node: PlacedNode, clipId: string): React.ReactNode {
       return (
         <polygon
           className={`fd-node fd-${kind}`}
-          points={`${cx},${y} ${x + width},${cy} ${cx},${y + height} ${x},${cy}`}
+          points={`${cx},${y} ${x + width + DIAMOND_OVERHANG},${cy} ${cx},${y + height} ${x - DIAMOND_OVERHANG},${cy}`}
         />
       );
     case 'return':
@@ -51,10 +57,20 @@ function edgePath(edge: PlacedEdge): string {
   return edge.points.map(([x, y], index) => `${index === 0 ? 'M' : 'L'}${x},${y}`).join(' ');
 }
 
-function edgeLabelPosition(edge: PlacedEdge): [number, number] {
+/**
+ * Mirrors `diagrams.edge_label_position`. Both branches of a decision leave
+ * from the same point, so a label on the first segment drew "sí" over "no": a
+ * branch that turns sideways carries its label on its own horizontal run.
+ */
+function edgeLabelPosition(edge: PlacedEdge): [number, number, 'start' | 'middle'] {
   const [x0, y0] = edge.points[0] ?? [0, 0];
-  const [x1, y1] = edge.points[1] ?? [x0, y0];
-  return [(x0 + x1) / 2 + 6, (y0 + y1) / 2 - 4];
+  const turn = edge.points[1];
+  const run = edge.points[2];
+  if (!edge.back && turn !== undefined && run !== undefined && run[0] !== turn[0]) {
+    return [(turn[0] + run[0]) / 2, turn[1] - 5, 'middle'];
+  }
+  const [x1, y1] = turn ?? [x0, y0];
+  return [(x0 + x1) / 2 + 6, (y0 + y1) / 2 - 4, 'start'];
 }
 
 export function FlowDiagram({ diagram }: Props): React.ReactNode {
@@ -80,36 +96,46 @@ export function FlowDiagram({ diagram }: Props): React.ReactNode {
         </clipPath>
       </defs>
       {layout.edges.map((edge) => {
-        const [lx, ly] = edgeLabelPosition(edge);
+        const [lx, ly, anchor] = edgeLabelPosition(edge);
         const key = `${edge.source}-${edge.target}-${edge.label}`;
         return (
           <g key={key} className={edge.back ? 'fd-edge fd-back' : 'fd-edge'}>
             <path d={edgePath(edge)} markerEnd={`url(#${markerId})`} />
             {edge.label !== '' && (
-              <text className="fd-edge-label" x={lx} y={ly}>
+              <text className="fd-edge-label" x={lx} y={ly} textAnchor={anchor}>
                 {EDGE_WORDS.has(edge.label) ? t(`design.edge.${edge.label}`) : edge.label}
               </text>
             )}
           </g>
         );
       })}
-      {layout.nodes.map((node) => (
-        <g key={node.id} className="fd-group">
-          {nodeShape(node, clipId)}
-          <text
-            className="fd-label"
-            x={node.x + node.width / 2}
-            y={node.y + node.height / 2 + 4}
-            textAnchor="middle"
-          >
-            {node.kind === 'start'
-              ? t('design.node.start', { name: node.label })
-              : node.kind === 'end'
-                ? t('design.node.end')
-                : node.label}
-          </text>
-        </g>
-      ))}
+      {layout.nodes.map((node) => {
+        const cx = node.x + node.width / 2;
+        // Start and end carry our own words; every other shape draws the lines
+        // the server wrapped to fit it, and the full label is the hover title.
+        const lines =
+          node.kind === 'start'
+            ? [t('design.node.start', { name: node.label })]
+            : node.kind === 'end'
+              ? [t('design.node.end')]
+              : node.lines;
+        const first = node.y + node.height / 2 + 4 - ((lines.length - 1) * LINE_HEIGHT) / 2;
+        return (
+          <g key={node.id} className="fd-group">
+            {node.kind !== 'start' && node.kind !== 'end' && <title>{node.label}</title>}
+            {nodeShape(node, clipId)}
+            <text className="fd-label" textAnchor="middle">
+              {lines.map((line, index) => (
+                // Lines are positional: the same text may repeat within one label.
+                // eslint-disable-next-line react/no-array-index-key
+                <tspan key={index} x={cx} y={first + index * LINE_HEIGHT}>
+                  {line}
+                </tspan>
+              ))}
+            </text>
+          </g>
+        );
+      })}
     </svg>
   );
 }

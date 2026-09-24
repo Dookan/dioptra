@@ -307,7 +307,11 @@ export function CaseDesignScreen({ route, onNavigate }: Props): React.ReactNode 
                   approved: approvedCount,
                   count: functions.length,
                 })}
-                onAdvanced={setAnalysis}
+                onAdvanced={(next) => {
+                  // The button's arrow promises the next screen: go there.
+                  setAnalysis(next);
+                  onNavigate({ kind: 'tests', id: route.id, analysisId: route.analysisId });
+                }}
               />
             )}
           </section>

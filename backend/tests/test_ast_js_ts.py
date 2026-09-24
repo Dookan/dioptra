@@ -79,3 +79,9 @@ def test_broken_function_is_refused_but_others_still_parse() -> None:
         build_graph(SAMPLE_JS, "javascript", "broken", 25)
     with pytest.raises(ParseFailed):
         build_graph(b"function f(a) { if (a { return 1; } }\n", "javascript", "f", 1)
+
+
+def test_only_the_wrapping_parentheses_leave_a_condition() -> None:
+    source = b"function f(x) {\n  if ((x > 1) && ok(x)) { return 1; }\n  return 2;\n}\n"
+    labels = [n.label for n in build_graph(source, "javascript", "f", 1).nodes]
+    assert "if (x > 1) && ok(x)" in labels

@@ -13,7 +13,14 @@ from __future__ import annotations
 from markupsafe import Markup, escape
 
 from app.reports.strings import report_strings
-from app.workflow.diagrams import Layout, PlacedEdge, PlacedNode
+from app.workflow.diagrams import (
+    DIAMOND_KINDS,
+    DIAMOND_OVERHANG,
+    Layout,
+    PlacedEdge,
+    PlacedNode,
+    edge_label_position,
+)
 
 MAX_LABEL_CHARS = 28
 #: The builder's own tokens (``true``, ``false``, ``Start`` …) read in the
@@ -30,6 +37,8 @@ _FILL = {
     "process": "#FFFFFF",
 }
 _STROKE = {"throw": "#B3261E"}
+#: Baseline to baseline of a wrapped label, for an 11px face.
+LINE_HEIGHT = 12
 
 
 def _label(text: str) -> str:
@@ -47,20 +56,30 @@ def _node(node: PlacedNode) -> str:
     common = f'fill="{fill}" stroke="{stroke}" stroke-width="1"'
     if node.kind in {"start", "end"}:
         shape = f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{h / 2}" {common}/>'
-    elif node.kind in {"decision", "loop"}:
-        points = f"{cx},{y} {x + w},{cy} {cx},{y + h} {x},{cy}"
+    elif node.kind in DIAMOND_KINDS:
+        o = DIAMOND_OVERHANG
+        points = f"{cx},{y} {x + w + o},{cy} {cx},{y + h} {x - o},{cy}"
         shape = f'<polygon points="{points}" {common}/>'
     elif node.kind in {"return", "throw"}:
         points = f"{x + 10},{y} {x + w},{y} {x + w - 10},{y + h} {x},{y + h}"
         shape = f'<polygon points="{points}" {common}/>'
     else:
         shape = f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="6" {common}/>'
-    label = escape(
-        _label(node.label or (_TOKENS["start"] if node.kind == "start" else _TOKENS["end"]))
+    if node.kind in {"start", "end"}:
+        lines = [
+            _label(node.label or (_TOKENS["start"] if node.kind == "start" else _TOKENS["end"]))
+        ]
+    else:
+        lines = node.lines or [_label(node.label)]
+    # The block of lines is centred on the shape; each line is its own tspan.
+    first = cy + 4 - (len(lines) - 1) * LINE_HEIGHT / 2
+    spans = "".join(
+        f'<tspan x="{cx}" y="{first + index * LINE_HEIGHT}">{escape(line)}</tspan>'
+        for index, line in enumerate(lines)
     )
     text = (
-        f'<text x="{cx}" y="{cy + 4}" text-anchor="middle" font-family="Liberation Sans, Arial, '
-        f'sans-serif" font-size="11" fill="#1C2420">{label}</text>'
+        '<text text-anchor="middle" font-family="Liberation Sans, Arial, '
+        f'sans-serif" font-size="11" fill="#1C2420">{spans}</text>'
     )
     return shape + text
 
@@ -74,10 +93,10 @@ def _edge(edge: PlacedEdge) -> str:
     )
     if not edge.label:
         return line
-    (x0, y0), (x1, y1) = edge.points[0], edge.points[1] if len(edge.points) > 1 else edge.points[0]
+    lx, ly, anchor = edge_label_position(edge)
     label = escape(_label(_TOKENS.get(edge.label, edge.label)))
     text = (
-        f'<text x="{(x0 + x1) / 2 + 6}" y="{(y0 + y1) / 2 - 4}" font-family="Liberation Sans, '
+        f'<text x="{lx}" y="{ly}" text-anchor="{anchor}" font-family="Liberation Sans, '
         f'Arial, sans-serif" font-size="10" fill="#5C6B62">{label}</text>'
     )
     return line + text

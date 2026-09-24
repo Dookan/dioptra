@@ -202,3 +202,10 @@ def test_large_functions_do_not_crash_the_process(shape: str) -> None:
         assert result.returncode == 0, (shape, result.returncode, result.stderr[-300:])
         nodes, complexity = (int(v) for v in result.stdout.split())
         assert nodes > 100 and complexity > 100
+
+
+def test_a_condition_keeps_its_own_closing_parenthesis() -> None:
+    # `strip("()")` used to eat EVERY parenthesis at either end of the label.
+    source = b"def f(x):\n    if not isinstance(x, int):\n        return 1\n    return (2)\n"
+    labels = [n.label for n in build_graph(source, "python", "f", 1).nodes]
+    assert "if not isinstance(x, int)" in labels

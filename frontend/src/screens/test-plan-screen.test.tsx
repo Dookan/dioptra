@@ -195,9 +195,10 @@ describe('test plan screen', () => {
         justification: 'Plan acordado con el analista.',
       });
     });
-    expect(await screen.findByText(es.plan.nextStep.lockedTitle)).toBeInTheDocument();
-    expect(screen.getByRole('listitem', { current: 'step' })).toHaveTextContent(es.stepper.design);
-    expect(screen.queryByRole('button', { name: es.plan.include })).not.toBeInTheDocument();
+    // The button's arrow promises the design screen, and that is where it lands.
+    await waitFor(() => {
+      expect(globalThis.location.hash).toBe(`#/projects/${PROJECT_ID}/analyses/${ANALYSIS_ID}/design`);
+    });
   });
 
   it('does not advance when the server rejects the plan', async () => {

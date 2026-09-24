@@ -8,6 +8,10 @@
 name: dioptra
 
 services:
+  # The bundled database. A PostgreSQL installed OUTSIDE Docker (on this host or
+  # another) replaces it: docker-compose.external-db.yml switches this service
+  # off and DIOPTRA_DB_HOST / DIOPTRA_DB_PORT point every URL below at it
+  # (docs/deployment/README.md → external database).
   postgres:
     image: postgres:18-alpine
     environment:
@@ -52,12 +56,12 @@ services:
       DIOPTRA_ENV: ${DIOPTRA_ENV:-prod}
       # The runtime role only (P5 day 20): the owner's URL never enters the
       # serving process — the one-shot `migrate` service below holds it.
-      DIOPTRA_DATABASE_URL: postgresql+psycopg://dioptra_app:${DIOPTRA_APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-dioptra}
+      DIOPTRA_DATABASE_URL: postgresql+psycopg://dioptra_app:${DIOPTRA_APP_DB_PASSWORD}@${DIOPTRA_DB_HOST:-postgres}:${DIOPTRA_DB_PORT:-5432}/${POSTGRES_DB:-dioptra}?sslmode=${DIOPTRA_DB_SSLMODE:-prefer}
       DIOPTRA_JWT_SECRET: ${DIOPTRA_JWT_SECRET:?DIOPTRA_JWT_SECRET is required (32+ characters)}
       DIOPTRA_REFRESH_COOKIE_SECURE: ${DIOPTRA_REFRESH_COOKIE_SECURE:-true}
-      DIOPTRA_SEED_PASSWORD_AMEDINA: ${DIOPTRA_SEED_PASSWORD_AMEDINA:-}
+      DIOPTRA_SEED_PASSWORD_SROSALES: ${DIOPTRA_SEED_PASSWORD_SROSALES:-}
       DIOPTRA_SEED_PASSWORD_MMARIN: ${DIOPTRA_SEED_PASSWORD_MMARIN:-}
-      DIOPTRA_SEED_PASSWORD_CPEREZ: ${DIOPTRA_SEED_PASSWORD_CPEREZ:-}
+      DIOPTRA_SEED_PASSWORD_PPEREZ: ${DIOPTRA_SEED_PASSWORD_PPEREZ:-}
       DIOPTRA_REDIS_URL: redis://valkey:6379/0
       DIOPTRA_WORKSPACE_ROOT: /var/lib/dioptra/workspaces
       DIOPTRA_VULNDB_SPOOL_DIR: /var/lib/dioptra/vulndb
@@ -84,7 +88,14 @@ services:
         condition: service_healthy
     read_only: true
     tmpfs:
-      - /tmp
+      # SIZED: an upload is spooled here before the route's own checks run,
+      # and this tmpfs is RAM. Behind nginx the 200 MiB body cap bounds each
+      # spool; on a two-host deployment the published API port is reachable
+      # without nginx, so this bound is what stops a chunked body filling the
+      # host's memory before authentication (precommit panel, 2026-09-24).
+      # 512 MiB = two 200 MiB uploads in flight plus WeasyPrint's font cache;
+      # a third concurrent upload fails with an error rather than exhausting RAM.
+      - /tmp:size=512m
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
@@ -98,7 +109,7 @@ services:
       dockerfile: docker/api.Dockerfile
     environment:
       DIOPTRA_ENV: ${DIOPTRA_ENV:-prod}
-      DIOPTRA_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-dioptra}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-dioptra}
+      DIOPTRA_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-dioptra}:${POSTGRES_PASSWORD}@${DIOPTRA_DB_HOST:-postgres}:${DIOPTRA_DB_PORT:-5432}/${POSTGRES_DB:-dioptra}?sslmode=${DIOPTRA_DB_SSLMODE:-prefer}
       DIOPTRA_JWT_SECRET: ${DIOPTRA_JWT_SECRET:?DIOPTRA_JWT_SECRET is required (32+ characters)}
       DIOPTRA_REFRESH_COOKIE_SECURE: ${DIOPTRA_REFRESH_COOKIE_SECURE:-true}
       XDG_CACHE_HOME: /tmp
@@ -124,7 +135,7 @@ services:
     environment:
       DIOPTRA_ENV: ${DIOPTRA_ENV:-prod}
       # The runtime role only: the worker never migrates.
-      DIOPTRA_DATABASE_URL: postgresql+psycopg://dioptra_app:${DIOPTRA_APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-dioptra}
+      DIOPTRA_DATABASE_URL: postgresql+psycopg://dioptra_app:${DIOPTRA_APP_DB_PASSWORD}@${DIOPTRA_DB_HOST:-postgres}:${DIOPTRA_DB_PORT:-5432}/${POSTGRES_DB:-dioptra}?sslmode=${DIOPTRA_DB_SSLMODE:-prefer}
       DIOPTRA_JWT_SECRET: ${DIOPTRA_JWT_SECRET:?DIOPTRA_JWT_SECRET is required (32+ characters)}
       DIOPTRA_REDIS_URL: redis://valkey:6379/0
       DIOPTRA_WORKSPACE_ROOT: /var/lib/dioptra/workspaces
@@ -216,7 +227,7 @@ services:
       dockerfile: docker/api.Dockerfile
     environment:
       DIOPTRA_ENV: ${DIOPTRA_ENV:-prod}
-      DIOPTRA_DATABASE_URL: postgresql+psycopg://dioptra_app:${DIOPTRA_APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-dioptra}
+      DIOPTRA_DATABASE_URL: postgresql+psycopg://dioptra_app:${DIOPTRA_APP_DB_PASSWORD}@${DIOPTRA_DB_HOST:-postgres}:${DIOPTRA_DB_PORT:-5432}/${POSTGRES_DB:-dioptra}?sslmode=${DIOPTRA_DB_SSLMODE:-prefer}
       DIOPTRA_JWT_SECRET: ${DIOPTRA_JWT_SECRET:?DIOPTRA_JWT_SECRET is required (32+ characters)}
       DIOPTRA_REDIS_URL: redis://valkey:6379/0
       DIOPTRA_REPORT_SPOOL_DIR: /var/lib/dioptra/reports

@@ -255,4 +255,29 @@ describe('verification screen', () => {
     expect(screen.queryByRole('button', { name: es.verify.reopen })).toBeNull();
     expect(screen.queryByRole('button', { name: es.verify.markEquivalent })).toBeNull();
   });
+
+  it('lands on the report screen once the stage advances', async () => {
+    const passedRun = {
+      ...FAILED_RUN,
+      status: 'passed',
+      reasons: [],
+      uncovered_items: [],
+      surviving_mutants: [],
+      assertion_free_cases: [],
+    };
+    renderVerify('developer', {
+      [VERIFICATION_URL]: { status: 200, body: [passedRun] },
+      [`/api/v1/analyses/${ANALYSIS_ID}/stage/advance`]: {
+        status: 200,
+        body: { ...ANALYSIS, stage: 'report' },
+      },
+    });
+    const user = await signIn('cperez');
+    await user.click(await screen.findByRole('button', { name: es.verify.advance.label }));
+    await user.type(screen.getByLabelText(es.workflow.advance.reasonLabel), 'Todas las funciones pasan.');
+    await user.click(screen.getByRole('button', { name: es.verify.advance.label }));
+    await waitFor(() => {
+      expect(globalThis.location.hash).toBe(`#/projects/${PROJECT_ID}/analyses/${ANALYSIS_ID}/report`);
+    });
+  });
 });

@@ -21,12 +21,12 @@ def seed_passwords(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_seed_creates_the_three_roles(db: Session, seed_passwords: None) -> None:
     created = seed(db)
 
-    assert created == ["amedina", "mmarin", "cperez"]
+    assert created == ["srosales", "mmarin", "pperez"]
     roles = {
         username: get_user_by_username(db, username).role  # type: ignore[union-attr]
         for username, _, _ in SEED_ACCOUNTS
     }
-    assert roles == {"amedina": Role.ADMIN, "mmarin": Role.ANALYST, "cperez": Role.DEVELOPER}
+    assert roles == {"srosales": Role.ADMIN, "mmarin": Role.ANALYST, "pperez": Role.DEVELOPER}
 
 
 def test_seeded_accounts_must_change_their_password(db: Session, seed_passwords: None) -> None:
@@ -53,7 +53,7 @@ def test_seeding_without_a_password_refuses_instead_of_inventing_one(
     with pytest.raises(SeedRefused):
         seed(db)
 
-    assert get_user_by_username(db, "amedina") is None
+    assert get_user_by_username(db, "srosales") is None
 
 
 def test_seeding_is_refused_in_production(

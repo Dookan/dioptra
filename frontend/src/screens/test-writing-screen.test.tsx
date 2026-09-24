@@ -203,4 +203,19 @@ describe('test writing screen', () => {
     await signIn('cperez');
     expect(await screen.findByText(es.tests.parseError)).toBeTruthy();
   });
+
+  it('lands on the verification screen once the stage advances', async () => {
+    renderTests('developer', 'tests', {
+      [STATES_URL]: { status: 200, body: [{ ...STATES[0], cases: 1, written: 1 }] },
+      [`/api/v1/analyses/${ANALYSIS_ID}/stage/advance`]: { status: 200, body: analysis('verification') },
+    });
+    const user = await signIn('cperez');
+    await user.click(await screen.findByRole('button', { name: es.tests.advance.label }));
+    await user.type(screen.getByLabelText(es.workflow.advance.reasonLabel), 'Todos los casos escritos.');
+    await user.click(screen.getByRole('button', { name: es.tests.advance.label }));
+    // The button's arrow promises "ejecutar y medir", and that is where it lands.
+    await waitFor(() => {
+      expect(globalThis.location.hash).toBe(`#/projects/${PROJECT_ID}/analyses/${ANALYSIS_ID}/verify`);
+    });
+  });
 });

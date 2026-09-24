@@ -1207,23 +1207,53 @@ button.card:focus-visible {
 }
 
 /* --- case design: the flow diagram (mockup 06) ----------------------------- */
+/* Two equal columns, not the anchor's 380px + 1fr. Mockup 06 draws a toy
+   diagram that fits 380px; a real function's is 690px wide or more, and in
+   that column the developer saw a sliver of it behind two scrollbars
+   (`mmarin`, 2026-09-24). The diagram is the thing E5 is designed from, so it
+   gets half the screen. Recorded deviation: docs/ui-model.md → Phase 3. */
 .cols.design {
-  grid-template-columns: 380px 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
+/* Tall as the window allows; the page header and the banner sit above it.
+   Scrollbars in the theme's colours, the `.scrollpane` recipe: the native
+   ones rendered white in the dark theme. */
 .diagram-frame {
   margin: 10px 0 0;
   overflow: auto;
-  max-height: 520px;
+  max-height: max(420px, calc(100vh - 260px));
   background: var(--s2);
   border: 1px solid var(--line);
   border-radius: var(--radius-button);
   padding: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) var(--s2);
 }
 
+.diagram-frame::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.diagram-frame::-webkit-scrollbar-track {
+  background: var(--s2);
+}
+
+.diagram-frame::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+  border: 2px solid var(--s2);
+}
+
+/* Shrinks to the column when wider than it (the viewBox keeps the aspect),
+   never grows past its natural size: a three-node function stays legible
+   instead of being blown up to half a screen. */
 .flow-diagram {
   display: block;
-  max-width: none;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--ink);
@@ -1759,7 +1789,8 @@ button.card:focus-visible {
 }
 
 @media (max-width: 900px) {
-  .cols.inventory {
+  .cols.inventory,
+  .cols.design {
     grid-template-columns: 1fr;
   }
 

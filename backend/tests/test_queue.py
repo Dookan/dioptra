@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from unittest.mock import MagicMock
 
 import pytest
@@ -96,3 +98,30 @@ def test_the_pdf_job_goes_to_its_own_queue(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(queue, "_queue", fake_queue)
     queue.enqueue_report(uuid.uuid4())
     assert seen == [("reports", ReportWorkerJob)]
+
+
+@pytest.mark.parametrize(
+    "job_module",
+    [
+        "app.analysis.pipeline",
+        "app.workflow.verify_job",
+        "app.inventory.sync",
+        "app.reports.jobs",
+    ],
+)
+def test_a_worker_process_can_configure_every_mapper(job_module: str) -> None:
+    # A worker imports only its job class and the job's own module — never the
+    # routers that load every model in the API. It runs in a CHILD interpreter
+    # because this test process already has every model imported, which is
+    # exactly what hid the defect: the job died on its first query and the
+    # analysis stayed QUEUED forever (2026-09-24).
+    code = (
+        "import app.core.queue, importlib\n"
+        f"importlib.import_module({job_module!r})\n"
+        "from sqlalchemy.orm import configure_mappers\n"
+        "configure_mappers()\n"
+    )
+    result = subprocess.run(  # noqa: S603 — our own fixed snippet, sys.executable
+        [sys.executable, "-c", code], capture_output=True, text=True, timeout=60, check=False
+    )
+    assert result.returncode == 0, result.stderr[-2000:]

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import zipfile
 from pathlib import Path
 
@@ -23,8 +24,9 @@ from app.reports.svg import layout_svg
 
 # Imported by module: pytest would otherwise try to collect the ``Test*`` ORM classes.
 from app.workflow import models as wf
+from app.workflow.ast.extract import build_graph
 from app.workflow.ast.graph import FlowGraph, FlowNode
-from app.workflow.diagrams import layout
+from app.workflow.diagrams import PlacedNode, layout
 from app.workflow.models import CaseDesign, CoverageCriterion, VerificationRun, VerificationStatus
 from tests.inventory_support import LODASH_GHSA, attach_sbom, component, osv_record, write_osv_zip
 from tests.support import make_finding, seed_done_analysis
@@ -443,7 +445,9 @@ def test_svg_clips_at_the_limit_and_translates_the_builders_tokens() -> None:
         ],
     )
     svg = str(layout_svg(layout(graph), title="f"))
-    assert ">" + "b" * 27 + "…<" in svg and "b" * 28 not in svg
+    # A decision holds two lines of 22; the rest becomes an ellipsis.
+    assert ">" + "b" * 22 + "<" in svg and ">" + "b" * 21 + "…<" in svg
+    assert "b" * 23 not in svg
     assert ">sí<" in svg and ">true<" not in svg
     assert svg.index(">Inicio<") < svg.index(">Fin<")
 
@@ -544,3 +548,38 @@ def test_the_report_says_which_lines_the_criterion_judged_in_every_format(
     db.commit()
     db.refresh(analysis)
     assert needle not in engine.render_html(analysis, project)
+
+
+# --- The annex SVG draws the wrapped lines where the screen does (pinned by
+# the precommit coverage adversary, 2026-09-24).
+
+
+def _annex_svg(source: bytes, name: str) -> tuple[str, list[PlacedNode]]:
+    placed = layout(build_graph(source, "python", name, 1))
+    return str(layout_svg(placed, title=name)), placed.nodes
+
+
+def test_the_annex_draws_a_loop_as_a_diamond_with_its_overhang() -> None:
+    svg, nodes = _annex_svg(b"def g(a):\n    while a > 0:\n        a -= 1\n    return a\n", "g")
+    (loop,) = [n for n in nodes if n.kind == "loop"]
+    cy = loop.y + loop.height / 2
+    assert f"{loop.x + loop.width + 20},{cy}" in svg
+    assert f"{loop.x - 20},{cy}" in svg
+
+
+def test_the_annex_stacks_wrapped_lines_centred_on_the_shape() -> None:
+    source = b"def f(x):\n    if not isinstance(x, int):\n        return 1\n    return 0\n"
+    svg, nodes = _annex_svg(source, "f")
+    (decision,) = [n for n in nodes if n.kind == "decision"]
+    assert len(decision.lines) == 2
+    cy = decision.y + decision.height / 2
+    assert f'y="{cy + 4 - 6}">{decision.lines[0]}</tspan>' in svg
+    assert f'y="{cy + 4 + 6}">{decision.lines[1]}</tspan>' in svg
+
+
+def test_the_annex_centres_a_turning_branch_label_on_its_run() -> None:
+    source = (
+        b"def f(a):\n    if a:\n        return 1\n    if a > 2:\n        return 2\n    return 0\n"
+    )
+    svg, _ = _annex_svg(source, "f")
+    assert re.search(r'text-anchor="middle"[^>]*font-size="10"[^>]*>sí<', svg)
