@@ -4,14 +4,31 @@
 #
 #   scripts/dev.sh            # API on :8000, UI on http://localhost:5173
 #   scripts/dev.sh seed       # also creates the three seed accounts first
+#   scripts/dev.sh workers    # a real queue: Valkey + the two RQ workers
+#                             # (arguments combine: `scripts/dev.sh seed workers`)
 #
 # Production is `docker compose -f docker/docker-compose.yml up --build`
 # (README → Run it); this script exists so a dev session is one command.
-# Nothing here reaches the internet: the vulnerability sync is disabled and
-# the queue runs inline (no Valkey needed).
+# Nothing here reaches the internet: the vulnerability sync is disabled and,
+# by default, the queue runs inline (no Valkey needed). `workers` swaps that
+# for what Compose runs: a local Valkey and two RQ workers with the SAME job
+# classes — `analysis` (PipelineJob) and `reports` (ReportWorkerJob) — so the
+# PDF export is seen as a job: queued, rendering, ready (phase 8). The workers
+# run on the host, so this proves the queue and the allowlists, not that the
+# report worker has no Docker socket; Compose is what proves that.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+SEED=0
+WORKERS=0
+for arg in "$@"; do
+  case "$arg" in
+    seed) SEED=1 ;;
+    workers) WORKERS=1 ;;
+    *) echo "unknown argument: $arg (expected: seed, workers)" >&2; exit 2 ;;
+  esac
+done
 
 PG_CONTAINER="${DIOPTRA_DEV_PG:-dioptra-dev-pg}"
 PG_PORT="${DIOPTRA_DEV_PG_PORT:-55432}"
@@ -58,15 +75,14 @@ export DIOPTRA_OSV_DB_DIR="$DATA/osv"
 export DIOPTRA_WORKSPACE_ROOT="$DATA/workspaces"
 export DIOPTRA_SANDBOX_RUNS_ROOT="$DATA/runs"
 export DIOPTRA_VULNDB_SPOOL_DIR="$DATA/vulndb"
-# Phase 8: finished PDFs wait here. With the queue inline (below) the PDF job
-# renders INSIDE its POST, so in this helper the export is still a one-minute
-# request on a large report; the toast and the one-per-person rule behave as
-# in production only with a real worker (docker compose).
+# Phase 8: finished PDFs wait here. With the queue inline (the default) the
+# PDF job renders INSIDE its POST, so the toast jumps straight to "listo";
+# `scripts/dev.sh workers` shows the queued and rendering states too.
 export DIOPTRA_REPORT_SPOOL_DIR="$DATA/reports"
 export DIOPTRA_VULNDB_SYNC_ENABLED=false
 
 (cd backend && uv run alembic upgrade head)
-if [ "${1:-}" = "seed" ]; then
+if [ "$SEED" = 1 ]; then
   (cd backend && uv run python -m app.seed)
 fi
 
@@ -93,11 +109,40 @@ free_port 5173 "vite"
 cleanup() { kill 0 2>/dev/null || true; }
 trap cleanup EXIT INT TERM
 
+if [ "$WORKERS" = 1 ]; then
+  VALKEY_CONTAINER="${DIOPTRA_DEV_VALKEY:-dioptra-dev-valkey}"
+  VALKEY_PORT="${DIOPTRA_DEV_VALKEY_PORT:-56379}"
+  if ! docker ps --format '{{.Names}}' | grep -qx "$VALKEY_CONTAINER"; then
+    if docker ps -a --format '{{.Names}}' | grep -qx "$VALKEY_CONTAINER"; then
+      docker start "$VALKEY_CONTAINER" >/dev/null
+    else
+      echo "starting $VALKEY_CONTAINER (valkey/valkey:9-alpine on 127.0.0.1:$VALKEY_PORT)"
+      # Loopback only and no persistence: a development broker, nothing more.
+      docker run -d --name "$VALKEY_CONTAINER" -p "127.0.0.1:$VALKEY_PORT:6379" \
+        valkey/valkey:9-alpine valkey-server --save "" --appendonly no >/dev/null
+    fi
+  fi
+  for _ in $(seq 1 30); do
+    if docker exec "$VALKEY_CONTAINER" valkey-cli ping 2>/dev/null | grep -q PONG; then break; fi
+    sleep 1
+  done
+  export DIOPTRA_QUEUE_INLINE=false
+  export DIOPTRA_REDIS_URL="redis://127.0.0.1:$VALKEY_PORT/0"
+  # The same argv as the Compose services, minus the container around them.
+  (cd backend && uv run rq worker --url "$DIOPTRA_REDIS_URL" --serializer json \
+    --job-class app.core.queue.PipelineJob --with-scheduler analysis) &
+  (cd backend && uv run rq worker --url "$DIOPTRA_REDIS_URL" --serializer json \
+    --job-class app.core.queue.ReportWorkerJob --with-scheduler reports) &
+fi
+
 (cd backend && uv run uvicorn app.main:create_app --factory --reload --host 127.0.0.1 --port 8000) &
 (cd frontend && npm run dev) &
 sleep 2
 echo
-echo "UI: http://localhost:5173   API: http://127.0.0.1:8000/api/docs   (Ctrl+C stops both)"
+echo "UI: http://localhost:5173   API: http://127.0.0.1:8000/api/docs   (Ctrl+C stops everything)"
+if [ "$WORKERS" = 1 ]; then
+  echo "Queue: Valkey on 127.0.0.1:$VALKEY_PORT, workers on 'analysis' and 'reports'; PDFs wait in $DATA/reports"
+fi
 echo "Accounts (passwords from .env; every seeded account must change it on first login):"
 printf '  %-8s %-10s %s\n' amedina admin "${DIOPTRA_SEED_PASSWORD_AMEDINA:-<DIOPTRA_SEED_PASSWORD_AMEDINA not set>}"
 printf '  %-8s %-10s %s\n' mmarin  analyst "${DIOPTRA_SEED_PASSWORD_MMARIN:-<DIOPTRA_SEED_PASSWORD_MMARIN not set>}"

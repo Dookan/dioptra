@@ -78,10 +78,14 @@ Usernames are initial + lastname, lowercase, no dots.
 ```bash
 scripts/dev.sh          # API with hot reload on :8000, Vite on http://localhost:5173
 scripts/dev.sh seed     # also creates the three seed accounts
+scripts/dev.sh workers  # a real queue: Valkey + the two RQ workers (arguments combine)
 ```
 
 It uses (or starts) the `dioptra-dev-pg` PostgreSQL container on 127.0.0.1:55432,
-runs the queue inline, keeps the vulnerability sync off and prints the seed
+runs the queue inline by default — `workers` swaps that for the
+`dioptra-dev-valkey` broker on 127.0.0.1:56379 and the same `analysis` and
+`reports` workers Compose runs, so a PDF export is seen queued and rendering —
+keeps the vulnerability sync off and prints the seed
 accounts at the end. `scripts/self_audit.py` runs the committed tree through
 the platform's own pipeline (the plan's last-day self-audit).
 

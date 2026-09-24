@@ -54,6 +54,11 @@ export function ReportJobProvider({ children }: { children: React.ReactNode }): 
   // and no longer blocks the next PDF.
   const [readyId, setReadyId] = useState<string | null>(null);
   const downloading = useRef<string | null>(null);
+  // The request itself is in flight. Without this the screen said nothing
+  // until the server answered — instant behind a real worker, but the whole
+  // render with the queue inline, and never zero on a slow link (reported by
+  // mmarin, 2026-09-23). Feedback starts at the click.
+  const [starting, setStarting] = useState(false);
 
   // A reload, or a new login, recovers the job in flight — or the finished
   // one whose download never happened because the tab was closed.
@@ -132,6 +137,7 @@ export function ReportJobProvider({ children }: { children: React.ReactNode }): 
     async (analysisId: string, version?: number): Promise<boolean> => {
       if (accessToken === null) return false;
       setErrorKey(null);
+      setStarting(true);
       try {
         const created = await api.startReportJob(accessToken, analysisId, version);
         setReadyId(null);
@@ -153,6 +159,8 @@ export function ReportJobProvider({ children }: { children: React.ReactNode }): 
         }
         setErrorKey(errorKeyOf(error));
         return false;
+      } finally {
+        setStarting(false);
       }
     },
     [accessToken],
@@ -168,10 +176,11 @@ export function ReportJobProvider({ children }: { children: React.ReactNode }): 
   }, []);
 
   const busy =
-    job !== null &&
-    (job.status === 'queued' ||
-      job.status === 'running' ||
-      (job.status === 'done' && readyId !== job.id));
+    starting ||
+    (job !== null &&
+      (job.status === 'queued' ||
+        job.status === 'running' ||
+        (job.status === 'done' && readyId !== job.id)));
 
   const value = useMemo<ReportJobState>(
     () => ({ job, busy, errorKey, start, dismiss }),
@@ -184,7 +193,14 @@ export function ReportJobProvider({ children }: { children: React.ReactNode }): 
   // would be re-read every poll for minutes (mockup-fidelity, phase-8 panel).
   let elapsed: string | null = null;
   let closable = false;
-  if (job !== null && job.status === 'queued') {
+  // Only a failure is painted in the error colour, never a request in flight.
+  let failed = false;
+  // Whatever an earlier job left on the toast (an error, a "listo"), a new
+  // request replaces it at once: `busy` keeps this from colliding with a job
+  // still queued or running, since the button cannot be pressed then.
+  if (starting) {
+    title = t('reportJob.toast.startingTitle');
+  } else if (job !== null && job.status === 'queued') {
     title = t('reportJob.toast.queuedTitle');
     body =
       job.ahead > 0
@@ -202,10 +218,12 @@ export function ReportJobProvider({ children }: { children: React.ReactNode }): 
     title = t('reportJob.toast.erroredTitle');
     body = t(reasonKey(job.detail));
     closable = true;
+    failed = true;
   } else if (errorKey !== null) {
     title = t('reportJob.toast.erroredTitle');
     body = t(errorKey);
     closable = true;
+    failed = true;
   }
   // A refusal while a job is being followed adds its sentence under the job.
   const refusal = errorKey !== null && job !== null && job.status !== 'errored' ? errorKey : null;
@@ -221,7 +239,7 @@ export function ReportJobProvider({ children }: { children: React.ReactNode }): 
         <div role="status" aria-label={t('reportJob.toast.label')}>
           {visible && (
             <>
-              <b className={job?.status === 'errored' || !job ? 'bad' : undefined}>{title}</b>
+              <b className={failed ? 'bad' : undefined}>{title}</b>
               {body !== null && <p className="sub">{body}</p>}
               {refusal !== null && <p className="sub">{t(refusal)}</p>}
             </>

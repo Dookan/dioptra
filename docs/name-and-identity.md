@@ -70,7 +70,7 @@ Single authoritative list. Anything not on it MUST NOT embed the product name.
 | i18n keys | `app.name`, `app.brandInitials` in `es.json` / `en.json` |
 | Browser tab title | `Dioptra` in `frontend/index.html` |
 | Favicon | `frontend/public/favicon.svg` — the `DP` mark, `aria-label="Dioptra"` |
-| Development helpers | `dioptra-dev-pg` (the development PostgreSQL container), `~/.cache/dioptra-dev` (its data directory) — `scripts/dev.sh`; the self-audit project `dioptra-self-audit-<date>-<sha>` with system name `Dioptra` — `scripts/self_audit.py` |
+| Development helpers | `dioptra-dev-pg` (the development PostgreSQL container), `dioptra-dev-valkey` (the development broker of `scripts/dev.sh workers`, 127.0.0.1:56379), `~/.cache/dioptra-dev` (their data directory) — `scripts/dev.sh`; the self-audit project `dioptra-self-audit-<date>-<sha>` with system name `Dioptra` — `scripts/self_audit.py` |
 | CycloneDX tool credit | `metadata.tools.components[].name = "Dioptra"` in the CBOM and VEX documents (`backend/app/inventory/documents.py`) |
 
 Renaming again means changing this table first, then everything it lists; the

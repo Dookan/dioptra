@@ -839,6 +839,7 @@
     },
     "toast": {
       "label": "Reporte en PDF",
+      "startingTitle": "Pidiendo tu reporte…",
       "queuedTitle": "Tu reporte está en cola",
       "queuedAhead_one": "Hay {{count}} reporte antes que el tuyo.",
       "queuedAhead_other": "Hay {{count}} reportes antes que el tuyo.",

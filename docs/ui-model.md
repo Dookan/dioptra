@@ -92,6 +92,10 @@ Added to `docs/mockups/index.html` on 2026-08-28, same tokens and principles:
   preparando un PDF; podrás pedir otro cuando termine") — the toast is never
   the only place that explains a disabled button. Below 520 px it spans the
   width at the bottom.
+- **Feedback starts at the click, not at the server's answer** ("Pidiendo tu
+  reporte…", button disabled): behind a real worker the POST returns in
+  milliseconds, but with `dev.sh`'s inline queue it lasts the whole render and
+  the screen said nothing for ~50 s (`mmarin`, 2026-09-23).
 - A reload, or a new login, asks `GET /api/v1/report-jobs/mine` once and
   recovers the toast — and the download of a PDF that finished while the tab
   was closed.

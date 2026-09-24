@@ -391,4 +391,91 @@ describe('asynchronous PDF export', () => {
     });
     expect(toast()).not.toHaveTextContent(es.errors.report.jobInFlight);
   });
+
+  it('answers the click at once, before the server does', async () => {
+    // With the queue inline the POST lasts the whole render; on a slow link it
+    // is never instant. The toast and the disabled button must not wait for it.
+    renderApp({ [POLL]: { status: 200, body: job('running') } });
+    const user = await signIn();
+    let release: (() => void) | undefined;
+    const answered = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const stubbed = globalThis.fetch;
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === START) {
+        return answered.then(
+          () =>
+            new Response(JSON.stringify(job('queued')), {
+              status: 202,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+        );
+      }
+      return (stubbed as typeof globalThis.fetch)(input, init);
+    });
+
+    await confirmPdf(user);
+    expect(toast()).toHaveTextContent(es.reportJob.toast.startingTitle);
+    // A request in flight is not a failure: never the error colour.
+    expect(screen.getByText(es.reportJob.toast.startingTitle)).not.toHaveClass('bad');
+    expect(screen.getByRole('button', { name: es.project.download.pdf })).toBeDisabled();
+    expect(screen.getByText(es.reportJob.blocked)).toBeInTheDocument();
+
+    release?.();
+    await waitFor(() => {
+      expect(toast()).toHaveTextContent(es.reportJob.toast.queuedTitle);
+    });
+    expect(toast()).not.toHaveTextContent(es.reportJob.toast.startingTitle);
+  });
+
+  it('a new request replaces what an earlier failure left on the toast', async () => {
+    renderApp({
+      [START]: sequence(
+        { status: 202, body: job('queued') },
+        { status: 202, body: job('queued', { id: 'j-2' }) },
+      ),
+      [POLL]: { status: 200, body: job('errored', { detail: 'render_failed' }) },
+    });
+    const user = await signIn();
+    await confirmPdf(user);
+    await tick(POLL_MS);
+    await waitFor(() => {
+      expect(toast()).toHaveTextContent(es.reportJob.reason.render_failed);
+    });
+    expect(screen.getByText(es.reportJob.toast.erroredTitle)).toHaveClass('bad');
+
+    let release: (() => void) | undefined;
+    const answered = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const stubbed = globalThis.fetch;
+    vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) =>
+      String(input) === START
+        ? answered.then(() => (stubbed as typeof globalThis.fetch)(input, init))
+        : (stubbed as typeof globalThis.fetch)(input, init),
+    );
+    await confirmPdf(user);
+    // The old failure is gone the instant the person asks again.
+    expect(toast()).toHaveTextContent(es.reportJob.toast.startingTitle);
+    expect(toast()).not.toHaveTextContent(es.reportJob.reason.render_failed);
+    release?.();
+  });
+
+  it('a refusal with no job to follow is painted as a failure', async () => {
+    renderApp({
+      [START]: {
+        status: 503,
+        body: { code: 'report_enqueue_failed', message_key: 'errors.report.enqueueFailed' },
+      },
+    });
+    await confirmPdf(await signIn());
+    await waitFor(() => {
+      expect(toast()).toHaveTextContent(es.errors.report.enqueueFailed);
+    });
+    expect(screen.getByText(es.reportJob.toast.erroredTitle)).toHaveClass('bad');
+    // It can be closed, and the PDF can be asked for again.
+    expect(screen.getByRole('button', { name: es.reportJob.toast.dismiss })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: es.project.download.pdf })).toBeEnabled();
+  });
 });
