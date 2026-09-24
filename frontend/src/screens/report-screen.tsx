@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { ApiError } from '../api/client';
 import * as api from '../api/projects';
 import type { Analysis, Project, ReportFormat, ReportState, Severity } from '../api/projects';
+import { PdfExportButton } from '../report-jobs/pdf-export-button';
 import { useAuth } from '../auth/auth-context';
 import { AppShell } from '../components/app-shell';
 import { stageIndex } from '../components/stages';
@@ -21,7 +22,8 @@ import { Stepper } from '../components/stepper';
 import { widthClass } from '../components/width-class';
 import type { Route } from '../navigation/use-route';
 
-const FORMATS: ReportFormat[] = ['pdf', 'docx', 'md'];
+// The PDF is a worker job (phase 8, PdfExportButton); these three are sub-second.
+const FORMATS: ReportFormat[] = ['docx', 'md'];
 const SEVERITIES: Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
 /** Mirrors backend/app/workflow/triage.py::MIN_JUSTIFICATION_CHARS — the server is the gate. */
 const MIN_JUSTIFICATION = 10;
@@ -286,11 +288,17 @@ export function ReportScreen({ route, onNavigate }: Props): React.ReactNode {
                 })}
               </ul>
               <div className="actions wrap">
+                <PdfExportButton
+                  analysisId={route.analysisId}
+                  label={t('report.export.pdf')}
+                  className="btn primary"
+                  disabled={accessToken === null}
+                />
                 {FORMATS.map((format) => (
                   <button
                     key={format}
                     type="button"
-                    className={format === 'pdf' ? 'btn primary' : 'btn ghost'}
+                    className="btn ghost"
                     disabled={accessToken === null}
                     onClick={() => {
                       void download(format);

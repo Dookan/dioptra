@@ -10,9 +10,21 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import DDL, JSON, ForeignKey, Integer, String, UniqueConstraint, event
+from sqlalchemy import (
+    DDL,
+    JSON,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+    event,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.analysis.models import Analysis
@@ -109,3 +121,76 @@ event.listen(
     "after_create",
     _SQLITE_SIGNED_NO_DELETE.execute_if(dialect="sqlite"),
 )
+
+
+class ReportJobStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    DONE = "done"
+    ERRORED = "errored"
+    #: The artefact was downloaded or swept: the row stays as the trace.
+    EXPIRED = "expired"
+
+
+#: The states that hold a person's "one PDF at a time" slot (survey §7.1).
+IN_FLIGHT = (ReportJobStatus.QUEUED, ReportJobStatus.RUNNING)
+
+
+class ReportJob(Base):
+    """One asynchronous PDF export (phase 8, tasks/phase8-survey.md §5.1).
+
+    The artefact lives in ``DIOPTRA_REPORT_SPOOL_DIR`` under ``<id>.pdf``: its
+    name is derived from the primary key, never from a stored string, so no
+    column can be turned into a filesystem path.
+    """
+
+    __tablename__ = "report_jobs"
+
+    id: Mapped[uuid.UUID] = mapped_column(default=uuid.uuid4, primary_key=True)
+    analysis_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("analyses.id", ondelete="CASCADE"), index=True
+    )
+    #: The editor version asked for; NULL means "the current one at render time".
+    version: Mapped[int | None] = mapped_column(Integer, default=None)
+    format: Mapped[str] = mapped_column(String(8), default="pdf")
+    status: Mapped[ReportJobStatus] = mapped_column(
+        # VALUES, not member names: the partial unique index below spells its
+        # predicate in raw SQL, and SQLAlchemy's default would store 'QUEUED'
+        # where the predicate says 'queued' — the index would then match
+        # nothing and the one-per-person rule would silently vanish.
+        Enum(
+            ReportJobStatus,
+            native_enum=False,
+            length=8,
+            validate_strings=True,
+            values_callable=lambda members: [member.value for member in members],
+        ),
+        default=ReportJobStatus.QUEUED,
+    )
+    requested_by_username: Mapped[str] = mapped_column(String(64))
+    requested_by_id: Mapped[uuid.UUID | None] = mapped_column(default=None)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
+    #: The last time a message for this job was put on the queue: the sweep
+    #: re-enqueues a QUEUED job whose message may have been lost, at most
+    #: once per stale window.
+    enqueued_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
+    started_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    downloaded_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    byte_size: Mapped[int | None] = mapped_column(Integer, default=None)
+    #: A short machine code (``render_failed``, ``spool_full``, ``abandoned``…),
+    #: never a stack trace: the client renders it through an i18n key.
+    detail: Mapped[str | None] = mapped_column(String(200), default=None)
+
+    __table_args__ = (
+        # One job in flight per person is the DATABASE's rule, not a
+        # read-then-insert check two concurrent requests could both pass.
+        Index(
+            "uq_report_jobs_one_in_flight",
+            "requested_by_username",
+            unique=True,
+            postgresql_where=text("status IN ('queued', 'running')"),
+            sqlite_where=text("status IN ('queued', 'running')"),
+        ),
+        Index("ix_report_jobs_status_created", "status", "created_at"),
+    )

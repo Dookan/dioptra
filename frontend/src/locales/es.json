@@ -100,7 +100,12 @@
       "versionNotCurrent": "Solo se puede firmar la versión actual. Recarga la página.",
       "versionAlreadySigned": "Esta versión ya está firmada.",
       "unknownSection": "Esa sección del reporte no se puede editar.",
-      "sectionTooLong": "El texto de la sección es demasiado largo."
+      "sectionTooLong": "El texto de la sección es demasiado largo.",
+      "jobInFlight": "Ya tienes un PDF en preparación. Espera a que termine para pedir otro.",
+      "jobNotFound": "Ese reporte no existe o no es tuyo.",
+      "jobNotReady": "El PDF todavía no está listo, o ya se descargó.",
+      "enqueueFailed": "No se pudo poner el reporte en cola: la cola no responde. Intenta de nuevo en un momento.",
+      "pdfIsQueued": "El PDF se prepara en segundo plano: pídelo con el botón de PDF de la pantalla."
     },
     "findings": {
       "notFound": "El hallazgo no existe."
@@ -280,8 +285,7 @@
       "docx": "Descargar DOCX",
       "md": "Descargar Markdown",
       "sbom": "Descargar SBOM (CycloneDX)",
-      "working": "Preparando…",
-      "workingHint": "Estamos componiendo el documento. En un informe grande el PDF puede tardar cerca de un minuto."
+      "working": "Preparando…"
     },
     "findings": {
       "empty": "No se encontraron hallazgos.",
@@ -817,8 +821,45 @@
       "vulndb.import.request": "importó un archivo de la base de vulnerabilidades",
       "vulndb.sync": "sincronizó la base de vulnerabilidades",
       "vulndb.import": "cargó el archivo importado en la base de vulnerabilidades",
-      "verification.mutant.equivalent": "justificó un mutante como equivalente"
+      "verification.mutant.equivalent": "justificó un mutante como equivalente",
+      "report.export.request": "pidió el reporte en PDF",
+      "report.export": "preparó el reporte en PDF",
+      "report.export.download": "descargó el reporte en PDF"
     },
     "systemActor": "Sistema"
+  },
+  "reportJob": {
+    "blocked": "Ya estás preparando un PDF; podrás pedir otro cuando termine.",
+    "dialog": {
+      "title": "Preparar el reporte en PDF",
+      "body": "El servidor arma el PDF página por página, y en un reporte grande puede tardar varios minutos. Puedes seguir trabajando: te avisamos abajo a la derecha y la descarga empieza sola.",
+      "oneAtATime": "Mientras se prepara no podrás pedir otro PDF.",
+      "confirm": "Preparar el PDF",
+      "cancel": "Cancelar"
+    },
+    "toast": {
+      "label": "Reporte en PDF",
+      "queuedTitle": "Tu reporte está en cola",
+      "queuedAhead_one": "Hay {{count}} reporte antes que el tuyo.",
+      "queuedAhead_other": "Hay {{count}} reportes antes que el tuyo.",
+      "queuedNext": "Es el siguiente en prepararse.",
+      "runningTitle": "Estamos preparando tu reporte",
+      "runningBody": "En un reporte grande puede tardar varios minutos.",
+      "downloadingTitle": "El reporte está listo. Descargando…",
+      "readyTitle": "El reporte está listo",
+      "readyBody": "La descarga empezó.",
+      "erroredTitle": "No pudimos preparar el reporte",
+      "dismiss": "Cerrar",
+      "elapsed": "Lleva {{time}}."
+    },
+    "reason": {
+      "render_failed": "El servidor no pudo componer el PDF. Puedes pedirlo de nuevo.",
+      "spool_full": "No queda espacio para guardar más reportes. Avisa a quien administra la plataforma.",
+      "abandoned": "El trabajo quedó sin terminar. Puedes pedirlo de nuevo.",
+      "enqueue_failed": "La cola no respondió. Puedes pedirlo de nuevo en un momento.",
+      "write_failed": "El servidor no pudo guardar el PDF. Puedes pedirlo de nuevo.",
+      "artefact_missing": "El archivo ya no estaba. Puedes pedirlo de nuevo.",
+      "unknown": "Algo falló. Puedes pedirlo de nuevo."
+    }
   }
 }

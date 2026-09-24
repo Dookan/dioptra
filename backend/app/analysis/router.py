@@ -17,6 +17,7 @@ from app.ingest.errors import AnalysisNotFound, AnalysisNotReady
 from app.projects.router import analysis_out
 from app.projects.schemas import AnalysisOut, FindingOut, finding_out
 from app.reports import engine, versions
+from app.reports.errors import ReportPdfIsQueued
 
 router = APIRouter(prefix="/api/v1/analyses", tags=["analyses"])
 
@@ -68,7 +69,14 @@ def get_report(
 
     ``version`` selects a snapshot of the editor (default: the current one;
     with no saved version the composed baseline renders).
+
+    The PDF is no longer rendered here (phase 8): a large report took a minute
+    of this request, and leaving the path open would make "one PDF at a time"
+    the screen's rule rather than the server's. It is a job —
+    ``POST …/report/jobs``. HTML, Markdown and DOCX stay synchronous.
     """
+    if format == "pdf":
+        raise ReportPdfIsQueued(str(analysis_id))
     analysis = service.get_analysis(db, analysis_id)
     if analysis.status is not AnalysisStatus.DONE:
         raise AnalysisNotReady(analysis.status.value)
@@ -78,9 +86,7 @@ def get_report(
     if selected is None and history:
         selected = history[-1]
     body: bytes | str
-    if format == "pdf":
-        body = engine.render_pdf(analysis, project, version=selected, versions=history)
-    elif format == "html":
+    if format == "html":
         body = engine.render_html(analysis, project, version=selected, versions=history)
     elif format == "md":
         body = engine.render_markdown(analysis, project, version=selected, versions=history)

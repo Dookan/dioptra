@@ -58,7 +58,9 @@ map, CVSS, dedupe) → findings + SBOM persisted → triage (E3, VEX verdicts on
 SCA findings) → risk matrix (E4) → AST briefs + Mermaid diagrams (E5) →
 scaffolds (E6) → sandbox run + coverage + mutation (E7; a failure loops back
 to E5 through an explicit reopen, never a backwards stage move) → report composition
-(E8, including the inventory section) → HTML/PDF/DOCX/Markdown export.
+(E8, including the inventory section) → HTML/DOCX/Markdown export in the
+request, PDF export as a worker job the person follows from a toast (phase 8,
+`reports/jobs.py`).
 
 Off the workflow, per deployment: scheduled sync (or file import) of the
 OSV + NVD mirror → BOM ↔ CVE correlation over every stored SBOM → inventory

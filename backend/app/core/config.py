@@ -152,6 +152,27 @@ class Settings(BaseSettings):
     #: the overview stops and says so.
     max_inventory_components: int = Field(default=50_000, ge=100)
 
+    # --- Asynchronous PDF export (phase 8, tasks/phase8-survey.md) ------------
+    #: Where the report worker writes a finished PDF until its requester downloads
+    #: it; shared by the API and the report worker, like the vulndb spool.
+    report_spool_dir: Path = Path("/var/lib/dioptra/reports")
+    #: Ceiling of PDF renders RUNNING at once across the installation. With
+    #: Compose's single worker exactly one runs whatever this says; it is the
+    #: ceiling an operator who runs more workers gets to use (survey §7.1).
+    max_concurrent_report_jobs: int = Field(default=2, ge=1, le=32)
+    #: The spool refuses a new PDF past this many bytes on disk.
+    report_spool_max_bytes: int = Field(default=2 * 1024 * 1024 * 1024, ge=1024 * 1024)
+    #: A RUNNING job that started longer ago than this is abandoned (its worker
+    #: died), so it stops blocking its requester's next PDF; a QUEUED job whose
+    #: last enqueue is this old is enqueued again rather than abandoned (only
+    #: the retention window abandons a waiting job). Floored above the RQ job
+    #: timeout of a render (20 min, ``core/queue.py::REPORT_JOB_TIMEOUT_SECONDS``):
+    #: a lower value would abandon a render still in progress and let a second
+    #: one start beside it.
+    report_job_stale_minutes: int = Field(default=30, ge=25, le=24 * 60)
+    #: A finished PDF nobody downloaded is deleted after this long.
+    report_job_retention_hours: int = Field(default=24, ge=1, le=24 * 30)
+
     @model_validator(mode="after")
     def _prod_requires_a_secure_refresh_cookie(self) -> Settings:
         """Refuse to boot a production instance that would leak the refresh token.

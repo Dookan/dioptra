@@ -19,6 +19,7 @@ Usernames are initial + lastname, lowercase, no dots: `mmarin`, `cperez`,
 | Edit report sections (E8) | — | ✓ | — |
 | Sign/lock a report version | — | ✓ | — |
 | Export report (PDF/DOCX/Markdown) | ✓ | ✓ | ✓ (may download; "view" never meant a screen-only copy — the developer needs the findings to plan tests) |
+| Follow and download a PDF export job (phase 8) | ✓ any job (downloading one consumes it: the file is deleted and its requester asks again) | own jobs | own jobs — one in flight per person; someone else's job answers 404 |
 | Read the inventory panel; download SBOM / CBOM / VEX / CSV | ✓ | ✓ | ✓ (a vulnerable dependency is a malicious-case candidate at E5) |
 | Refresh the vulnerability mirror: request a sync, import a dump (written reason, audit row) | ✓ | ✓ | — |
 | VEX verdicts | — | via E3 triage only — no separate endpoint | — |

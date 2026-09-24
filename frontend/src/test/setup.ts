@@ -23,3 +23,15 @@ Object.defineProperty(globalThis, 'matchMedia', {
     dispatchEvent: () => false,
   }),
 });
+
+// jsdom ships <dialog> without showModal/close. The polyfill toggles `open`,
+// which is what the accessibility tree reads; focus trapping is the browser's.
+if (typeof HTMLDialogElement.prototype.showModal !== 'function') {
+  HTMLDialogElement.prototype.showModal = function showModal(this: HTMLDialogElement) {
+    this.setAttribute('open', '');
+  };
+  HTMLDialogElement.prototype.close = function close(this: HTMLDialogElement) {
+    this.removeAttribute('open');
+    this.dispatchEvent(new Event('close'));
+  };
+}

@@ -60,3 +60,49 @@ class SectionTooLong(ReportError):
     status_code = 422
     code = "report_section_too_long"
     message_key = "errors.report.sectionTooLong"
+
+
+# --- Asynchronous PDF export (phase 8) ---------------------------------------
+
+
+class ReportJobInFlight(ReportError):
+    """The person already has a PDF queued or running (survey §7.1)."""
+
+    status_code = 409
+    code = "report_job_in_flight"
+    message_key = "errors.report.jobInFlight"
+
+
+class ReportJobNotFound(ReportError):
+    """Unknown job — or someone else's: 404 either way, never an oracle."""
+
+    status_code = 404
+    code = "report_job_not_found"
+    message_key = "errors.report.jobNotFound"
+
+
+class ReportJobNotReady(ReportError):
+    """The PDF is not there to download: still rendering, failed, or taken."""
+
+    status_code = 409
+    code = "report_job_not_ready"
+    message_key = "errors.report.jobNotReady"
+
+
+class ReportEnqueueFailed(ReportError):
+    status_code = 503
+    code = "report_enqueue_failed"
+    message_key = "errors.report.enqueueFailed"
+
+
+class ReportPdfIsQueued(ReportError):
+    """The synchronous endpoint no longer renders PDFs: ask for a job instead.
+
+    Rendering one in a request is what froze the screen, and leaving the path
+    open would make the one-per-person rule the screen's rather than the
+    server's.
+    """
+
+    status_code = 409
+    code = "report_pdf_is_queued"
+    message_key = "errors.report.pdfIsQueued"

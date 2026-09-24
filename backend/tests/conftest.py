@@ -35,6 +35,8 @@ os.environ.setdefault("DIOPTRA_SANDBOX_RUNS_ROOT", tempfile.mkdtemp(prefix="diop
 # The sync job itself never reaches the network here: every test that runs it
 # replaces `app.inventory.sync.download` with a fixture writer.
 os.environ.setdefault("DIOPTRA_VULNDB_SPOOL_DIR", tempfile.mkdtemp(prefix="dioptra-test-vulndb-"))
+# Phase 8: where a finished PDF waits for its requester.
+os.environ.setdefault("DIOPTRA_REPORT_SPOOL_DIR", tempfile.mkdtemp(prefix="dioptra-test-reports-"))
 
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -97,6 +99,10 @@ def app(session_factory: sessionmaker[Session], monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr("app.workflow.verify_job.get_session_factory", lambda: session_factory)
     # The inventory's sync and import jobs do the same (P5).
     monkeypatch.setattr("app.inventory.sync.get_session_factory", lambda: session_factory)
+    # And the asynchronous PDF export (phase 8).
+    monkeypatch.setattr("app.reports.jobs.get_session_factory", lambda: session_factory)
+    # The start-up sweep imports the factory lazily from its home module.
+    monkeypatch.setattr("app.db.session.get_session_factory", lambda: session_factory)
 
     def override_get_db() -> Iterator[Session]:
         session = session_factory()

@@ -62,6 +62,47 @@ Added to `docs/mockups/index.html` on 2026-08-28, same tokens and principles:
   of whom may triage — it lands with the per-action role vocabulary named as a
   non-goal in `tasks/phase6-user-administration.md`.
 
+## Descargar PDF — a job with a dialog and a toast (phase 8, 2026-09-23)
+
+- **Supersedes the PDF half of the section below.** "Descargar PDF" (screen
+  03) and "Exportar PDF" (screen 09) open a native `<dialog>` first
+  (`report-jobs/pdf-export-button.tsx`) that says a large report can take
+  several minutes and that no other PDF can be asked for meanwhile, with
+  "Preparar el PDF" / "Cancelar". Confirming starts a worker job; DOCX,
+  Markdown and the SBOM keep the synchronous busy state below.
+- A **toast at the bottom right** (`report-jobs/report-job-provider.tsx`,
+  mounted above every authenticated screen) follows the job: "Tu reporte está
+  en cola" with how many are ahead — never "preparando" while it only waits,
+  because with one worker a queued job is not being worked on — then
+  "Estamos preparando tu reporte" with "Lleva m:ss" underneath, then "El
+  reporte está listo · La descarga empezó", after which it closes itself in
+  four seconds. A failure says why in plain words and offers "Cerrar". The
+  word is **reporte**, the anchor's, not "informe". Accessibility, from the
+  panel: only the status sentences sit in the `role="status"` region; the
+  clock is `aria-hidden` beside it, because inside it would be re-announced
+  every two seconds for minutes; and the empty toast is VISUALLY hidden,
+  never `display:none`, so the region is in the accessibility tree before its
+  first sentence. The dialog carries `aria-describedby` on its two
+  sentences, and confirming moves focus to the "why is this disabled" note,
+  since the dialog would otherwise return it to a button it just disabled.
+- **Where, and the trade-off**: `mmarin` chose the toast over a strip under
+  the tabs bar (survey §7.5). A toast is easier to miss and this one blocks
+  the person's next PDF, so it is **not dismissible while queued or
+  running**, and every disabled PDF button says why beside itself ("Ya estás
+  preparando un PDF; podrás pedir otro cuando termine") — the toast is never
+  the only place that explains a disabled button. Below 520 px it spans the
+  width at the bottom.
+- A reload, or a new login, asks `GET /api/v1/report-jobs/mine` once and
+  recovers the toast — and the download of a PDF that finished while the tab
+  was closed.
+- Recorded deviations: the anchor has no modal and no toast anywhere; both
+  follow the date popover's elevation (a surface step up, the anchor's float
+  shadow). The dialog's backdrop is `rgba(0, 0, 0, 0.35)` — a literal, like
+  that shadow, because the token set has no scrim; `mmarin`'s call whether it
+  becomes a token. **Not checked on screen yet**: no test applies
+  `components.css` (see the note under "Hallazgos (E3) — código de
+  terceros"), so the toast's placement in both themes needs the same look.
+
 ## Descargas del reporte (screen 03) — 2026-09-23
 
 - The export buttons carry a **busy state**: the one in flight reads

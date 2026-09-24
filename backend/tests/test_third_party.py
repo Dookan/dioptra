@@ -199,7 +199,6 @@ def test_dependency_findings_are_still_listed_and_still_reported(
         ("html", b"vendor/b.php"),
         ("md", b"vendor/b.php"),
         ("docx", None),
-        ("pdf", None),
     ):
         response = client.get(
             f"/api/v1/analyses/{analysis.id}/report?format={fmt}", headers=headers
@@ -208,3 +207,8 @@ def test_dependency_findings_are_still_listed_and_still_reported(
         assert response.content, fmt
         if needle is not None:
             assert needle in response.content, fmt
+    # The PDF is a job since phase 8; the queue runs inline in the suite.
+    job = client.post(f"/api/v1/analyses/{analysis.id}/report/jobs", json={}, headers=headers)
+    assert job.status_code == 202, job.text
+    pdf = client.get(f"/api/v1/report-jobs/{job.json()['id']}/download", headers=headers)
+    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")

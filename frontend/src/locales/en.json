@@ -100,7 +100,12 @@
       "versionNotCurrent": "Only the current version can be signed. Reload the page.",
       "versionAlreadySigned": "This version is already signed.",
       "unknownSection": "That report section cannot be edited.",
-      "sectionTooLong": "The section text is too long."
+      "sectionTooLong": "The section text is too long.",
+      "jobInFlight": "You already have a PDF being prepared. Wait for it to finish before asking for another.",
+      "jobNotFound": "That report does not exist or is not yours.",
+      "jobNotReady": "The PDF is not ready yet, or it was already downloaded.",
+      "enqueueFailed": "The report could not be queued: the queue is not answering. Try again in a moment.",
+      "pdfIsQueued": "The PDF is prepared in the background: ask for it with the PDF button on the screen."
     },
     "findings": {
       "notFound": "The finding does not exist."
@@ -280,8 +285,7 @@
       "docx": "Download DOCX",
       "md": "Download Markdown",
       "sbom": "Download SBOM (CycloneDX)",
-      "working": "Preparing…",
-      "workingHint": "We are composing the document. On a large report the PDF can take close to a minute."
+      "working": "Preparing…"
     },
     "findings": {
       "empty": "No findings were found.",
@@ -817,8 +821,45 @@
       "vulndb.import.request": "imported a vulnerability-database file",
       "vulndb.sync": "synchronised the vulnerability database",
       "vulndb.import": "loaded the imported file into the vulnerability database",
-      "verification.mutant.equivalent": "justified a mutant as equivalent"
+      "verification.mutant.equivalent": "justified a mutant as equivalent",
+      "report.export.request": "asked for the PDF report",
+      "report.export": "prepared the PDF report",
+      "report.export.download": "downloaded the PDF report"
     },
     "systemActor": "System"
+  },
+  "reportJob": {
+    "blocked": "You are already preparing a PDF; you can ask for another once it finishes.",
+    "dialog": {
+      "title": "Prepare the PDF report",
+      "body": "The server builds the PDF page by page, and a large report can take several minutes. You can keep working: we let you know at the bottom right and the download starts on its own.",
+      "oneAtATime": "While it is being prepared you cannot ask for another PDF.",
+      "confirm": "Prepare the PDF",
+      "cancel": "Cancel"
+    },
+    "toast": {
+      "label": "PDF report",
+      "queuedTitle": "Your report is in the queue",
+      "queuedAhead_one": "There is {{count}} report ahead of yours.",
+      "queuedAhead_other": "There are {{count}} reports ahead of yours.",
+      "queuedNext": "It is the next one to be prepared.",
+      "runningTitle": "We are preparing your report",
+      "runningBody": "A large report can take several minutes.",
+      "downloadingTitle": "The report is ready. Downloading…",
+      "readyTitle": "The report is ready",
+      "readyBody": "The download has started.",
+      "erroredTitle": "We could not prepare the report",
+      "dismiss": "Close",
+      "elapsed": "{{time}} so far."
+    },
+    "reason": {
+      "render_failed": "The server could not compose the PDF. You can ask for it again.",
+      "spool_full": "There is no room left to store more reports. Tell whoever administers the platform.",
+      "abandoned": "The job was left unfinished. You can ask for it again.",
+      "enqueue_failed": "The queue did not answer. You can ask again in a moment.",
+      "write_failed": "The server could not store the PDF. You can ask for it again.",
+      "artefact_missing": "The file was no longer there. You can ask for it again.",
+      "unknown": "Something failed. You can ask for it again."
+    }
   }
 }

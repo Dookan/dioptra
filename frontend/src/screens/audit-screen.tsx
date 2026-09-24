@@ -64,6 +64,9 @@ const KNOWN_ACTIONS = new Set([
   'vulndb.import.request',
   'vulndb.sync',
   'vulndb.import',
+  'report.export.request',
+  'report.export',
+  'report.export.download',
 ]);
 
 function Row({ entry }: { entry: AuditEntry }): React.ReactNode {

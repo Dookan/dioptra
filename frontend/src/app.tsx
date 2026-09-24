@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 
 import { useAuth } from './auth/auth-context';
 import { useRoute } from './navigation/use-route';
+import { ReportJobProvider } from './report-jobs/report-job-provider';
 import { AuditScreen } from './screens/audit-screen';
 import { FindingsScreen } from './screens/findings-screen';
 import { InventoryScreen } from './screens/inventory-screen';
@@ -65,7 +66,12 @@ export function App(): React.ReactNode {
     case 'password-change':
       return <PasswordChangeScreen />;
     case 'authenticated':
-      return <Authenticated />;
+      // Above every screen: the PDF job outlives the screen it started on.
+      return (
+        <ReportJobProvider>
+          <Authenticated />
+        </ReportJobProvider>
+      );
     case 'anonymous':
       return <LoginScreen />;
   }

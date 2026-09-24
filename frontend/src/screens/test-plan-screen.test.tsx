@@ -329,7 +329,8 @@ describe('test plan screen', () => {
     // named `showing.all`, which the ternary cannot pick while a filter is
     // active — it could never have failed (coverage adversary, 2026-09-23).
     // The count line must be absent altogether, so assert on the role.
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    // Scoped to the screen: the PDF toast's live region sits outside <main>.
+    expect(within(screen.getByRole('main')).queryByRole('status')).not.toBeInTheDocument();
 
     // Clearing the box restores the full list. `lastQuery` is what makes this
     // work: without it the effect compares '' to a never-updated '' and
@@ -350,7 +351,8 @@ describe('test plan screen', () => {
     });
     await signIn('cperez');
     expect(await screen.findByText(es.plan.noFunctions)).toBeInTheDocument();
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    // Scoped to the screen: the PDF toast's live region sits outside <main>.
+    expect(within(screen.getByRole('main')).queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('saves a function that was ticked before a filter hid it', async () => {

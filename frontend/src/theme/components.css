@@ -1807,3 +1807,113 @@ button.card:focus-visible {
     scroll-behavior: smooth;
   }
 }
+
+/* --- asynchronous PDF export (phase 8) ------------------------------------
+   `.sub` has no bare rule; beside an export button it says why the PDF
+   button is disabled, so it gets the load-bearing --t2, never --t3. */
+.actions .sub {
+  align-self: center;
+  color: var(--t2);
+  font-size: 12.5px;
+}
+
+/* The toast `mmarin` chose over a strip under the tabs bar (survey §7.5).
+   A surface step above the page and the anchor's float shadow, like the
+   date popover; the accent border marks it as the platform speaking, the
+   same edge the "next step" banner uses. It is NOT dismissible while the
+   job runs, so it must never cover content for good: it sits in the corner,
+   narrow, and below 520 px it spans the width at the bottom instead. */
+.jobtoast {
+  position: fixed;
+  z-index: 40;
+  right: 16px;
+  bottom: 16px;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  padding: 12px 14px;
+  background: var(--s2);
+  border: 1px solid var(--acc);
+  border-radius: var(--radius-card);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.07);
+  color: var(--ink);
+}
+
+/* Empty is VISUALLY hidden, never display:none: the live region inside must
+   already be in the accessibility tree when its first sentence arrives. */
+.jobtoast.empty {
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The m:ss clock changes on every poll; fixed-width digits keep it still. */
+.jobtoast .clock {
+  font-variant-numeric: tabular-nums;
+}
+
+.jobtoast b {
+  display: block;
+  font-size: 13.5px;
+}
+
+.jobtoast b.bad {
+  color: var(--err);
+}
+
+.jobtoast .sub {
+  margin: 4px 0 0;
+  color: var(--t2);
+  font-size: 12.5px;
+}
+
+.jobtoast .actions {
+  margin-top: 10px;
+  justify-content: flex-end;
+}
+
+@media (max-width: 520px) {
+  .jobtoast {
+    right: 8px;
+    left: 8px;
+    bottom: 8px;
+    width: auto;
+    max-width: none;
+  }
+}
+
+/* The confirmation before a PDF starts: a native <dialog>, so focus trapping
+   and Escape are the browser's. */
+.dialog {
+  max-width: 440px;
+  padding: 18px 20px;
+  background: var(--s1);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-frame);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.07);
+}
+
+.dialog::backdrop {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.dialog h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.dialog p {
+  margin: 0 0 8px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.dialog .sub {
+  color: var(--t2);
+  font-size: 12.5px;
+}

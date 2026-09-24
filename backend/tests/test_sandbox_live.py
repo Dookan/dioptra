@@ -25,6 +25,7 @@ from app.core.config import Settings, get_settings
 from app.sandbox import executor, results, workspace
 from app.sandbox.errors import SandboxTimedOut
 from app.workflow.scaffold import ScaffoldCase, ScaffoldFile
+from app.workflow.verify import Outcome
 
 pytestmark = pytest.mark.sandbox
 
@@ -560,7 +561,7 @@ def test_a_weak_php_suite_leaves_surviving_mutants(php_live: Settings, tmp_path:
         workspace.discard(attempt)
 
 
-def _php_verify(settings: Settings, tmp_path: Path, content: str) -> object:
+def _php_verify(settings: Settings, tmp_path: Path, content: str) -> Outcome:
     """Drive the REAL scoring path over a real PHP sandbox run.
 
     `verify_function` is what the worker calls: it builds the attempt, runs the

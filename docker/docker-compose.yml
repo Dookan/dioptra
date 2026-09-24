@@ -62,6 +62,9 @@ services:
       DIOPTRA_WORKSPACE_ROOT: /var/lib/dioptra/workspaces
       DIOPTRA_VULNDB_SPOOL_DIR: /var/lib/dioptra/vulndb
       DIOPTRA_VULNDB_SYNC_ENABLED: ${DIOPTRA_VULNDB_SYNC_ENABLED:-true}
+      # Phase 8: the worker writes a finished PDF here and the API hands it to
+      # its requester, then deletes it. The API never renders a PDF itself.
+      DIOPTRA_REPORT_SPOOL_DIR: /var/lib/dioptra/reports
       # WeasyPrint's font cache must land on the tmpfs: the root is read-only.
       XDG_CACHE_HOME: /tmp
     volumes:
@@ -71,6 +74,9 @@ services:
       # A vulnerability dump uploaded through the panel waits here for the
       # worker's import job; the API only spools it (P5, tasks/phase5-survey.md §2).
       - ${DIOPTRA_DATA_DIR:-/var/lib/dioptra}/vulndb:/var/lib/dioptra/vulndb
+      # A finished PDF waits here for its requester (phase 8); the API reads it
+      # once, deletes it after sending, and sweeps what nobody took.
+      - ${DIOPTRA_DATA_DIR:-/var/lib/dioptra}/reports:/var/lib/dioptra/reports
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -190,6 +196,52 @@ services:
     # group. Its GID differs per host: `stat -c %g /var/run/docker.sock`.
     group_add:
       - "${DIOPTRA_DOCKER_GID:-999}"
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  # Phase 8: renders the institutional PDF, and nothing else. WeasyPrint shapes
+  # hostile text (snippets, paths, lockfile names, test files) through native
+  # code (Pango, HarfBuzz, cairo); it must not do that in the process holding
+  # the Docker socket, which is root on the host. So this worker has NO socket,
+  # no jail, no runs directory — only the reports spool — listens only on the
+  # `reports` queue, and its job class refuses every callable but the PDF
+  # export (`app.core.queue.ReportWorkerJob`), just as the `worker` above
+  # refuses the PDF export. One process: exactly one PDF renders at a time
+  # whatever DIOPTRA_MAX_CONCURRENT_REPORT_JOBS says; the cap is the ceiling an
+  # operator who scales this service gets to use (tasks/phase8-survey.md §7.1).
+  report-worker:
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    environment:
+      DIOPTRA_ENV: ${DIOPTRA_ENV:-prod}
+      DIOPTRA_DATABASE_URL: postgresql+psycopg://dioptra_app:${DIOPTRA_APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-dioptra}
+      DIOPTRA_JWT_SECRET: ${DIOPTRA_JWT_SECRET:?DIOPTRA_JWT_SECRET is required (32+ characters)}
+      DIOPTRA_REDIS_URL: redis://valkey:6379/0
+      DIOPTRA_REPORT_SPOOL_DIR: /var/lib/dioptra/reports
+      DIOPTRA_MAX_CONCURRENT_REPORT_JOBS: ${DIOPTRA_MAX_CONCURRENT_REPORT_JOBS:-2}
+      # WeasyPrint's font cache must land on the tmpfs: the root is read-only.
+      XDG_CACHE_HOME: /tmp
+    volumes:
+      - ${DIOPTRA_DATA_DIR:-/var/lib/dioptra}/reports:/var/lib/dioptra/reports
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    # `--with-scheduler`: a job the concurrency cap deferred comes back through
+    # RQ's own delayed queue (a job the sweep re-enqueues is enqueued directly).
+    command:
+      [
+        "rq", "worker", "--url", "redis://valkey:6379/0",
+        "--serializer", "json", "--job-class", "app.core.queue.ReportWorkerJob",
+        "--with-scheduler",
+        "reports",
+      ]
+    read_only: true
+    tmpfs:
+      - /tmp
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped

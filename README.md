@@ -93,8 +93,9 @@ Docker daemon. The image is built once by Compose. Two things are operator
 choices:
 
 - **One data directory, same path on host and containers.** `DIOPTRA_DATA_DIR`
-  (default `/var/lib/dioptra`, owned by uid 10001) holds the per-analysis jails
-  and the OSV database. `docker run` bind mounts are resolved by the host
+  (default `/var/lib/dioptra`, owned by uid 10001) holds the per-analysis jails,
+  the OSV database, the vulnerability-dump spool and `reports/` — finished PDFs
+  waiting for their requester, deleted once downloaded (phase 8). `docker run` bind mounts are resolved by the host
   daemon, which is why the path must be identical on both sides.
 - **Vulnerability data is local.** Run
   `scripts/osv_db_download.sh /var/lib/dioptra/osv` on a connected host (or copy

@@ -170,18 +170,18 @@ describe('project screen', () => {
     expect(screen.getByRole('button', { name: es.project.findings.review })).toBeInTheDocument();
   });
 
-  it('says it is working and refuses a second click while the PDF is being composed', async () => {
-    // The server composes the PDF with WeasyPrint: 58 s measured on a real
-    // Laravel analysis with 687 findings. Without feedback the screen reads as
-    // frozen, and a second click stacks another minute of server work.
+  it('says it is working and refuses a second click while a synchronous download runs', async () => {
+    // The PDF is a worker job since phase 8 (report-jobs/*.test.tsx); DOCX,
+    // Markdown and the SBOM are still fetched in the request, and a slow link
+    // must not read as a frozen screen or invite a second click.
     renderProject({
       [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [analysis('done')] },
     });
     const user = await signIn();
 
-    const pdf = await screen.findByRole('button', { name: es.project.download.pdf });
+    const docx = await screen.findByRole('button', { name: es.project.download.docx });
     await waitFor(() => {
-      expect(pdf).toBeEnabled();
+      expect(docx).toBeEnabled();
     });
 
     // Hold the report request open; everything else keeps its stub.
@@ -192,21 +192,20 @@ describe('project screen', () => {
     const stubbed = globalThis.fetch;
     vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
       if (String(input).includes('/report?format=')) {
-        return held.then(() => new Response('PDF', { status: 200 }));
+        return held.then(() => new Response('PK', { status: 200 }));
       }
       return (stubbed as typeof globalThis.fetch)(input, init);
     });
 
-    await user.click(pdf);
+    await user.click(docx);
 
     const working = await screen.findByRole('button', { name: es.project.download.working });
     expect(working).toBeDisabled();
     expect(screen.getByRole('button', { name: es.project.download.sbom })).toBeDisabled();
-    expect(screen.getByText(es.project.download.workingHint)).toBeInTheDocument();
 
     release?.();
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: es.project.download.pdf })).toBeEnabled();
+      expect(screen.getByRole('button', { name: es.project.download.docx })).toBeEnabled();
     });
   });
 });

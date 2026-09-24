@@ -205,12 +205,12 @@ def test_report_is_refused_until_the_analysis_is_done(
     )
     db.add(analysis)
     db.commit()
-    response = client.get(f"/api/v1/analyses/{analysis.id}/report", headers=headers)
+    response = client.get(f"/api/v1/analyses/{analysis.id}/report?format=html", headers=headers)
     assert response.status_code == 409
     assert response.json()["code"] == "analysis_not_ready"
 
 
-@pytest.mark.parametrize("fmt", ["html", "md", "docx", "pdf"])
+@pytest.mark.parametrize("fmt", ["html", "md", "docx"])
 def test_report_exports_after_an_inline_run(client: TestClient, analyst: User, fmt: str) -> None:
     headers = login(client, analyst.username)
     project_id = client.post("/api/v1/projects", json=PROJECT, headers=headers).json()["id"]
@@ -223,9 +223,7 @@ def test_report_exports_after_an_inline_run(client: TestClient, analyst: User, f
     response = client.get(f"/api/v1/analyses/{analysis_id}/report?format={fmt}", headers=headers)
     assert response.status_code == 200, response.text
     assert "attachment" in response.headers["content-disposition"] or fmt == "html"
-    if fmt == "pdf":
-        assert response.content.startswith(b"%PDF")
-    elif fmt == "docx":
+    if fmt == "docx":
         assert response.content.startswith(b"PK")
     else:
         assert "formulario_mincyt_apirest-desarrollo" in response.text

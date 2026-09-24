@@ -1,8 +1,10 @@
 # Phase 8 survey — the report export becomes asynchronous
 
-> **Status: SURVEY — read-only. Written 2026-09-23. §7.1 and §7.4 answered
-> by `mmarin`; §7.2, §7.3 and §7.5 still open, and the Verdict's condition
-> (commit phase 7a first) was accepted.**
+> **Status: SIGNED OFF 2026-09-23 by `mmarin`** — every question of §7
+> answered (§7.2 requester or admin, §7.3 delete on download + start-up sweep
+> + spool cap, §7.5 a bottom-right toast), and the Verdict's condition met:
+> phase 7a is committed (`1b5795e`, `48528d2`, `5135bde`) and the tree was
+> clean when this phase opened. Task file: `tasks/phase8-async-report-export.md`.
 > Plan-first investigation gate (CLAUDE.md → Agent Behavioral Rules): this
 > slice adds a **fifth job to the queue allowlist** — a documented security
 > control (`docs/threat-model.md` → the Valkey residual: "a job class that
@@ -192,10 +194,12 @@ every PDF button in the app is disabled and says so.
    refused with a typed error naming their job in flight; a request that
    would exceed N is ACCEPTED and waits, because refusing it would punish a
    person for someone else's export.
-2. **Who may download a finished job.** Recommendation: the requester or the
-   admin. The report itself is downloadable by all three roles today, so this
+2. **Who may download a finished job → ANSWERED by `mmarin`, 2026-09-23:
+   the requester or the admin.** The report itself is downloadable by all three roles today, so this
    is about not handing one person's spooled artefact to another.
-3. **How long a finished PDF lives on disk**, and what removes it. There is no
+3. **How long a finished PDF lives on disk → ANSWERED by `mmarin`,
+   2026-09-23: deleted on a successful download, plus a cap on the spool
+   directory and a start-up sweep of jobs older than N hours.** There is no
    retention job in the platform and `docs/standards-mapping.md` → V8 already
    records "no data-retention schedule for old analyses" as a gap.
    Recommendation: delete on successful download, plus a cap on the spool
@@ -207,10 +211,14 @@ every PDF button in the app is disabled and says so.
    516-page report stays a ~50 s render. This phase makes that wait
    asynchronous and legible; it does not shorten it, and nothing in it should
    be described as making the PDF faster.
-5. **Where the banner lives**: under the tabs bar (my recommendation, it is
-   the one strip present on every screen and it pushes nothing around) or
-   floating bottom-right as a toast (less intrusive, but easier to miss, and
-   this one has to be noticed because it blocks other exports).
+5. **Where the banner lives → ANSWERED by `mmarin`, 2026-09-23: floating
+   bottom-right as a TOAST**, against the recommendation of the tabs-bar
+   strip. Consequence carried into the build: because a toast is easier to
+   miss and this one blocks the person's next PDF, it is NOT auto-dismissed
+   while the job is queued or running, it is a `role="status"` live region so
+   a screen reader announces each state change, and every disabled PDF button
+   says in its own words why it is disabled — the toast is never the only
+   place that says so.
 
 ## 8. Estimate
 
@@ -246,4 +254,4 @@ any of it. The honest part is §2 — **this phase does not make the PDF faster.
 It stops it blocking a request and tells the person what is happening. The
 only real speed lever found is printing fewer pages, and that is §7.4.
 
-Signed off by: ______________  date: __________
+Signed off by: `mmarin`  date: 2026-09-23 (answers to §7.2, §7.3, §7.5 given in session; §7.1 and §7.4 earlier the same day)

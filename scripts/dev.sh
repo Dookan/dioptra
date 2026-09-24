@@ -45,7 +45,7 @@ PG_PASSWORD="$(docker inspect "$PG_CONTAINER" --format '{{range .Config.Env}}{{p
   | sed -n 's/^POSTGRES_PASSWORD=//p' | head -1)"
 PG_PASSWORD="${PG_PASSWORD:-${POSTGRES_PASSWORD:-dioptra}}"
 
-mkdir -p "$DATA/workspaces" "$DATA/runs" "$DATA/vulndb" "$DATA/osv"
+mkdir -p "$DATA/workspaces" "$DATA/runs" "$DATA/vulndb" "$DATA/osv" "$DATA/reports"
 
 export DIOPTRA_ENV="${DIOPTRA_ENV:-dev}"
 export DIOPTRA_REFRESH_COOKIE_SECURE=false
@@ -58,6 +58,11 @@ export DIOPTRA_OSV_DB_DIR="$DATA/osv"
 export DIOPTRA_WORKSPACE_ROOT="$DATA/workspaces"
 export DIOPTRA_SANDBOX_RUNS_ROOT="$DATA/runs"
 export DIOPTRA_VULNDB_SPOOL_DIR="$DATA/vulndb"
+# Phase 8: finished PDFs wait here. With the queue inline (below) the PDF job
+# renders INSIDE its POST, so in this helper the export is still a one-minute
+# request on a large report; the toast and the one-per-person rule behave as
+# in production only with a real worker (docker compose).
+export DIOPTRA_REPORT_SPOOL_DIR="$DATA/reports"
 export DIOPTRA_VULNDB_SYNC_ENABLED=false
 
 (cd backend && uv run alembic upgrade head)

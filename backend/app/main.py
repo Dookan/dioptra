@@ -25,6 +25,7 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.inventory.router import router as inventory_router
 from app.projects.router import router as projects_router
+from app.reports.jobs_router import router as report_jobs_router
 from app.reports.router import router as reports_router
 from app.workflow.router import router as findings_router
 from app.workflow.router import workflow_router
@@ -75,6 +76,17 @@ async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
             enqueue_sync(None, delay_seconds=60)
         except Exception:  # noqa: BLE001 — logged; start-up continues
             logger.warning("could not schedule the vulnerability sync at start-up", exc_info=True)
+    # Phase 8, survey §7.3: the start-up sweep of the PDF spool — abandoned
+    # jobs free their requester, finished files nobody took are deleted. It
+    # also runs before every job request, so a failure here costs nothing.
+    try:
+        from app.db.session import get_session_factory  # noqa: PLC0415
+        from app.reports.jobs import sweep_and_requeue  # noqa: PLC0415
+
+        with get_session_factory()() as db:
+            sweep_and_requeue(db, settings)
+    except Exception:  # noqa: BLE001 — logged; start-up continues
+        logger.warning("could not sweep the report spool at start-up", exc_info=True)
     yield
 
 
@@ -149,4 +161,5 @@ def create_app() -> FastAPI:
     app.include_router(findings_router)
     app.include_router(workflow_router)
     app.include_router(reports_router)
+    app.include_router(report_jobs_router)
     return app

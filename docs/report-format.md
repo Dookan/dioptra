@@ -92,6 +92,19 @@ of the analyst's, so they are absent from the editor's section list
 - Exports: PDF (Jinja2 → HTML → WeasyPrint, template identical to the manual
   one), DOCX (basic in P1, python-docx as the candidate library), Markdown.
   Report language follows the UI language (es default).
+- **The PDF is a worker job since phase 8** (`tasks/phase8-survey.md`,
+  `backend/app/reports/jobs.py`): `POST …/report/jobs` audits and enqueues,
+  a dedicated `report-worker` with no Docker socket renders with the same `engine.render_pdf` call and writes the
+  file to `DIOPTRA_REPORT_SPOOL_DIR`, and `GET /api/v1/report-jobs/{id}/download`
+  hands it to its requester (or the admin) once and deletes it. One PDF in
+  flight per person (a partial unique index); at most
+  `DIOPTRA_MAX_CONCURRENT_REPORT_JOBS` running, a job over the cap waits
+  rather than being refused. **1.x contract change**: `GET …/report?format=pdf`
+  refuses with 409 `report_pdf_is_queued`; HTML, Markdown and DOCX stay
+  synchronous. **The render is not faster** — a 516-page report still takes
+  ~50 s, all of it WeasyPrint; `mmarin` declined printing fewer pages (survey
+  §7.4). No PDF is cached: sections 7–10 are composed live (above), so a cache
+  key would have to cover every workflow row and the mirror's date.
 - Known PDF risks (plan, week 2): long tables, page breaks, repeated headers
   in WeasyPrint. That is why day 10 is entirely fidelity work; if it slips,
   buffer is consumed and P2 starts anyway on the data.

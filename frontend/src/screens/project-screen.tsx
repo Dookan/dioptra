@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { ApiError } from '../api/client';
 import * as api from '../api/projects';
 import type { Analysis, Project, ReportFormat, Severity } from '../api/projects';
+import { PdfExportButton } from '../report-jobs/pdf-export-button';
 import { useAuth } from '../auth/auth-context';
 import { AdvanceStage } from '../components/advance-stage';
 import { AppShell } from '../components/app-shell';
@@ -20,7 +21,8 @@ import type { Route } from '../navigation/use-route';
 
 const POLL_MS = 3000;
 const SEVERITIES: Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
-const FORMATS: ReportFormat[] = ['pdf', 'docx', 'md'];
+// The PDF is a worker job (phase 8, PdfExportButton); these three are sub-second.
+const FORMATS: ReportFormat[] = ['docx', 'md'];
 
 interface Props {
   route: Route;
@@ -149,11 +151,8 @@ function Downloads({ analysis }: { analysis: Analysis }): React.ReactNode {
   const { t } = useTranslation();
   const { accessToken } = useAuth();
   const [errorKey, setErrorKey] = useState<string | null>(null);
-  // Which download is in flight, or null. The PDF of a real report is composed
-  // by WeasyPrint on the server and takes a WHILE — measured at 58 s on a
-  // Laravel analysis with 687 findings. Without this the button stayed
-  // enabled and said nothing, so the screen read as frozen and a second click
-  // stacked another minute of server work on top of the first.
+  // Which synchronous download is in flight, or null. The PDF is not one of
+  // them since phase 8: it is a worker job with its own dialog and toast.
   const [busy, setBusy] = useState<ReportFormat | 'sbom' | null>(null);
   const ready = analysis.status === 'done';
 
@@ -174,11 +173,17 @@ function Downloads({ analysis }: { analysis: Analysis }): React.ReactNode {
 
   return (
     <div className="actions wrap">
+      <PdfExportButton
+        analysisId={analysis.id}
+        label={t('project.download.pdf')}
+        className="btn primary"
+        disabled={!ready || accessToken === null}
+      />
       {FORMATS.map((format) => (
         <button
           key={format}
           type="button"
-          className={format === 'pdf' ? 'btn primary' : 'btn'}
+          className="btn"
           disabled={!ready || accessToken === null || busy !== null}
           onClick={() => {
             if (accessToken !== null) {
@@ -203,14 +208,6 @@ function Downloads({ analysis }: { analysis: Analysis }): React.ReactNode {
       >
         {busy === 'sbom' ? t('project.download.working') : t('project.download.sbom')}
       </button>
-      {busy === 'pdf' && (
-        // Only the PDF is slow (~50 s on a large report); the other formats are
-        // sub-second, and telling someone downloading Markdown that "the PDF can
-        // take a minute" is noise. The busy LABEL still covers every button.
-        <span className="sub" role="status">
-          {t('project.download.workingHint')}
-        </span>
-      )}
       {errorKey !== null && (
         <span className="alert inline" role="alert">
           {t(errorKey)}

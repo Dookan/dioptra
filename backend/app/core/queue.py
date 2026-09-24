@@ -25,15 +25,27 @@ VERIFY_JOB = "app.workflow.verify_job.run_verification_job"
 #: container (tasks/phase5-survey.md §1).
 SYNC_JOB = "app.inventory.sync.run_sync_job"
 IMPORT_JOB = "app.inventory.sync.run_import_job"
-#: The ONLY callables the worker may execute. Adding one here is a security
-#: decision: the worker is the process holding the Docker socket.
+#: Phase 8: one asynchronous PDF export. Its only argument is a job uuid, so a
+#: broker write can ask for nothing but a row that already exists — and that
+#: row names an analysis the requester could already export. No container, no
+#: outbound connection, no path taken from the argument.
+REPORT_JOB = "app.reports.jobs.run_report_job"
+#: The ONLY callables the `worker` service may execute. Adding one here is a
+#: security decision: that worker is the process holding the Docker socket.
 ALLOWED_JOBS = frozenset({PIPELINE_JOB, VERIFY_JOB, SYNC_JOB, IMPORT_JOB})
+#: The ONLY callable the `report-worker` service may execute. The PDF render
+#: shapes hostile text through native code, so it runs in a worker with NO
+#: Docker socket, and the socket-holding worker refuses it (phase-8 panel).
+REPORT_WORKER_JOBS = frozenset({REPORT_JOB})
+#: RQ's timeout for one PDF render; the stale threshold is floored above it.
+REPORT_JOB_TIMEOUT_SECONDS = 20 * 60
 QUEUE_NAME = "analysis"
+REPORT_QUEUE_NAME = "reports"
 SYNC_JOB_ID = "vulndb-sync"
 
 
 class PipelineJob(Job):
-    """The only jobs the worker executes (``ALLOWED_JOBS``).
+    """The only jobs the socket-holding worker executes (``ALLOWED_JOBS``).
 
     RQ resolves a job's callable from a dotted path stored in the broker, so
     anything able to write to Valkey could otherwise make the worker — the one
@@ -42,10 +54,13 @@ class PipelineJob(Job):
     ``--serializer json`` (no pickle); this class refuses every other callable.
     """
 
+    #: What this worker may run; the report worker's subclass narrows it.
+    allowed: frozenset[str] = ALLOWED_JOBS
+
     @property
     def func(self) -> Callable[..., Any]:
-        if self.func_name not in ALLOWED_JOBS:
-            allowed = ", ".join(sorted(ALLOWED_JOBS))
+        if self.func_name not in self.allowed:
+            allowed = ", ".join(sorted(self.allowed))
             message = f"refusing job {self.func_name!r}: only {allowed} may run here"
             raise PermissionError(message)
         parent: Callable[..., Any] = super().func
@@ -68,6 +83,16 @@ class PipelineJob(Job):
     def send_webhooks(self, status: Any, *, exc_string: str | None = None) -> None:
         """No outbound request ever leaves the worker on a broker's say-so."""
         del status, exc_string
+
+
+class ReportWorkerJob(PipelineJob):
+    """The only job the `report-worker` service executes: the PDF export.
+
+    Same JSON serializer and the same refusal of callbacks and webhooks as
+    ``PipelineJob``; only the allowlist differs.
+    """
+
+    allowed = REPORT_WORKER_JOBS
 
 
 def enqueue_pipeline(analysis_id: uuid.UUID) -> None:
@@ -125,16 +150,14 @@ def enqueue_verification(analysis_id: uuid.UUID, actor_username: str) -> None:
     logger.info("enqueued verification analysis=%s", analysis_id)
 
 
-def _queue() -> Any:
+def _queue(name: str = QUEUE_NAME, job_class: type[Job] = PipelineJob) -> Any:
     from redis import Redis
     from rq import Queue
     from rq.serializers import JSONSerializer
 
     settings = get_settings()
     connection = Redis.from_url(settings.redis_url)
-    return Queue(
-        QUEUE_NAME, connection=connection, serializer=JSONSerializer, job_class=PipelineJob
-    )
+    return Queue(name, connection=connection, serializer=JSONSerializer, job_class=job_class)
 
 
 def enqueue_sync(
@@ -200,3 +223,38 @@ def enqueue_import(token: str, kind: str, requested_by: str) -> None:
         return
     _queue().enqueue(IMPORT_JOB, token, kind, requested_by, job_timeout=3600 * 2, result_ttl=0)
     logger.info("enqueued vulnerability import token=%s kind=%s", token, kind)
+
+
+def enqueue_report(job_id: uuid.UUID, *, delay_seconds: int = 0) -> None:
+    """Schedule one PDF export. The ``report_jobs`` row MUST be committed already.
+
+    ``delay_seconds`` is the worker re-queueing a job the concurrency cap
+    deferred; it needs the worker's scheduler, and inline mode drops it (the
+    test that exercises the cap calls the job directly).
+    """
+    settings = get_settings()
+    if settings.queue_inline:
+        from app.reports.jobs import run_report_job
+
+        if delay_seconds == 0:
+            run_report_job(str(job_id))
+        return
+    # Its own queue, read only by the socket-less report worker.
+    queue = _queue(REPORT_QUEUE_NAME, ReportWorkerJob)
+    # A 516-page report renders in ~50 s on the reference host; the timeout is
+    # well above that and below the stale threshold that frees the slot, whose
+    # setting is floored above it (``report_job_stale_minutes``, ge=25).
+    timeout = REPORT_JOB_TIMEOUT_SECONDS
+    if delay_seconds > 0:
+        from datetime import timedelta
+
+        queue.enqueue_in(
+            timedelta(seconds=delay_seconds),
+            REPORT_JOB,
+            str(job_id),
+            job_timeout=timeout,
+            result_ttl=0,
+        )
+    else:
+        queue.enqueue(REPORT_JOB, str(job_id), job_timeout=timeout, result_ttl=0)
+    logger.info("enqueued report job=%s delay=%ss", job_id, delay_seconds)

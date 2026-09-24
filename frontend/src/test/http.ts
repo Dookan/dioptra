@@ -8,10 +8,21 @@ export interface StubResponse {
 
 export type Routes = Record<string, StubResponse | (() => StubResponse)>;
 
+/**
+ * Requests every authenticated screen makes whatever the test is about: the
+ * report-job provider asks, once, whether the person has a PDF in flight
+ * (phase 8). A test that cares declares the route itself and wins.
+ */
+const AMBIENT: Routes = {
+  '/api/v1/report-jobs/mine': { status: 200, body: null },
+};
+
 export function stubFetch(routes: Routes) {
   const calls = vi.fn((input: RequestInfo | URL) => {
     const path = String(input);
-    const route = routes[path];
+    // Looked up, never spread: some tests pass a Proxy whose `get` matches by
+    // prefix, and spreading one copies nothing.
+    const route = routes[path] ?? AMBIENT[path];
     if (route === undefined) {
       throw new Error(`unstubbed request: ${path}`);
     }
