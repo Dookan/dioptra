@@ -93,7 +93,7 @@ export function LoginScreen(): React.ReactNode {
         <div className="foot">
           <LanguageToggle />
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
-          <span className="mono">{t('app.version')}</span>
+          <span className="mono">v{__APP_VERSION__}</span>
         </div>
       </form>
     </div>

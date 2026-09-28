@@ -1,7 +1,7 @@
 # Task: Phase 6 — User administration
 
 > **Status: DESIGN — written 2026-09-23, NOT started.** First task file of the
-> **second cycle** (post-v1.0.0, target **1.1.0**), whose other known inhabitant
+> **second cycle** (post-v1.0.0; under the 2026-09-28 scheme its close is a MINOR bump from whatever the version is then), whose other known inhabitant
 > is the PHP/Laravel + Java/Spring wave cut from P5. It is NOT part of the work
 > plan's P0–P5 roadmap: the plan gave mockup 10's "Usuarios" half no day, and
 > `tasks/phase5-survey.md` §8 recorded it as not built for exactly that reason.
@@ -283,7 +283,7 @@ becomes reachable.
 ## Definition of Done
 
 - [ ] `tasks/phase6-survey.md` written and signed off by `mmarin` before any edit
-- [ ] Scope-change log entry recorded (second cycle opened, 1.1.0 named)
+- [ ] Scope-change log entry recorded (second cycle opened)
 - [ ] All deliverables implemented; ruff + mypy + oxlint + tsc clean
 - [ ] All specified tests passing (pytest / Vitest), denial cases included
 - [ ] Mutation pass on `app/auth/admin.py` (mutmut, phase-close) — we apply to
@@ -305,7 +305,7 @@ becomes reachable.
 - [ ] `docs/roles-and-permissions.md`, `docs/ui-model.md`,
       `docs/threat-model.md`, `docs/standards-mapping.md` updated
 - [ ] CLAUDE.md phase status + `docs/development-phases.md`: Phase 6 → DONE
-      with date and commit; tag `v1.1.0`
+      with date and commit; bump the MINOR version (CLAUDE.md → Release rules)
 
 ## Non-goals (explicit)
 

@@ -1,6 +1,7 @@
 /** Login screen behaviour, in both languages and both themes. */
 import es from '../locales/es.json';
 import en from '../locales/en.json';
+import pkg from '../../package.json';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
@@ -52,6 +53,13 @@ describe('login screen', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: es.login.submit })).toBeInTheDocument();
     expect(screen.getByText(es.login.noAccount)).toBeVisible();
+  });
+
+  it('shows the version the bundle was built from, not a copy of it', async () => {
+    renderApp({});
+    await screen.findByText(es.login.greeting);
+    // One source: package.json through Vite's define, as the status bar does.
+    expect(screen.getByText(`v${pkg.version}`)).toBeInTheDocument();
   });
 
   it('signs in and lands on the home screen', async () => {

@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 // vitest/config re-exports Vite's defineConfig with the `test` section typed.
 import { defineConfig } from 'vitest/config';
 
-// The status bar shows the bundle's own version (mockups 02–11); one source: package.json.
+// The status bar and the login footer show the bundle's own version (mockups 01–11); one source: package.json.
 const { version } = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as {
   version: string;
 };

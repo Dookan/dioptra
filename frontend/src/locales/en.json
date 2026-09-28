@@ -1,7 +1,6 @@
 {
   "app": {
     "name": "Dioptra",
-    "version": "v0.1.0",
     "brandInitials": "DP"
   },
   "login": {
