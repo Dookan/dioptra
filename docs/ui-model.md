@@ -500,7 +500,7 @@ Radii: frames 14, cards 12, buttons 9, badges 5. Borders 1px hairline.
 - The screen has **two lists**, both in the LEFT pane. The working queue holds
   the findings of the audited project's OWN code; at the foot of the same pane,
   a collapsed `<details class="panel deps">` — "Hallazgos en código de terceros
-  (N)" — holds everything the platform found inside a dependency directory.
+  (N)" — holds the SAST and secret findings the platform found inside a dependency directory (an SCA finding and, since phase 11, a sensitive artefact stay in the queue wherever they sit).
   It sits inside the pane rather than after the grid **on purpose**: the detail
   panel is `sticky` only within `.cols.findings`, so a section placed after the
   grid would update a detail that had already scrolled off above — which is the

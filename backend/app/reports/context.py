@@ -46,14 +46,17 @@ TOOL_STATUS_LABELS: dict[ToolStatus, str] = {
 }
 SPANISH_MONTHS: tuple[str, ...] = tuple(_S["months"])
 
-#: Categories rendered in "Hallazgos de vulnerabilidades" (code + secrets).
-SECURITY_CATEGORIES = frozenset({ToolCategory.SAST, ToolCategory.SECRET})
+#: Categories rendered in "Hallazgos de vulnerabilidades" (code, secrets and,
+#: since phase 11, the sensitive artefacts committed to the tree).
+SECURITY_CATEGORIES = frozenset({ToolCategory.SAST, ToolCategory.SECRET, ToolCategory.ARTEFACT})
 
 #: Paragraph separator of the editable prose, both in defaults and overrides.
 PARAGRAPH_BREAK = "\n\n"
 
 
-def _catalog_describe(cwe: int | None, fallback_title: str | None) -> Any:
+def _catalog_describe(
+    cwe: int | None, fallback_title: str | None, artefact_rule: str | None = None
+) -> Any:
     """Resolve the institutional prose for a CWE.
 
     Imported lazily: the catalog is a sibling module of the pipeline and the
@@ -61,7 +64,7 @@ def _catalog_describe(cwe: int | None, fallback_title: str | None) -> Any:
     """
     from app.analysis.catalog import describe  # noqa: PLC0415
 
-    return describe(cwe, fallback_title=fallback_title)
+    return describe(cwe, fallback_title=fallback_title, artefact_rule=artefact_rule)
 
 
 def _owasp_title(code: str | None) -> str | None:
@@ -101,7 +104,11 @@ def _dependency_heading(finding: Finding, advisory: dict[str, Any]) -> tuple[str
 
 
 def _finding_context(finding: Finding) -> dict[str, Any]:
-    entry = _catalog_describe(finding.cwe, finding.title)
+    entry = _catalog_describe(
+        finding.cwe,
+        finding.title,
+        finding.rule_id if finding.category is ToolCategory.ARTEFACT else None,
+    )
     path = finding.path or UNKNOWN_PATH_LABEL
     location = path if finding.line is None else f"{path}:{finding.line}"
     advisory = finding.advisory or {}

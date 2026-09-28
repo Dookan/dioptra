@@ -76,4 +76,10 @@ def finding_is_third_party(category: ToolCategory, path: str) -> bool:
     """
     if category is ToolCategory.SCA:
         return False
+    if category is ToolCategory.ARTEFACT:
+        # Phase 11 (`mmarin`, 2026-09-28): a library does not ship a
+        # `production.sql`. A dump, an `.env` or a key under `vendor/` was put
+        # there by the team, so it stays theirs to adjudicate — and ONLY this
+        # finding kind gets the exemption (`tasks/phase11-survey.md` §5).
+        return False
     return is_third_party(path)

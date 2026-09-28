@@ -370,7 +370,8 @@ def closure_context(analysis: Analysis, findings: list[Finding]) -> dict[str, An
     security = [
         f
         for f in findings
-        if f.category in {ToolCategory.SAST, ToolCategory.SECRET, ToolCategory.SCA}
+        if f.category
+        in {ToolCategory.SAST, ToolCategory.SECRET, ToolCategory.SCA, ToolCategory.ARTEFACT}
     ]
     return {
         "metrics": metrics_context(analysis),

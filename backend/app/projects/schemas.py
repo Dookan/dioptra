@@ -169,7 +169,11 @@ def finding_out(finding: Finding) -> FindingOut:
     """Serialize a finding with the catalog prose the report uses for it."""
     from app.analysis.catalog import describe  # noqa: PLC0415 — keeps schemas import-light
 
-    entry = describe(finding.cwe, fallback_title=finding.title)
+    entry = describe(
+        finding.cwe,
+        fallback_title=finding.title,
+        artefact_rule=finding.rule_id if finding.category is ToolCategory.ARTEFACT else None,
+    )
     payload = FindingOut.model_validate(finding)
     payload.description = entry.description
     payload.impact = entry.impact

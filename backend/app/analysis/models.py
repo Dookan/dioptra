@@ -53,6 +53,10 @@ class ToolCategory(StrEnum):
     SECRET = "secret"  # noqa: S105 — a category label, not a credential
     SBOM = "sbom"
     METRICS = "metrics"
+    #: Phase 11: our own scan for dumps, uploads, `.env`, keys and logs
+    #: committed to the tree (`app/analysis/artefacts.py`). Exactly 8
+    #: characters, the column's length; stored as text, no CHECK constraint.
+    ARTEFACT = "artefact"
 
 
 class ToolStatus(StrEnum):

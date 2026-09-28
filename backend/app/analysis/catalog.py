@@ -678,8 +678,161 @@ ALIASES: dict[int, int] = {
 }
 
 
-def describe(cwe: int | None, *, fallback_title: str | None = None) -> CatalogEntry:
-    """Report prose for a CWE. Unknown CWEs get the generic entry, titled by the rule."""
+#: Phase 11: the sensitive-artefact findings (`app/analysis/artefacts.py`) are
+#: keyed by RULE, not by CWE — three of the five share CWE-538, and a dump, a
+#: directory of photos and an `.env` file need different words. Written in the
+#: anchor reports' register (`tasks/phase11-survey.md` §6.2).
+ARTEFACT_CATALOG: dict[str, CatalogEntry] = {
+    "artefact-database-dump": CatalogEntry(
+        title="Respaldo de base de datos incluido en el repositorio",
+        description=(
+            "Se identificó un respaldo (dump) de base de datos incluido junto al código fuente. "
+            "El archivo contiene la estructura y los registros de la base de datos, y se "
+            "distribuye con el repositorio a cualquier persona que tenga acceso al código."
+        ),
+        impact=(
+            "Toda persona con acceso al repositorio, a una copia del código o a su historial de "
+            "versiones obtiene los datos de la base: información personal de usuarios, "
+            "credenciales o sus hashes y datos de negocio. La exposición debe considerarse "
+            "consumada desde el momento en que el archivo se incorporó al repositorio."
+        ),
+        mitigation=(
+            "Eliminar el respaldo del repositorio y también de su historial de versiones.",
+            (
+                "Tratar los datos como expuestos: evaluar la notificación que corresponda y "
+                "rotar todas las credenciales, claves y contraseñas que el respaldo contenga."
+            ),
+            (
+                "Guardar los respaldos fuera del repositorio, en un almacenamiento con control "
+                "de acceso y cifrado."
+            ),
+        ),
+        references=(
+            _cwe(538),
+            _cwe(530),
+            _OWASP["A01"],
+        ),
+    ),
+    "artefact-user-uploads": CatalogEntry(
+        title="Archivos subidos por usuarios incluidos en el repositorio",
+        description=(
+            "Se identificó un directorio de archivos cargados por los usuarios del sistema "
+            "(imágenes o documentos) incluido junto al código fuente. Son datos de la operación "
+            "del sistema, no parte de la aplicación. Revisar si contienen datos personales."
+        ),
+        impact=(
+            "Los archivos se distribuyen con el repositorio a cualquier persona con acceso al "
+            "código. Si contienen documentos de identidad, fotografías de personas u otros "
+            "datos personales, estos quedan expuestos fuera del control del sistema."
+        ),
+        mitigation=(
+            "Eliminar los archivos del repositorio y de su historial de versiones.",
+            (
+                "Excluir el directorio de cargas del control de versiones (por ejemplo, en "
+                ".gitignore) y almacenarlo en un volumen o servicio con control de acceso."
+            ),
+            "Revisar el contenido y, si incluye datos personales, tratarlos como expuestos.",
+        ),
+        references=(
+            _cwe(538),
+            _OWASP["A01"],
+        ),
+    ),
+    "artefact-env-file": CatalogEntry(
+        title="Archivo de configuración de entorno (.env) incluido en el repositorio",
+        description=(
+            "Se identificó un archivo de variables de entorno con valores asignados incluido "
+            "junto al código fuente. Estos archivos suelen contener la configuración real del "
+            "despliegue: cadenas de conexión, contraseñas, claves de API y secretos de firma."
+        ),
+        impact=(
+            "Cualquier persona con acceso al repositorio o a su historial obtiene la "
+            "configuración del entorno y los secretos que contenga, lo que puede permitir el "
+            "acceso no autorizado a la base de datos y a los servicios asociados."
+        ),
+        mitigation=(
+            "Eliminar el archivo del repositorio y de su historial de versiones.",
+            "Revocar y rotar todos los secretos que el archivo contenga.",
+            (
+                "Versionar solo una plantilla sin valores (por ejemplo, .env.example) y excluir "
+                "el archivo real mediante .gitignore."
+            ),
+        ),
+        references=(
+            _cwe(538),
+            _cwe(798),
+            _OWASP["A01"],
+        ),
+    ),
+    "artefact-private-key": CatalogEntry(
+        title="Clave privada incluida en el repositorio",
+        description=(
+            "Se identificó un archivo de clave privada (o un almacén de claves) incluido junto "
+            "al código fuente."
+        ),
+        impact=(
+            "Quien obtenga la clave privada puede suplantar al servidor o al servicio que la "
+            "utiliza, descifrar comunicaciones o firmar en su nombre."
+        ),
+        mitigation=(
+            "Revocar la clave y el certificado asociado, y emitir un par nuevo.",
+            "Eliminar el archivo del repositorio y de su historial de versiones.",
+            "Almacenar las claves en un gestor de secretos o en el servidor, fuera del código.",
+        ),
+        references=(
+            _cwe(321),
+            _OWASP["A02"],
+        ),
+    ),
+    "artefact-log-file": CatalogEntry(
+        title="Archivos de registro (logs) incluidos en el repositorio",
+        description=(
+            "Se identificaron archivos de registro (logs) de gran tamaño incluidos junto al "
+            "código fuente."
+        ),
+        impact=(
+            "Los registros de ejecución pueden contener datos de usuarios, rutas internas, "
+            "trazas de errores, tokens o credenciales, que quedan expuestos a cualquier persona "
+            "con acceso al repositorio."
+        ),
+        mitigation=(
+            "Eliminar los registros del repositorio y de su historial de versiones.",
+            "Excluir los archivos de registro del control de versiones mediante .gitignore.",
+            "Revisar su contenido y rotar cualquier secreto que aparezca en ellos.",
+        ),
+        references=(
+            _cwe(532),
+            "https://owasp.org/Top10/A09_2021-Security_Logging_and_Monitoring_Failures/",
+        ),
+    ),
+}
+
+#: The one-line message of each artefact finding. The snippet beside it is a
+#: signature label, a count or key NAMES — never the file's content.
+ARTEFACT_MESSAGES: dict[str, str] = {
+    "artefact-database-dump": "Respaldo de base de datos de {size} en el repositorio.",
+    "artefact-user-uploads": (
+        "{files} archivos cargados por usuarios ({size}). Revisar si contienen datos personales."
+    ),
+    "artefact-env-file": "Archivo de entorno con valores asignados. Claves: {detail}.",
+    "artefact-private-key": "Clave privada en el repositorio ({detail}).",
+    "artefact-log-file": "{files} archivos de registro de más de 1 MB ({size}).",
+}
+#: The snippet of a directory-level hit: how much is there, never what.
+ARTEFACT_COUNT_SNIPPET = "{files} archivos · {size}"
+
+
+def describe(
+    cwe: int | None, *, fallback_title: str | None = None, artefact_rule: str | None = None
+) -> CatalogEntry:
+    """Report prose for a CWE. Unknown CWEs get the generic entry, titled by the rule.
+
+    ``artefact_rule``: the rule id of a phase-11 artefact finding, whose prose
+    is per rule. Callers pass it ONLY for that category, so no other tool's
+    rule id can select this prose.
+    """
+    if artefact_rule is not None and artefact_rule in ARTEFACT_CATALOG:
+        return ARTEFACT_CATALOG[artefact_rule]
     if cwe is not None and cwe in CATALOG:
         return CATALOG[cwe]
     if cwe is not None and cwe in ALIASES:

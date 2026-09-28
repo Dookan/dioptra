@@ -233,7 +233,7 @@
         "syft": "armando el inventario de componentes (Syft)",
         "lizard": "midiendo la complejidad (Lizard)",
         "cloc": "contando líneas por lenguaje (cloc)",
-        "normalize": "guardando los hallazgos"
+        "normalize": "buscando respaldos y archivos sensibles, y guardando los hallazgos"
       }
     }
   },
@@ -352,6 +352,9 @@
       "doneTitle": "Revisión completa",
       "doneBody": "Todos los hallazgos tienen veredicto. Pasa al plan de pruebas, o edita y firma el reporte.",
       "advance": "Pasar al plan de pruebas"
+    },
+    "toolNames": {
+      "artefacts": "archivos sensibles"
     },
     "filters": {
       "all": "Todos",

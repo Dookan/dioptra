@@ -157,6 +157,10 @@ only_mutate = [
     "app/ingest/upload.py",
     # Phase 10 addendum A: the dump import parsed part by part straight to disk.
     "app/inventory/dump_upload.py",
+    # Phase 11 close: the sensitive-artefact scan (what it reads, what it
+    # reports, what it never copies) and the one exemption it bends.
+    "app/analysis/artefacts.py",
+    "app/analysis/third_party.py",
 ]
 pytest_add_cli_args_test_selection = [
     "tests/test_gates.py",
@@ -187,4 +191,6 @@ pytest_add_cli_args_test_selection = [
     "tests/test_inventory_crypto.py::test_the_pipeline_persists_crypto_assets_beside_the_findings",
     "tests/test_report_jobs.py",
     "tests/test_queue.py",
+    "tests/test_artefacts.py",
+    "tests/test_third_party.py",
 ]

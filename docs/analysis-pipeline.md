@@ -29,7 +29,26 @@ Security Top 10 when the target is an API), severity computed with CVSS 3.1.
 5. **Metrics** — Lizard (cyclomatic complexity per function) + cloc. Feeds the
    E4 risk matrix: complexity × findings × criticality.
 6. **Config/IaC** — Trivy config / Checkov (Dockerfiles, CI, permissions).
-7. **No-CDN rule (factory norm)** — any `<script>`, `<link>`, font or import
+7. **Sensitive artefacts (phase 11, 2026-09-28)** — our own deterministic
+   walk over the jail (`analysis/artefacts.py`, in the worker, during the
+   normalisation step) for data committed AS SOURCE: database dumps (a dump
+   signature in the head of a `.sql`/`.dump`/`.pgdump`/`.bak`/`.sql.gz`, the
+   `PGDMP` or SQLite magic), user-upload directories (≥ 10 images or
+   documents under `uploads`/`upload`/`media`/`storage/app`), `.env` files
+   with values (not the `.example`/`.sample`/`.dist` templates), private keys
+   and logs over 1 MB. It reads a 4 KiB HEAD per candidate and `lstat` for the
+   size, never follows a symlink, skips only `.git`, and stops at 300 000
+   files or 500 hits with the cap recorded as a coverage gap. Its hits are
+   stored raw (`raw_tool_outputs`, tool `artefacts`) before they become
+   findings of category `artefact`, merged BEFORE the worst-first ordering so
+   a HIGH dump competes for the cap on its severity. **A finding never carries
+   the file's content**: a dump's snippet is a canonical signature label, an
+   upload directory's is "N archivos · X MB", an `.env`'s is its KEY names.
+   Why not a Semgrep rule: Semgrep skips targets over `--max-target-bytes`,
+   so it would be silent on exactly the 234 MB dump that prompted this
+   (`tasks/phase11-survey.md` §2). Measured on that tree (1.4 GiB, 19 851
+   files): 0.32 s.
+8. **No-CDN rule (factory norm)** — any `<script>`, `<link>`, font or import
    pointing at an external domain → finding CWE-829 / OWASP A08:2021, with the
    mitigation "bundle and serve locally, version-pinned". It is among the
    initial own rules of P1 day 7.
@@ -117,7 +136,7 @@ Wave 3 Go + C#/.NET stays out of scope for v1.0.0.
   nothing and E5 could not read the file.
 - **Third-party findings are marked, never dropped.** A finding whose path has
   a dependency directory as one of its segments (`backend/app/analysis/third_party.py`)
-  is persisted with `third_party = true`. It is normalised, stored, deduped,
+  is persisted with `third_party = true` — except an SCA finding (its verdict feeds the VEX) and, since phase 11, a sensitive artefact (a dump under `vendor/` is still the team's). It is normalised, stored, deduped,
   reported and inventoried exactly like any other; the flag only takes it out
   of the E3 triage queue (`docs/workflow-gates.md` → Third-party findings). A
   runner is never told to skip those paths — the scanners still refuse the

@@ -83,6 +83,15 @@ the queue: its verdict is the ONLY input of the VEX document
 and the same predicate decides the column and the cap's ordering so the two
 cannot drift.
 
+**A sensitive artefact is never third-party either** (phase 11, `mmarin`
+2026-09-28). A database dump, an `.env` file, a private key, an upload
+directory or a log found inside `vendor/` or `node_modules/` was put there by
+the team — a library does not ship a `production.sql` — so the
+`artefact` category stays in the queue wherever it sits. It is the ONLY other
+exemption: every SAST and secret finding in a dependency directory keeps the
+rule above. In the findings cap's ordering a vendored artefact ranks with
+vendored SCA, above vendored SAST (`tasks/phase11-survey.md` §5). `finding_is_third_party` exempts this category the same way.
+
 Measured on the anchor Laravel application: 687 findings → 257 in the queue,
 430 informative — all of them SAST and secrets, which is what the rule exists
 for.

@@ -17,6 +17,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.analysis import artefacts
 from app.analysis.metrics import parse_cloc_json, parse_lizard_csv, scan_commented_code
 from app.analysis.models import (
     Analysis,
@@ -32,10 +33,12 @@ from app.analysis.models import (
 )
 from app.analysis.normalizer import (
     NormalizationError,
+    NormalizedFinding,
     ToolReport,
     normalize,
     normalize_crypto,
     parse_sarif,
+    report_order,
 )
 from app.analysis.progress import ACQUIRE, NORMALIZE
 from app.analysis.runners import default_runners
@@ -196,7 +199,13 @@ def _execute(db: Session, analysis: Analysis, settings: Settings) -> None:
         raise NoToolRan("no SAST/SCA/secret tool produced a report")
 
     _enter(db, analysis, NORMALIZE)
-    findings = normalize(collected.reports, collected.roots)
+    # Phase 11: our own walk for dumps, uploads, `.env`, keys and logs. Its
+    # hits are merged BEFORE the ordering below, so a dump competes for the
+    # cap on its severity like any other finding, never last in line.
+    findings = sorted(
+        [*normalize(collected.reports, collected.roots), *_scan_artefacts(db, analysis, workspace)],
+        key=report_order,
+    )
     # The audited project's OWN findings rank before dependency ones, and the
     # normalizer's worst-first order is preserved inside each group because
     # Python's sort is stable.
@@ -305,6 +314,60 @@ def _execute(db: Session, analysis: Analysis, settings: Settings) -> None:
         )
     )
     db.commit()
+
+
+def _scan_artefacts(db: Session, analysis: Analysis, workspace: Path) -> list[NormalizedFinding]:
+    """Run the artefact scan, persist what it saw, and return it as findings.
+
+    The raw hits are durable before they become findings, like every tool's
+    output; a scan that could not run, or stopped at its cap, is a recorded
+    coverage gap, never a silent pass (`tasks/phase11-survey.md` §7).
+    """
+    try:
+        scan = artefacts.scan_artefacts(workspace)
+    except OSError as exc:
+        db.add(
+            ToolRun(
+                analysis_id=analysis.id,
+                tool=artefacts.TOOL,
+                category=ToolCategory.ARTEFACT,
+                status=ToolStatus.FAILED,
+                detail=f"scan failed: {exc.__class__.__name__}",
+            )
+        )
+        db.commit()
+        return []
+    raw = [
+        {"rule_id": h.rule_id, "path": h.path, "size": h.size, "detail": h.detail, "files": h.files}
+        for h in scan.hits
+    ]
+    db.add(
+        RawToolOutput(
+            analysis_id=analysis.id,
+            tool=artefacts.TOOL,
+            exit_code=0,
+            stderr=None,
+            output=json.dumps({"files_seen": scan.files_seen, "hits": raw}).encode("utf-8"),
+            truncated=scan.truncated,
+        )
+    )
+    detail = (
+        f"stopped after {scan.files_seen} files or {artefacts.MAX_HITS} hits; "
+        "the rest of the tree was not checked for artefacts"
+        if scan.truncated
+        else None
+    )
+    db.add(
+        ToolRun(
+            analysis_id=analysis.id,
+            tool=artefacts.TOOL,
+            category=ToolCategory.ARTEFACT,
+            status=ToolStatus.RAN,
+            detail=detail,
+        )
+    )
+    db.commit()
+    return [artefacts.to_finding(hit) for hit in scan.hits]
 
 
 #: Files a scanned tree can ship to reconfigure a scanner from the inside.

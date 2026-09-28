@@ -151,6 +151,29 @@ describe('findings screen', () => {
     expect(screen.getByRole('link', { name: es.nav.report })).toBeInTheDocument();
   });
 
+  it("names the platform's own artefact scan in words and keeps it filterable", async () => {
+    renderFindings('analyst', [
+      finding('f-1'),
+      finding('f-2', { tools: ['artefacts'], category: 'artefact', path: 'respaldo.sql' }),
+    ]);
+    const user = await signIn();
+    const list = await screen.findByRole('list', { name: es.findings.listLabel });
+    const filter = screen.getByLabelText(es.findings.filters.tool);
+    expect(
+      within(filter).getByRole('option', { name: es.findings.toolNames.artefacts }),
+    ).toBeInTheDocument();
+    expect(within(filter).queryByRole('option', { name: 'artefacts' })).toBeNull();
+    // A product name is still shown as it is.
+    expect(within(filter).getByRole('option', { name: 'semgrep' })).toBeInTheDocument();
+
+    await user.selectOptions(filter, 'artefacts');
+    expect(within(list).getAllByRole('button')).toHaveLength(1);
+    // The detail of the selected finding names the tool in words too.
+    await user.click(within(list).getByRole('button'));
+    const detail = screen.getByRole('region', { name: es.findings.detailLabel });
+    expect(within(detail).getByText(es.findings.toolNames.artefacts)).toBeInTheDocument();
+  });
+
   it('filters by severity', async () => {
     renderFindings('analyst', [
       finding('f-1'),

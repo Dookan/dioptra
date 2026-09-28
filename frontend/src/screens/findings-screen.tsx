@@ -9,6 +9,7 @@
  */
 import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import { ApiError } from "../api/client";
 import * as api from "../api/projects";
@@ -48,6 +49,14 @@ interface Filters {
   owasp: string;
   tool: string;
   file: string;
+}
+
+/** Tool names are product names shown as they are (Semgrep, Gitleaks); the
+ * platform's own scans have no product name and are said in words. */
+const OWN_SCANS = new Set(["artefacts"]);
+
+function toolLabel(t: TFunction, tool: string): string {
+  return OWN_SCANS.has(tool) ? t(`findings.toolNames.${tool}`) : tool;
 }
 
 function unique(values: (string | null)[]): string[] {
@@ -192,7 +201,9 @@ function FindingDetail({
           {finding.line !== null &&
             ` · ${t("findings.line", { line: finding.line })}`}
         </span>
-        <span className="sub">{finding.tools.join(", ")}</span>
+        <span className="sub">
+          {finding.tools.map((tool) => toolLabel(t, tool)).join(", ")}
+        </span>
       </div>
       <h5>{t("findings.what")}</h5>
       <p className="desc">{finding.description}</p>
@@ -494,7 +505,7 @@ export function FindingsScreen({ route, onNavigate }: Props): React.ReactNode {
               value={filters.tool}
               options={toolOptions.map((tool) => ({
                 value: tool,
-                label: tool,
+                label: toolLabel(t, tool),
               }))}
               onChange={(tool) => {
                 setFilters((existing) => ({ ...existing, tool }));

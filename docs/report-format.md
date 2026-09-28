@@ -110,5 +110,13 @@ of the analyst's, so they are absent from the editor's section list
 - Known PDF risks (plan, week 2): long tables, page breaks, repeated headers
   in WeasyPrint. That is why day 10 is entirely fidelity work; if it slips,
   buffer is consumed and P2 starts anyway on the data.
+- **Sensitive artefacts** (phase 11, 2026-09-28): a database dump, an upload
+  directory, an `.env`, a private key or a large log committed to the tree
+  is a finding of category `artefact` and prints in "Hallazgos de
+  vulnerabilidades" beside SAST and secrets, with prose chosen by RULE
+  (`analysis/catalog.py::ARTEFACT_CATALOG` — three of the five share CWE-538
+  and need different words). Its "Detección" is a signature label, a count or
+  key names: **no byte of a dump row, an `.env` value or an image reaches any
+  format.** The scan appears in "Cobertura de herramientas" as `artefacts`.
 - Coverage gaps (a tool that could not run, tests that could not execute) are
   reported explicitly — the current manual template already does this; keep it.

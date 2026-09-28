@@ -233,7 +233,7 @@
         "syft": "building the component inventory (Syft)",
         "lizard": "measuring complexity (Lizard)",
         "cloc": "counting lines per language (cloc)",
-        "normalize": "storing the findings"
+        "normalize": "looking for backups and sensitive files, then storing the findings"
       }
     }
   },
@@ -352,6 +352,9 @@
       "doneTitle": "Review complete",
       "doneBody": "Every finding has a verdict. Move on to the test plan, or edit and sign the report.",
       "advance": "Move on to the test plan"
+    },
+    "toolNames": {
+      "artefacts": "sensitive files"
     },
     "filters": {
       "all": "All",

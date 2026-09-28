@@ -615,14 +615,16 @@ def normalize(
                 merged[finding.fingerprint] = (
                     finding if existing is None else _merge(existing, finding)
                 )
-    return sorted(
-        merged.values(),
-        key=lambda item: (
-            SEVERITY_ORDER[item.severity],
-            item.path,
-            item.line if item.line is not None else -1,
-            item.rule_id,
-        ),
+    return sorted(merged.values(), key=report_order)
+
+
+def report_order(item: NormalizedFinding) -> tuple[int, str, int, str]:
+    """Worst first, then by place: the order the report and the cap rely on."""
+    return (
+        SEVERITY_ORDER[item.severity],
+        item.path,
+        item.line if item.line is not None else -1,
+        item.rule_id,
     )
 
 
@@ -637,4 +639,5 @@ __all__ = [
     "normalize_crypto",
     "normalize_path",
     "parse_sarif",
+    "report_order",
 ]
