@@ -174,8 +174,9 @@ Added to `docs/mockups/index.html` on 2026-08-28, same tokens and principles:
   only "Paso N de M".
 - Recorded deviation: mockup 03 draws no upload progress; it follows the
   anchor's own `.progress` element from screens 02, 04 and 09.
-- **Not checked on screen yet** — no test applies `components.css`; the bar's
-  width and both themes need the usual look.
+- **Checked on screen by `mmarin`, 2026-09-28** — both bars, the upload's and
+  the analysis', read right. No test applies `components.css`, so a change to
+  `.progress.wide`, `.srlive` or the clock needs the same look again.
 
 ## Registro (screen 03) — 2026-09-23
 

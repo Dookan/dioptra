@@ -1,9 +1,11 @@
 # Task: Phase 10 — ZIP ingest up to 1 GiB, with a streamed body cap
 
-> **Status: IN_PROGRESS — built 2026-09-28.** Survey `tasks/phase10-survey.md`,
-> signed off by `mmarin` the same day (option C, 8 GiB / 300 000, the
-> existing worker, the 1.x contract change accepted). Second cycle, after
-> `v1.0.0`. Phase 11 (`tasks/phase11-survey.md`) waits for this one to close.
+> **Status: DONE — closed 2026-09-28; commits `720fa63` (the ingest, the
+> progress bars, the Semgrep budget) and `23e837e` (addendum A, the dump
+> import streamed to disk).** Survey `tasks/phase10-survey.md`, signed off by
+> `mmarin` the same day (option C, 8 GiB / 300 000, the existing worker, the
+> 1.x contract change accepted; addendum A with a 1 GiB cap). Second cycle,
+> after `v1.0.0`. Phase 11 (`tasks/phase11-survey.md`) may now start.
 
 ## Objective
 Let the platform ingest a real system shipped as a ZIP of up to 1 GiB
@@ -204,8 +206,8 @@ by the worker.
       an unlink whose file this very function created and still holds.
 - [x] `/precommit` returned `READY TO COMMIT` (2026-09-28, five agents; findings in deliverable 12, the two decisions under "Open")
 - [x] The dump-import addendum signed off and built (deliverable 13)
-- [ ] Both bars looked at on screen, light and dark
-- [ ] CLAUDE.md phase status + `docs/development-phases.md`: Phase 10 → DONE
+- [x] Both bars looked at on screen by `mmarin`, 2026-09-28 ("todo bien")
+- [x] CLAUDE.md phase status + `docs/development-phases.md`: Phase 10 → DONE
 
 ## Non-goals
 - A streamed multipart parser for the dump import (Deviations).
