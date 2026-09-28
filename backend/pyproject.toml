@@ -147,6 +147,11 @@ only_mutate = [
     # Phase 8 close: the asynchronous PDF export — the one-per-person rule,
     # the sweep, the claim under the cap and the ownership check.
     "app/reports/jobs.py",
+    # P1 close (2026-09-24): the ingest guards — zip-slip, the size and ratio
+    # caps, the SSRF refusal — the first hostile-input surface an audited
+    # tree meets. The normalizer is already listed above (P7a).
+    "app/ingest/archive.py",
+    "app/ingest/git_source.py",
 ]
 pytest_add_cli_args_test_selection = [
     "tests/test_gates.py",
@@ -166,6 +171,13 @@ pytest_add_cli_args_test_selection = [
     "tests/test_scaffold.py",
     "tests/test_scaffold_php.py",
     "tests/test_normalizer.py",
+    "tests/test_ingest_archive.py",
+    "tests/test_ingest_git.py",
+    "tests/test_inventory_crypto.py",
+    # Its end-to-end pipeline case fails under mutmut's copied tree (P1 close,
+    # 2026-09-24); the unit cases of the crypto path are what this pass needs.
+    "--deselect",
+    "tests/test_inventory_crypto.py::test_the_pipeline_persists_crypto_assets_beside_the_findings",
     "tests/test_report_jobs.py",
     "tests/test_queue.py",
 ]

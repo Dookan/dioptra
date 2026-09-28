@@ -22,13 +22,46 @@ MAX_LIZARD_ROWS = 5000
 _SKIPPED_DIRS = frozenset(
     {"node_modules", ".git", "vendor", "dist", "build", "venv", ".venv", "__pycache__"}
 )
-_SOURCE_SUFFIXES = frozenset({".js", ".ts", ".jsx", ".tsx", ".py", ".php", ".java"})
-_HASH_COMMENT_SUFFIXES = frozenset({".py"})
-#: A comment whose body looks like a statement rather than prose.
-_CODE_LIKE = re.compile(
-    r"^\s*(const|let|var|return|if|for|while|function|import|export|def|class|print|console\.)\b"
+# `.vue`, `.css`, `.scss` and `.html` joined on 2026-09-24: the anchor report of
+# the MINCYT frontend lists Vue and CSS files, whose commented-out code lives in
+# `<!-- … -->` and `/* … */` blocks the line-comment scan never saw.
+_SOURCE_SUFFIXES = frozenset(
+    {".js", ".ts", ".jsx", ".tsx", ".py", ".php", ".java", ".vue", ".css", ".scss", ".html"}
 )
-_COMMENTED_LINES_THRESHOLD = 3
+_HASH_COMMENT_SUFFIXES = frozenset({".py"})
+#: Block comments, as (opener, closer). Python has none worth reading here.
+_BLOCK_COMMENTS = (("/*", "*/"), ("<!--", "-->"))
+#: What makes a comment's body count as code. Deliberately the SAME breadth as
+#: the generator of the institution's anchor reports (`mmarin`, 2026-09-24:
+#: the "Errores y prácticas" section must list what the anchor listed): a
+#: statement ending, a keyword, an arrow, an assignment, or a call — which also
+#: matches prose shaped like one ("Vista Especial (Sin Layout)"). The report
+#: calls these files "con código comentado"; the breadth is the anchor's.
+_CODE_SIGNAL = re.compile(
+    r";\s*$|\{\s*$|\}\s*[;,]?\s*$|=>"
+    r"|\b(function|const|let|var|return|import|export|require|class|def|public|private|elif)\b"
+    r"|\b(if|for|while|switch|catch)\s*\("
+    r"|console\.|System\.|printf\s*\(|print\s*\(|await\b"
+    r"|\b\w+\s*=\s*[^=]"
+    r"|\b\w+\s*\([^)]*\)\s*[;{]?\s*$"
+)
+#: Tool directives and task notes are not disabled code. `nota` is matched, not
+#: shown: audited code is often commented in Spanish.
+_NOT_CODE = re.compile(
+    r"^\s*(todo|fixme|note|nota|hack|xxx|eslint|prettier|@ts-|noqa|type:)\b", re.IGNORECASE
+)
+#: A markup element in a comment (typically `<!-- … -->`) is disabled template
+#: code, not prose.
+_MARKUP_LIKE = re.compile(r"^\s*</?[A-Za-z][\w-]*(\s|>|/|$)")
+_COMMENTED_LINES_THRESHOLD = 2
+#: `_CODE_SIGNAL` was quadratic on a long line (unanchored `\w+` and `[^)]*`,
+#: measured 14.7 s on 32 KB) and runs in the worker over hostile files. The
+#: `\b` before both `\w+` alternatives (phase-10 panel, 2026-09-28) makes a
+#: failed match restart at word starts only — same lines matched, 13.8 ms →
+#: 0.09 ms on a 999-character word — and this cap stays as the second bound. A
+#: disabled statement is never kilobytes long; a longer line is minified or
+#: encoded data, so it is not code by definition and never reaches the regex.
+_MAX_COMMENT_LINE = 1000
 
 
 def _to_int(value: str) -> int | None:
@@ -95,24 +128,34 @@ def _as_int(value: object) -> int:
 
 def _looks_like_code(body: str) -> bool:
     stripped = body.strip()
-    if not stripped:
+    if not stripped or len(stripped) > _MAX_COMMENT_LINE or _NOT_CODE.match(stripped):
         return False
-    if stripped.endswith((";", "{", "}")):
-        return True
-    if _CODE_LIKE.match(stripped):
-        return True
-    return "= " in stripped and "(" in stripped
+    return bool(_MARKUP_LIKE.match(stripped) or _CODE_SIGNAL.search(stripped))
 
 
 def _count_commented_code(path: Path, max_bytes: int) -> int:
     marker = "#" if path.suffix in _HASH_COMMENT_SUFFIXES else "//"
+    blocks = () if path.suffix in _HASH_COMMENT_SUFFIXES else _BLOCK_COMMENTS
     with path.open("rb") as handle:
         raw = handle.read(max_bytes)
     count = 0
+    closer: str | None = None  # set while inside a block comment
     for line in raw.decode("utf-8", errors="replace").splitlines():
-        stripped = line.lstrip()
-        if stripped.startswith(marker) and _looks_like_code(stripped[len(marker) :]):
+        stripped = line.strip()
+        if closer is None:
+            opened = next(((o, c) for o, c in blocks if stripped.startswith(o)), None)
+            if opened is None:
+                if stripped.startswith(marker) and _looks_like_code(stripped[len(marker) :]):
+                    count += 1
+                continue
+            stripped = stripped[len(opened[0]) :]
+            closer = opened[1]
+        body, ends, _ = stripped.partition(closer)
+        # A leading `*` is the conventional gutter of a `/* … */` block, not code.
+        if _looks_like_code(body.strip().lstrip("*")):
             count += 1
+        if ends:
+            closer = None
     return count
 
 

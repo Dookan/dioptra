@@ -102,3 +102,82 @@ def test_lizard_paths_lose_only_the_tree_root() -> None:
     assert parse_lizard_csv(header + row)[0]["path"] == "src/helpers/edad.js"
     assert parse_lizard_csv(header + local, ("/work", jail))[0]["path"] == "src/helpers/edad.js"
     assert parse_lizard_csv(header + local)[0]["path"] == f"{jail.lstrip('/')}/src/helpers/edad.js"
+
+
+def test_commented_code_scan_reads_block_comments_in_markup_and_styles(tmp_path: Path) -> None:
+    # Disabled template markup and disabled style rules live in `<!-- … -->` and
+    # `/* … */` blocks: the line-comment scan alone never saw a Vue or CSS file.
+    _write(
+        tmp_path / "App.vue",
+        '<template>\n  <!-- <router-link to="/old">Old</router-link> -->\n'
+        '  <!--\n  <div class="legacy">\n    <span>{{ x }}</span>\n  -->\n</template>\n',
+    )
+    _write(
+        tmp_path / "styles.css",
+        "/* color: red; */\n/*\n * margin: 0;\n * padding: 0;\n */\nbody { color: blue; }\n",
+    )
+    # The anchor's breadth (mmarin, 2026-09-24): a comment shaped like a call
+    # counts, so the anchor's own "Vista … (Sin Layout …)" headings list a file,
+    # while bare section titles and tool directives never do.
+    _write(
+        tmp_path / "anchor.vue",
+        "<!-- 1. Vista Pública o Especial (Sin Layout Administrativo) -->\n"
+        "/* Fix for grouped components (SAIME, SENIAT, etc) */\n",
+    )
+    _write(
+        tmp_path / "notes.js",
+        "<!-- Hero Section -->\n<!-- Tabla -->\n// eslint-disable-next-line no-console\n"
+        "// TODO: call(x);\n",
+    )
+    # A CSS id selector is a live rule, not a `#` comment.
+    _write(tmp_path / "live.css", "#nav {\n  color: red;\n}\n#side {\n}\n")
+    assert scan_commented_code(tmp_path) == ["App.vue", "anchor.vue", "styles.css"]
+
+
+def test_commented_code_block_state_ends_at_its_own_closer(tmp_path: Path) -> None:
+    # A `-->` does not close a `/*` block: the three statements after it are
+    # still inside the comment and make the file offending.
+    _write(tmp_path / "a.js", "/* -->\nconst a = 1;\nconst b = 2;\nconst c = 3;\n*/\n")
+    # Once closed, the lines after are LIVE code and are not counted: one
+    # disabled statement is below the threshold.
+    _write(tmp_path / "b.js", "/* const a = 1; */\nconst b = 2;\nconst c = 3;\nconst d = 4;\n")
+    # Python has no block comment; `/*` there is not an opener.
+    _write(tmp_path / "c.py", "# x = f(1);\n/*\nconst a = 1;\nconst b = 2;\n")
+    assert scan_commented_code(tmp_path) == ["a.js"]
+
+
+def test_commented_code_block_gutter_and_every_suffix(tmp_path: Path) -> None:
+    # The `*` gutter of a block is not code, and statements without a `;` are
+    # recognised only once it is stripped. `.html` and `.scss` are scanned too.
+    _write(tmp_path / "a.js", "/*\n * const a = 1\n * const b = 2\n * const c = 3\n */\n")
+    _write(tmp_path / "legacy.html", "<!--\n<div>\n<span>x</span>\n<p>y</p>\n-->\n")
+    _write(tmp_path / "theme.scss", "/* color: red; */\n/* margin: 0; */\n/* padding: 0; */\n")
+    assert scan_commented_code(tmp_path) == ["a.js", "legacy.html", "theme.scss"]
+
+
+def test_a_huge_comment_line_is_not_code_and_costs_nothing(tmp_path: Path) -> None:
+    # The code signal is quadratic on one long line; the worker runs this scan
+    # over hostile files, so a 1 MB comment must be refused before the regex.
+    import time
+
+    _write(tmp_path / "blob.css", ("/* " + "a" * 1_000_000 + " */\n") * 3)
+    _write(tmp_path / "min.js", ("// " + "a(" * 500_000 + "\n") * 3)
+    started = time.monotonic()
+    assert scan_commented_code(tmp_path) == []
+    assert time.monotonic() - started < 2
+    edge = "x = 1;" + " " * 994
+    _write(tmp_path / "edge.js", f"// {edge}\n// {edge}\n")
+    assert scan_commented_code(tmp_path) == ["edge.js"]
+
+
+def test_a_file_of_long_words_under_the_line_cap_costs_milliseconds(tmp_path: Path) -> None:
+    # The per-line cap alone left the heuristic quadratic UNDER the cap: a
+    # megabyte of 996-character words cost 13.6 s per file, and a hostile tree
+    # ships 5 000 of them (phase-10 panel, 2026-09-28). `\b` fixes the shape.
+    import time
+
+    _write(tmp_path / "words.js", ("// " + "a" * 996 + "\n") * 1000)
+    _write(tmp_path / "blocks.css", "/*\n" + ("a" * 996 + "\n") * 1000)
+    started = time.monotonic()
+    assert scan_commented_code(tmp_path) == []
+    assert time.monotonic() - started < 2

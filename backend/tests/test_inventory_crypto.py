@@ -163,3 +163,75 @@ def test_the_pipeline_persists_crypto_assets_beside_the_findings(
     }
     assert rule_ids, "the fixture's own findings are still there"
     assert not any(is_crypto_inventory_rule(rule_id) for rule_id in rule_ids)
+
+
+def _crypto_result(algorithm: str, line: int | None, *, path: str = "/work/a.py") -> dict[str, Any]:
+    region = {"startLine": line} if line is not None else {}
+    return {
+        "ruleId": "rules.semgrep.crypto-inventory.crypto-inventory-py-hash",
+        "message": {"text": f"crypto-asset primitive=hash algorithm={algorithm} weak=no"},
+        "locations": [{"physicalLocation": {"artifactLocation": {"uri": path}, "region": region}}],
+    }
+
+
+def test_malformed_pieces_are_skipped_without_ending_the_scan() -> None:
+    # P1 close (2026-09-24): every `continue` of normalize_crypto survived a
+    # `break` mutant. Each malformed piece now comes BEFORE a good one.
+    good = {
+        "version": "2.1.0",
+        "runs": [
+            "garbage",
+            {
+                "results": [
+                    "garbage",
+                    {
+                        "ruleId": "rules.semgrep.weak-crypto.md5",
+                        "message": {"text": "not inventory"},
+                    },
+                    _crypto_result("sha256", 3),
+                ]
+            },
+        ],
+    }
+    reports = [
+        ToolReport(tool="osv-scanner", category=ToolCategory.SCA, sarif=good),
+        ToolReport(tool="semgrep", category=ToolCategory.SAST, sarif=good),
+    ]
+    assets = normalize_crypto(reports, ("/work",))
+    assert [(a.algorithm, a.path, a.line) for a in assets] == [("SHA-256", "a.py", 3)]
+
+
+def test_assets_are_sorted_lineless_first_and_capped(monkeypatch: pytest.MonkeyPatch) -> None:
+    sarif = {
+        "version": "2.1.0",
+        "runs": [
+            {
+                "results": [
+                    _crypto_result("sha512", 0),
+                    _crypto_result("sha1", None),
+                    _crypto_result("md5", 0),
+                ]
+            }
+        ],
+    }
+    report = ToolReport(tool="semgrep", category=ToolCategory.SAST, sarif=sarif)
+    assets = normalize_crypto([report], ("/work",))
+    assert [(a.line, a.algorithm) for a in assets] == [(None, "SHA-1"), (0, "MD5"), (0, "SHA-512")]
+    monkeypatch.setattr("app.analysis.normalizer.MAX_CRYPTO_ASSETS", 2)
+    assert len(normalize_crypto([report], ("/work",))) == 2
+
+
+def test_the_asset_carries_its_rule_and_primitive() -> None:
+    (asset,) = normalize_crypto(
+        [
+            ToolReport(
+                tool="semgrep",
+                category=ToolCategory.SAST,
+                sarif={"version": "2.1.0", "runs": [{"results": [_crypto_result("sha256", 1)]}]},
+            )
+        ],
+        ("/work",),
+    )
+    assert asset.rule_id == "rules.semgrep.crypto-inventory.crypto-inventory-py-hash"
+    assert asset.primitive == "hash"
+    assert asset.weak is False

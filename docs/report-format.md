@@ -21,7 +21,9 @@
    impact, detection (path:line + escaped snippet), mitigation, references
 7. **Métricas de código** (P5, built): functions measured, the ten most
    complex (Lizard `ccn`, `nloc`), lines by language (cloc), files with
-   commented-out code; duplication is stated as not measured in v1.0.0 (no
+   commented-out code (the anchor generator's breadth, `mmarin` 2026-09-24:
+   a comment shaped like a call or an assignment counts, so prose of that
+   shape does too); duplication is stated as not measured in v1.0.0 (no
    tool in the authority table).
 8. **Deuda de pruebas** (P5, built): the current workflow stage, the E4 plan
    (criterion, author, the team's own rationale), and per planned function
