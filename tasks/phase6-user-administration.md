@@ -359,8 +359,10 @@ becomes reachable.
       both password changes, `user.create jrivas role=analyst`, the
       `authz.denied`, and the three changes with their written reasons.
       Everything removed afterwards
-- [ ] **On-screen look by `mmarin`** (not a gate, as phase 11's): the Usuarios
-      tab in both themes, and the walk above through the screen on `dev.sh`
+- [x] **On-screen look by `mmarin`** (not a gate, as phase 11's): the Usuarios
+      tab in both themes, and the walk above through the screen on `dev.sh` —
+      checked 2026-09-28 ("ya revisé todo, está bien"), the Bitácora and
+      Inventario lists included
 - [x] `docs/roles-and-permissions.md`, `docs/ui-model.md`,
       `docs/threat-model.md`, `docs/standards-mapping.md` updated; the
       deployment guide (both halves) gives the bootstrap command instead of

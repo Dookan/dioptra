@@ -633,6 +633,8 @@ Radii: frames 14, cards 12, buttons 9, badges 5. Borders 1px hairline.
   its `--t2` / 13px down through `.caselist` into an unset row button, and
   `.panel li`'s margin stacks on `.rowline + .rowline` (12 px instead of the
   anchor's 8). Scoped to `.cols.users`; the Bitácora and Inventario lists share
-  the same inheritance and are left for their own on-screen look.
-- **Not checked on screen yet**: no test applies `components.css`, so the two
-  panels, the forms and both themes need the same look the other screens got.
+  the same inheritance and were looked at as they are.
+- **Checked on screen by `mmarin`, 2026-09-28** — the Usuarios tab in both
+  themes, and the Bitácora and Inventario lists: they read right. No test
+  applies `components.css`, so a change to `.cols.users` needs the same look
+  again.
