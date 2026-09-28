@@ -69,7 +69,13 @@
       "passwordChangeRequired": "Debes cambiar tu contraseña antes de continuar.",
       "weakPassword": "La contraseña es muy corta. Usa al menos 12 caracteres.",
       "forbidden": "Tu rol no tiene permiso para esta acción.",
-      "invalidUsername": "El nombre de usuario debe ser inicial + apellido, en minúsculas y sin puntos."
+      "invalidUsername": "El nombre de usuario debe ser inicial + apellido, en minúsculas y sin puntos.",
+      "userNotFound": "Esa cuenta no existe.",
+      "usernameTaken": "Ya existe una cuenta con ese nombre de usuario.",
+      "emailTaken": "Ese correo ya pertenece a otra cuenta.",
+      "cannotAdministerSelf": "No puedes cambiar tu propia cuenta desde aquí. Tu contraseña se cambia desde tu sesión; tu rol y tu estado, otra persona con rol de administración.",
+      "roleUnchanged": "La cuenta ya tiene ese rol.",
+      "statusUnchanged": "La cuenta ya está en ese estado."
     },
     "ingest": {
       "failed": "No se pudo procesar el código enviado.",
@@ -180,7 +186,8 @@
     "report": "Reporte",
     "workflow": "Workflow",
     "inventory": "Inventario",
-    "audit": "Bitácora"
+    "audit": "Bitácora",
+    "users": "Usuarios"
   },
   "stepper": {
     "label": "Etapas del proceso",
@@ -852,7 +859,12 @@
       "verification.mutant.equivalent": "justificó un mutante como equivalente",
       "report.export.request": "pidió el reporte en PDF",
       "report.export": "preparó el reporte en PDF",
-      "report.export.download": "descargó el reporte en PDF"
+      "report.export.download": "descargó el reporte en PDF",
+      "user.create": "creó una cuenta",
+      "user.role.change": "cambió el rol de una cuenta",
+      "user.disable": "desactivó una cuenta",
+      "user.enable": "reactivó una cuenta",
+      "user.password.reset": "restableció la contraseña de una cuenta"
     },
     "systemActor": "Sistema"
   },
@@ -889,6 +901,61 @@
       "write_failed": "El servidor no pudo guardar el PDF. Puedes pedirlo de nuevo.",
       "artefact_missing": "El archivo ya no estaba. Puedes pedirlo de nuevo.",
       "unknown": "Algo falló. Puedes pedirlo de nuevo."
+    }
+  },
+  "access": {
+    "refusedTitle": "Esta sección no es para tu rol",
+    "refusedBody": "Tu rol no puede abrir esta sección. Si la necesitas, pídeselo a quien administra la plataforma.",
+    "backHome": "Volver a Inicio"
+  },
+  "users": {
+    "title": "Usuarios",
+    "subtitle": "Crea cuentas, cambia roles, desactiva y restablece contraseñas. Cada cambio queda en la bitácora con quién lo hizo y por qué.",
+    "panel": "Cuentas",
+    "loading": "Cargando las cuentas…",
+    "pick": "Elige una cuenta de la lista para cambiarla, o crea una nueva.",
+    "self": "Esta es tu cuenta. Tu contraseña la cambias desde tu sesión; tu rol y tu estado solo los puede cambiar otra persona con rol de administración.",
+    "state": {
+      "active": "cuenta activa",
+      "disabled": "cuenta desactivada",
+      "mustChange": "debe cambiar la contraseña"
+    },
+    "neverLoggedIn": "nunca entró",
+    "lastLogin": "último acceso: {{date}}",
+    "lockedUntil": "bloqueada hasta {{date}}",
+    "create": {
+      "open": "Crear cuenta",
+      "title": "Nueva cuenta",
+      "note": "Tú eliges la contraseña inicial y se la entregas a la persona; al entrar por primera vez tendrá que cambiarla.",
+      "username": "Nombre de usuario",
+      "usernameHint": "Inicial + apellido, en minúsculas y sin puntos. Ejemplo: cperez.",
+      "displayName": "Nombre completo",
+      "email": "Correo (opcional)",
+      "role": "Rol",
+      "password": "Contraseña inicial (12 caracteres o más)",
+      "submit": "Crear la cuenta",
+      "cancel": "Cancelar"
+    },
+    "actions": {
+      "title": "Cambios en {{username}}",
+      "reasonLabel": "¿Por qué haces este cambio?",
+      "reasonHint": "Mínimo 10 caracteres. Queda en la bitácora junto al cambio.",
+      "roleLabel": "Rol",
+      "changeRole": "Cambiar el rol",
+      "passwordLabel": "Contraseña nueva",
+      "passwordHint": "Cierra todas sus sesiones, quita el bloqueo por intentos y le pide cambiarla al entrar.",
+      "resetPassword": "Restablecer la contraseña",
+      "disableNote": "Desactivar cierra todas sus sesiones al instante. La cuenta no se borra: su historial queda en la bitácora.",
+      "enableNote": "Reactivar le permite volver a entrar con su contraseña actual.",
+      "disable": "Desactivar la cuenta",
+      "enable": "Reactivar la cuenta"
+    },
+    "notice": {
+      "created": "Cuenta creada. Entrégale la contraseña inicial a la persona.",
+      "role": "Rol cambiado.",
+      "reset": "Contraseña restablecida.",
+      "disabled": "Cuenta desactivada.",
+      "enabled": "Cuenta reactivada."
     }
   }
 }

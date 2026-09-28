@@ -40,12 +40,12 @@ Líder del proyecto: **Moises Marin** (`mmarin`).
   consignas deterministas (P3); andamiaje, sandbox y re-auditoría por mutación
   (P4); inventario de software con copia local OSV + NVD, bitácora en pantalla,
   secciones de cierre del reporte y auto-auditoría (P5).
-- **Versión actual: 1.4.0.** Segundo ciclo, en curso: PHP/Laravel terminado
+- **Versión actual: 1.5.0.** Segundo ciclo, en curso: PHP/Laravel terminado
   (fase 7a); exportación de PDF asíncrona terminada (fase 8); ZIP de hasta
   1 GiB con barra de progreso del análisis terminado (fase 10); detección de
   respaldos, fotos subidas, `.env`, claves y logs incluidos en el código
   terminada (fase 11); Java/Spring pendiente (fase 7b); administración de
-  usuarios en diseño (fase 6).
+  usuarios terminada (fase 6).
 - **Numeración:** un cambio o corrección pequeña sube el tercer número, una
   fase completa el segundo, un cambio que rompe el contrato de la API el
   primero.
@@ -205,11 +205,11 @@ Project lead: **Moises Marin** (`mmarin`).
   mutation re-audit (P4); the software inventory with the local OSV + NVD
   mirror, the audit-log screen, the report's closing sections and the
   self-audit (P5).
-- **Current version: 1.4.0.** Second cycle, in progress: PHP/Laravel done
+- **Current version: 1.5.0.** Second cycle, in progress: PHP/Laravel done
   (phase 7a); asynchronous PDF export done (phase 8); ZIP ingest up to 1 GiB
   with an analysis progress bar done (phase 10); detection of backups,
   uploaded photos, `.env` files, keys and logs committed to the code done
-  (phase 11); Java/Spring pending (phase 7b); user administration in design
+  (phase 11); Java/Spring pending (phase 7b); user administration done
   (phase 6).
 - **Numbering:** a small change or correction bumps the third number, a
   completed phase the second, a change that breaks the API contract the

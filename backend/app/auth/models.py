@@ -16,6 +16,13 @@ from app.db.types import UtcDateTime
 #: Usernames are initial + lastname, lowercase, no dots (CLAUDE.md → Hard Rules).
 USERNAME_PATTERN = r"^[a-z][a-z0-9]{2,31}$"
 
+#: Names the pattern accepts but no account may take: they are actors the
+#: platform itself writes into the audit log (the worker's jobs, the bootstrap
+#: command). An account called ``system`` would make every such row ambiguous
+#: — a person's action indistinguishable from the worker's (phase 6 survey §5).
+SYSTEM_ACTOR = "system"
+RESERVED_USERNAMES = frozenset({SYSTEM_ACTOR})
+
 
 class Role(StrEnum):
     """Product roles. Authorization is deny-by-default: no implicit hierarchy."""

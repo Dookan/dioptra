@@ -76,3 +76,45 @@ class Forbidden(AuthError):
     status_code = 403
     code = "forbidden"
     message_key = "errors.auth.forbidden"
+
+
+class UserNotFound(AuthError):
+    status_code = 404
+    code = "user_not_found"
+    message_key = "errors.auth.userNotFound"
+
+
+class UsernameTaken(AuthError):
+    status_code = 409
+    code = "username_taken"
+    message_key = "errors.auth.usernameTaken"
+
+
+class EmailTaken(AuthError):
+    status_code = 409
+    code = "email_taken"
+    message_key = "errors.auth.emailTaken"
+
+
+class CannotAdministerSelf(AuthError):
+    """An admin acting on their own account: role, status or password.
+
+    One's own password goes through ``POST /api/v1/auth/password``, which asks
+    for the current one; the admin path does not.
+    """
+
+    status_code = 422
+    code = "cannot_administer_self"
+    message_key = "errors.auth.cannotAdministerSelf"
+
+
+class RoleUnchanged(AuthError):
+    status_code = 422
+    code = "role_unchanged"
+    message_key = "errors.auth.roleUnchanged"
+
+
+class StatusUnchanged(AuthError):
+    status_code = 422
+    code = "status_unchanged"
+    message_key = "errors.auth.statusUnchanged"

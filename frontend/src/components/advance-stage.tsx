@@ -11,7 +11,7 @@ import * as api from '../api/projects';
 import type { Analysis } from '../api/projects';
 import { useAuth } from '../auth/auth-context';
 
-/** Mirrors backend/app/workflow/triage.py::MIN_JUSTIFICATION_CHARS — the server is the gate. */
+/** Mirrors backend/app/core/text.py::MIN_JUSTIFICATION_CHARS — the server is the gate. */
 const MIN_JUSTIFICATION = 10;
 
 interface Props {

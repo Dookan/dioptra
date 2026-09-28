@@ -19,7 +19,7 @@ import { Stepper } from '../components/stepper';
 import type { Route } from '../navigation/use-route';
 
 const CRITERIA: CoverageCriterion[] = ['statements', 'decisions', 'paths'];
-/** Mirrors backend/app/workflow/triage.py::MIN_JUSTIFICATION_CHARS — the server is the gate. */
+/** Mirrors backend/app/core/text.py::MIN_JUSTIFICATION_CHARS — the server is the gate. */
 const MIN_RATIONALE = 10;
 const LEVEL_TONE: Record<RiskRow['level'], string> = { high: 'err', medium: 'warn', low: 'ok' };
 

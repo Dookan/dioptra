@@ -1,6 +1,6 @@
 [project]
 name = "dioptra-backend"
-version = "1.4.0"
+version = "1.5.0"
 description = "Dioptra — white-box analysis platform backend"
 requires-python = ">=3.13"
 license = { text = "Apache-2.0" }
@@ -161,6 +161,12 @@ only_mutate = [
     # reports, what it never copies) and the one exemption it bends.
     "app/analysis/artefacts.py",
     "app/analysis/third_party.py",
+    # Phase 6 close: account administration — the self guard, the locked
+    # last-admin re-check, the per-action session effects, the first-admin
+    # bootstrap — and the justification floor, now in core/text.py.
+    "app/auth/admin.py",
+    "app/auth/bootstrap.py",
+    "app/core/text.py",
 ]
 pytest_add_cli_args_test_selection = [
     "tests/test_gates.py",
@@ -193,4 +199,6 @@ pytest_add_cli_args_test_selection = [
     "tests/test_queue.py",
     "tests/test_artefacts.py",
     "tests/test_third_party.py",
+    "tests/test_users_admin.py",
+    "tests/test_authz.py",
 ]

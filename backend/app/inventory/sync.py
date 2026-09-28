@@ -24,6 +24,10 @@ from sqlalchemy.orm import Session
 
 from app.audit import service as audit
 from app.audit.models import AuditOutcome
+
+# SYSTEM_ACTOR is re-exported here for existing callers; auth refuses it as a
+# username (RESERVED_USERNAMES), so a row by "system" is always the platform.
+from app.auth.models import SYSTEM_ACTOR as SYSTEM_ACTOR
 from app.auth.models import User
 from app.core.clock import utc_now
 from app.core.config import Settings, get_settings
@@ -46,7 +50,6 @@ _COPY_CHUNK = 1024 * 1024
 #: A job argument is broker-writable; only a real username shape reaches the
 #: audit trail as the actor, anything else is attributed to the system.
 _ACTOR = re.compile(r"^[a-z]{2,64}$")
-SYSTEM_ACTOR = "system"
 
 
 def actor_of(requested_by: str | None) -> str:

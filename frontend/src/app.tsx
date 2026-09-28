@@ -8,6 +8,8 @@
 import { useTranslation } from 'react-i18next';
 
 import { useAuth } from './auth/auth-context';
+import { AccessRefused } from './components/access-refused';
+import { mayOpen } from './navigation/access';
 import { useRoute } from './navigation/use-route';
 import { ReportJobProvider } from './report-jobs/report-job-provider';
 import { AuditScreen } from './screens/audit-screen';
@@ -22,10 +24,17 @@ import { ReportScreen } from './screens/report-screen';
 import { CaseDesignScreen } from './screens/case-design-screen';
 import { TestPlanScreen } from './screens/test-plan-screen';
 import { TestWritingScreen } from './screens/test-writing-screen';
+import { UsersScreen } from './screens/users-screen';
 import { VerificationScreen } from './screens/verification-screen';
 
 function Authenticated(): React.ReactNode {
   const { route, navigate } = useRoute();
+  const { user } = useAuth();
+  // The role map is checked BEFORE any screen mounts: a forbidden hash never
+  // fires the screen's requests. Presentation only — the server refuses too.
+  if (user !== null && !mayOpen(route.kind, user.role)) {
+    return <AccessRefused route={route} onNavigate={navigate} />;
+  }
   switch (route.kind) {
     case 'projects':
       return <ProjectsScreen route={route} onNavigate={navigate} />;
@@ -47,6 +56,8 @@ function Authenticated(): React.ReactNode {
       return <InventoryScreen route={route} onNavigate={navigate} />;
     case 'audit':
       return <AuditScreen route={route} onNavigate={navigate} />;
+    case 'users':
+      return <UsersScreen route={route} onNavigate={navigate} />;
     case 'home':
       return <HomeScreen route={route} onNavigate={navigate} />;
   }

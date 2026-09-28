@@ -25,7 +25,7 @@ import type { Route } from '../navigation/use-route';
 // The PDF is a worker job (phase 8, PdfExportButton); these three are sub-second.
 const FORMATS: ReportFormat[] = ['docx', 'md'];
 const SEVERITIES: Severity[] = ['critical', 'high', 'medium', 'low', 'info'];
-/** Mirrors backend/app/workflow/triage.py::MIN_JUSTIFICATION_CHARS — the server is the gate. */
+/** Mirrors backend/app/core/text.py::MIN_JUSTIFICATION_CHARS — the server is the gate. */
 const MIN_JUSTIFICATION = 10;
 
 interface Props {

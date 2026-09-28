@@ -26,7 +26,7 @@ interface Props {
 }
 
 type Filter = 'all' | 'high' | 'unresolved';
-/** Mirrors backend/app/workflow/triage.py::MIN_JUSTIFICATION_CHARS — the server is the gate. */
+/** Mirrors backend/app/core/text.py::MIN_JUSTIFICATION_CHARS — the server is the gate. */
 const MIN_JUSTIFICATION = 10;
 const DOCUMENTS: InventoryDocument[] = ['sbom', 'cbom', 'vex', 'csv'];
 

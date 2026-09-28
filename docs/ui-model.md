@@ -19,6 +19,14 @@
 5. **Offline is visible** — the inventory panel always shows the date of the
    last vulnerability-database update; nothing in the UI implies a live
    lookup.
+6. **A role sees only the tabs it may open** (phase 6, `mmarin`'s decision 5)
+   — `frontend/src/navigation/access.ts` is the one map the tabs bar and the
+   router read, typed over every route kind so a new route cannot skip it; a
+   forbidden hash renders a plain refusal with a way back to Inicio and never
+   mounts the screen. Presentation only: the server refuses the same roles.
+   Recorded deviation: the mockups draw one tabs bar for everyone. Against
+   today's matrix only `#/users` is restricted, on purpose — every other
+   screen is a "view" row of `docs/roles-and-permissions.md`.
 
 ## Screens added for the work plan (2026-08-28)
 
@@ -577,8 +585,9 @@ Radii: frames 14, cards 12, buttons 9, badges 5. Borders 1px hairline.
   "Descargar VEX" (the plan lists VEX as an export; the anchor shows three);
   the project row's version is "análisis N · date" — the platform has no
   semantic version of the audited system, the anchor's "v1.3" is
-  illustrative; the "Usuarios" half of mockup 10 is not built (no endpoint,
-  not in the plan's day table — `tasks/phase5-survey.md` §8).
+  illustrative; the "Usuarios" half of mockup 10 was not built in P5 (no
+  endpoint, not in the plan's day table — `tasks/phase5-survey.md` §8); it is
+  since phase 6, as its own screen (below).
 - **Reporte (E8)**, recorded deviation: mockup 09 lists "Inventario (SBOM y
   CVE abiertos)" and "Anexos" among the sections; the built sections 7–10
   are composed from workflow rows and have no analyst prose, so the editor's
@@ -589,3 +598,41 @@ Radii: frames 14, cards 12, buttons 9, badges 5. Borders 1px hairline.
   action code, and an action the screen has no sentence for shows its code
   in mono, never a blank. The server scopes the rows by role; the subtitle
   says which scope the reader has.
+
+## Usuarios (screen 10, left half) — phase 6, 2026-09-28
+
+- Route `#/users`, tab **Usuarios** after Bitácora, admin only (principle 6);
+  `frontend/src/screens/users-screen.tsx`. Two panels 1fr 1fr as the anchor
+  draws them (`.cols.users`, one column below 900 px): the accounts on the
+  left, one `rowline` each — avatar with two initials, the username in bold,
+  "Analista · cuenta activa" (plus "debe cambiar la contraseña") and, on a
+  second `.sub` line, "último acceso: …" / "nunca entró" and "bloqueada hasta
+  …" when the lock is in the future (decision 4), the role badge on the right
+  in the anchor's tones (admin `info`, analyst `ok`, developer `warn`). The
+  right panel holds either the "Nueva cuenta" form or the changes for the
+  selected account; for one's own account it only says who can change it.
+- Every change but creation shares ONE written-reason field ("¿Por qué haces
+  este cambio?") and each button stays disabled below ten characters; a
+  server refusal keeps the reason and the form and shows the server's
+  sentence. Creation asks for no reason (CLAUDE.md's recorded exception) and
+  says the account must change the password at first login.
+- **Recorded deviations from mockup 10**: the Usuarios half is its own tab and
+  screen, not beside the Bitácora; "+ Invitar" is "Crear cuenta" and
+  "Invitación enviada · pendiente" / "Reenviar" become "debe cambiar la
+  contraseña" — the account is created outright (decision 1), there is no
+  mail; the per-user activity counts ("3 proyectos", "12 tests escritos") and
+  the status bar's "4 usuarios · 3 proyectos activos" are not drawn — no such
+  aggregate exists, and Bitácora answers what a person did; the state words
+  are the existing `roles.*` vocabulary plus "cuenta activa / desactivada"
+  rather than the anchor's gendered "Administradora · activa". The five new
+  audit actions read as sentences in Bitácora.
+- Load-bearing notes (what a change does, why one's own account offers
+  nothing) use `.cols.users .note` in `--t2`, not `.hint` (`--t3`, below AA);
+  a disabled account's avatar is dimmed like the anchor's pending row.
+- **Found by the phase-6 fidelity panel, fixed here only**: `.panel ul` hands
+  its `--t2` / 13px down through `.caselist` into an unset row button, and
+  `.panel li`'s margin stacks on `.rowline + .rowline` (12 px instead of the
+  anchor's 8). Scoped to `.cols.users`; the Bitácora and Inventario lists share
+  the same inheritance and are left for their own on-screen look.
+- **Not checked on screen yet**: no test applies `components.css`, so the two
+  panels, the forms and both themes need the same look the other screens got.

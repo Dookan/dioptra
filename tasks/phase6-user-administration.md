@@ -1,19 +1,12 @@
 # Task: Phase 6 — User administration
 
-> **Status: DESIGN — written 2026-09-23, NOT started.** First task file of the
-> **second cycle** (post-v1.0.0; under the 2026-09-28 scheme its close is a MINOR bump from whatever the version is then), whose other known inhabitant
-> is the PHP/Laravel + Java/Spring wave cut from P5. It is NOT part of the work
-> plan's P0–P5 roadmap: the plan gave mockup 10's "Usuarios" half no day, and
-> `tasks/phase5-survey.md` §8 recorded it as not built for exactly that reason.
-> **Survey `tasks/phase6-survey.md` SIGNED OFF 2026-09-28 by `mmarin`.** It
-> corrects this file where the two disagree — read its §1, §2 and §6 first:
-> schema caps are the columns' (`display_name` 120, `email` 254); `EmailTaken`
-> (409) and `StatusUnchanged` (422) join the error table; the last-admin guard
-> is a locked re-check of the actor and the count; a reset clears the
-> lockout; a bootstrap command for the first production admin is added; mail
-> recovery never applies to admins; deliverable 8 narrows to the `Mailer`
-> protocol, `NullMailer` and the settings (`SmtpMailer` lands with the
-> recovery flow). The Hard Rule carve-out is in CLAUDE.md.
+> **Status: DONE — built and closed 2026-09-28; the commit hash is recorded
+> here and in CLAUDE.md by a follow-up commit, as phases 1 and 8 did. Version
+> 1.5.0.** Survey `tasks/phase6-survey.md`, signed off by `mmarin` the same day
+> (docs-only commit `80d23bc`, which also wrote the Hard Rule carve-out into
+> CLAUDE.md before any code). Where this file and the survey disagree, the
+> survey wins (column widths, `EmailTaken`, `StatusUnchanged`, the guard, the
+> bootstrap, the narrowed mail port) — see Deviations.
 
 ## Why it exists
 
@@ -289,28 +282,113 @@ becomes reachable.
 
 - [x] `tasks/phase6-survey.md` written and signed off by `mmarin` before any edit (2026-09-28)
 - [x] Scope-change log entry recorded (2026-09-28, survey signed); Hard Rule carve-out written into CLAUDE.md
-- [ ] All deliverables implemented; ruff + mypy + oxlint + tsc clean
-- [ ] All specified tests passing (pytest / Vitest), denial cases included
-- [ ] Mutation pass on `app/auth/admin.py` (mutmut, phase-close) — we apply to
-      ourselves what we demand of the factory; every survivor classified here
-- [ ] No secrets in diff (Gitleaks clean); locale parity check green
-- [ ] `/precommit` returned `READY TO COMMIT` (mockup fidelity included)
-- [ ] Proven by test that a disabled, demoted or reset account loses its live
-      session on the NEXT request, not at token expiry
-- [ ] Proven by test that the last enabled admin cannot be disabled or demoted,
-      by anyone, including themselves
-- [ ] Tabs bar asserted per role, and a forbidden hash renders the refusal
+- [x] All deliverables implemented; ruff + mypy + oxlint + tsc clean — `ruff check`, `ruff format --check`, `mypy app tests` (173 files), `oxlint src`, `tsc -b`, 2026-09-28
+- [x] All specified tests passing (pytest / Vitest), denial cases included —
+      `backend/tests/test_users_admin.py` (64 cases: every endpoint × analyst
+      and developer → 403 + `authz.denied`, anonymous → 401) and the whole
+      non-sandbox backend suite green; `frontend` 157 tests (14 in
+      `users-screen.test.tsx`, plus the locale parity)
+- [x] Mutation pass on `app/auth/admin.py` (mutmut, phase-close), with
+      `auth/bootstrap.py` and `core/text.py` (all three joined the target
+      list): **390 mutants; first pass 82 survivors, second 64**. What the pass
+      found and was written: a guard that looked only at `disabled` would have
+      let a DEMOTED-but-enabled actor through (the race test now covers both);
+      disabling's revocation was invisible while the account was disabled
+      (asserted after re-enabling); no row's `source_ip` was checked; the
+      bootstrap was never run beside a non-admin account, nor with a name over
+      the column's 120, nor through `sys.argv`; two accounts with DIFFERENT
+      emails were never created. **The 64 survivors, all read**: typed-error
+      and log `detail` strings and log formats (the client sees `{code,
+      message_key}`); `.lower()` → `.upper()` before `get_user_by_username`
+      and `create_user`, which both lower-case again; `must_change_password
+      =True` removed where `create_user` defaults to it; the e-mail
+      read-before-insert mutated to `WHERE NULL` / `select(None)` — the
+      `IntegrityError` path still answers `email_taken`; `now=None` on
+      the reset's revocation (a timestamp); the guard run for non-admin
+      targets too (`and` → `or` — fail-closed, observable only in a race);
+      and the lock itself — `with_for_update` / `populate_existing` flags and
+      `order_by(None)`: SQLite renders no `FOR UPDATE`, so they are proven
+      where they matter instead, on PostgreSQL (next box). `LastAdminProtected`
+      is not in the list because it was removed as unreachable (Deviations)
+- [x] No secrets in diff (Gitleaks clean); locale parity check green
+- [x] `/precommit` returned `READY TO COMMIT` (mockup fidelity included),
+      2026-09-28. Security CLEAN; invariants HOLD; QA GENUINE on every claim
+      (the bootstrap and the mail refusal re-run as real processes, a
+      password canary through every endpoint). **Mockup fidelity** (all
+      slight, applied): the account list inherited `.panel ul`'s `--t2` and
+      `.panel li`'s margin (scoped fix under `.cols.users`, recorded in
+      `docs/ui-model.md` for the other lists), "Crear cuenta" not pushed right,
+      buttons touching the next label, load-bearing notes in below-AA `.hint`,
+      `<div>` inside a `<button>`, a refusal sentence that named one screen.
+      **Coverage adversary**, run alone (54 hand mutants beyond mutmut's
+      reach): backend 19 of 22 killed, the frontend's action panel only 16 of
+      32 — every survivor that was not equivalent now has a test (the role a
+      create asks for, the reserved name checked AFTER normalising, the mail
+      subject cap, the reason floor at exactly ten trimmed characters, the
+      role and reset buttons' preconditions and bodies, the reason cleared
+      after success, re-enabling, a lock in the past); three re-checked by
+      hand as killed. Tree verified byte-identical after the adversary
+- [x] Proven by test that a disabled, demoted or reset account loses its live
+      session on the NEXT request, not at token expiry — each test holds a
+      token minted BEFORE the change (`account_disabled`, role drift, the
+      `password_changed_at` cutoff); a demotion keeps the refresh cookie on
+      purpose and the refreshed profile carries the new role
+- [x] Proven that the last enabled admin cannot be disabled or demoted, by
+      anyone, including themselves — sequentially by the self guard; under a
+      race by the locked actor re-check: `test_an_actor_who_lost_admin_while_waiting_is_refused_and_recorded`
+      (4 cases) and, on PostgreSQL 18 with two connections and the real
+      service, A disabling B while B disables A → one commits, the other is
+      refused with an `authz.denied` row, one admin left; **attributable**:
+      with the locking SELECT made plain, both commit and no admin is left
+      (throwaway container, removed)
+- [x] Tabs bar asserted per role, and a forbidden hash renders the refusal
       without calling the API; the route map covers every route kind
-- [ ] Proven by test that with `DIOPTRA_MAIL_ENABLED=false` (the default) the
-      platform opens no SMTP connection and every admin action still works —
-      the air-gapped factory is the baseline, not the exception
-- [ ] Walked by hand on the dev instance: `srosales` creates an account, it
-      changes its password at first login, gets its role changed, is disabled
-      and re-enabled, and every step reads as a sentence in Bitácora
-- [ ] `docs/roles-and-permissions.md`, `docs/ui-model.md`,
-      `docs/threat-model.md`, `docs/standards-mapping.md` updated
-- [ ] CLAUDE.md phase status + `docs/development-phases.md`: Phase 6 → DONE
-      with date and commit; bump the MINOR version (CLAUDE.md → Release rules)
+- [x] Proven by test that with mail off (the default, and in this version the
+      only accepted value) no admin action opens a connection
+      (`test_no_admin_action_opens_a_connection`, a socket guard) and
+      `DIOPTRA_MAIL_ENABLED=true` refuses to boot
+- [x] Walked on a real instance (2026-09-28) — **through the API, not the
+      screen**: a throwaway PostgreSQL 18, migrations to head, the API process
+      under `DIOPTRA_ENV=prod`. `python -m app.auth.bootstrap` created
+      `srosales` (a second run refused); `srosales` was held at 409 until it
+      changed its password, created `jrivas` with no reason, `jrivas` was held
+      at 409, changed its password, reached `/projects` and got 403 on
+      `/users`; its role went analyst → developer (its old token 401), it was
+      disabled (token 403 `account_disabled`, login 401) and enabled again
+      (login 200); `srosales` disabling itself got 422. The Bitácora read back
+      as `srosales`: `system user.create srosales role=admin (bootstrap)`,
+      both password changes, `user.create jrivas role=analyst`, the
+      `authz.denied`, and the three changes with their written reasons.
+      Everything removed afterwards
+- [ ] **On-screen look by `mmarin`** (not a gate, as phase 11's): the Usuarios
+      tab in both themes, and the walk above through the screen on `dev.sh`
+- [x] `docs/roles-and-permissions.md`, `docs/ui-model.md`,
+      `docs/threat-model.md`, `docs/standards-mapping.md` updated; the
+      deployment guide (both halves) gives the bootstrap command instead of
+      the snippet
+- [x] CLAUDE.md phase status + `docs/development-phases.md`: Phase 6 → DONE
+      with date; the MINOR bump to **1.5.0** (CLAUDE.md → Release rules); the
+      commit hash lands in the follow-up commit
+
+## Deviations from this file (all recorded in the survey)
+
+- **`LastAdminProtected` does not exist.** With the actor re-checked under the
+  lock, the actor is an enabled admin and never the target, so a "no admin
+  left" count can never fire; the re-check is the guard, and its refusal is
+  `forbidden` plus an `authz.denied` row (survey §2 addendum).
+- **Caps are the columns'**: `display_name` 120, `email` 254 (this file said
+  200 for both). **Added**: `EmailTaken` (409, e-mail case-folded),
+  `StatusUnchanged` (422), a reserved-username set (`system`).
+- **A reset also clears the lockout** (`failed_attempts`, `locked_until`).
+- **Added**: `python -m app.auth.bootstrap` for the first production admin
+  (survey §6.1).
+- **Deliverable 8 narrowed** (survey §6.3): `app/notify/mailer.py` ships the
+  `Mailer` protocol and `NullMailer` only, and the one setting is
+  `DIOPTRA_MAIL_ENABLED`, which refuses `true`; host, port, TLS and the SMTP
+  client land with the recovery flow, which never applies to admins (§6.2).
+- **Settings** carry no host/port/from/TLS yet, for the same reason.
+- **One reason field** on the screen serves the three reasoned actions of the
+  selected account rather than one per action.
 
 ## Non-goals (explicit)
 

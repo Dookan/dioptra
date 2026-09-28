@@ -36,3 +36,16 @@ class ValidationFailed(AppError):
     status_code = 422
     code = "validation_failed"
     message_key = "errors.validation"
+
+
+class JustificationRequired(AppError):
+    """A sensitive action arrived without a usable written justification.
+
+    Lives here, not in ``app.workflow.errors``, because the auth surface
+    enforces the same floor (phase 6); the workflow module re-exports it, and
+    its code and key are unchanged.
+    """
+
+    status_code = 422
+    code = "justification_required"
+    message_key = "errors.workflow.justificationRequired"

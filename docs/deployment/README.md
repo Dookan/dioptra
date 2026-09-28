@@ -227,27 +227,25 @@ scripts/osv_db_download.sh /var/lib/dioptra/osv
 docker compose -f docker/docker-compose.yml -f docker/docker-compose.backend.yml up -d --build
 ```
 
-**Primer administrador.** En producción el seed está desactivado y todavía no
-hay pantalla de usuarios (`tasks/phase6-user-administration.md`), así que la
-primera cuenta se crea dentro del contenedor de la API. La contraseña se pide
-sin mostrarse y la cuenta debe cambiarla en su primer ingreso:
+**Primer administrador.** En producción el seed está desactivado; la primera
+cuenta de administración la crea el comando de arranque, que **se niega si ya
+existe un administrador activo**, deja una fila `user.create` en la bitácora
+(actor `system`) y obliga a cambiar la contraseña en el primer ingreso. La
+contraseña se lee sin mostrarse y solo viaja por el entorno de ese `exec`,
+nunca por la línea de comandos:
 
 ```bash
-docker compose -f docker/docker-compose.yml -f docker/docker-compose.backend.yml exec -it api python -c "
-import getpass, app.db.registry
-from app.auth.models import Role
-from app.auth.service import create_user
-from app.db.session import get_session_factory
-s = get_session_factory()()
-create_user(s, username='srosales', display_name='Saile Rosales', role=Role.ADMIN,
-            password=getpass.getpass('Contraseña inicial: '))
-s.commit(); print('cuenta creada')
-"
+read -rs -p 'Contraseña inicial: ' DIOPTRA_BOOTSTRAP_PASSWORD; echo
+export DIOPTRA_BOOTSTRAP_PASSWORD
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.backend.yml exec \
+  -e DIOPTRA_BOOTSTRAP_PASSWORD api python -m app.auth.bootstrap srosales "Saile Rosales"
+unset DIOPTRA_BOOTSTRAP_PASSWORD
 ```
 
-Repite con `Role.ANALYST` / `Role.DEVELOPER` para las demás cuentas. Usuario =
-inicial + apellido, minúsculas, sin puntos. Esta vía **no deja fila en la
-bitácora**; la pantalla de administración de la fase 6 lo resolverá.
+Las demás cuentas se crean desde la pestaña **Usuarios** (solo administración),
+con fila en la bitácora. Usuario = inicial + apellido, minúsculas, sin puntos;
+`system` está reservado. Si alguna vez todos los administradores quedaran
+desactivados, el mismo comando es la vía de vuelta.
 
 ## 6. Instalación del servidor frontend
 
@@ -647,27 +645,25 @@ scripts/osv_db_download.sh /var/lib/dioptra/osv
 docker compose -f docker/docker-compose.yml -f docker/docker-compose.backend.yml up -d --build
 ```
 
-**First administrator.** In production the seed is disabled and there is no
-user screen yet (`tasks/phase6-user-administration.md`), so the first account
-is created inside the API container. The password is prompted without echo
-and the account must change it at first login:
+**First administrator.** In production the seed is disabled; the first
+administrator account is created by the bootstrap command, which **refuses when
+an enabled administrator already exists**, writes a `user.create` row to the
+audit log (actor `system`) and forces a password change at first login. The
+password is read without echo and travels only in that `exec`'s environment,
+never on a command line:
 
 ```bash
-docker compose -f docker/docker-compose.yml -f docker/docker-compose.backend.yml exec -it api python -c "
-import getpass, app.db.registry
-from app.auth.models import Role
-from app.auth.service import create_user
-from app.db.session import get_session_factory
-s = get_session_factory()()
-create_user(s, username='srosales', display_name='Saile Rosales', role=Role.ADMIN,
-            password=getpass.getpass('Initial password: '))
-s.commit(); print('account created')
-"
+read -rs -p 'Initial password: ' DIOPTRA_BOOTSTRAP_PASSWORD; echo
+export DIOPTRA_BOOTSTRAP_PASSWORD
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.backend.yml exec \
+  -e DIOPTRA_BOOTSTRAP_PASSWORD api python -m app.auth.bootstrap srosales "Saile Rosales"
+unset DIOPTRA_BOOTSTRAP_PASSWORD
 ```
 
-Repeat with `Role.ANALYST` / `Role.DEVELOPER` for the other accounts. Username
-= initial + last name, lowercase, no dots. This path **writes no audit-log
-row**; the phase-6 administration screen will close that.
+Every other account is created from the **Users** tab (administrators only),
+with an audit-log row. Username = initial + last name, lowercase, no dots;
+`system` is reserved. If every administrator is ever disabled, the same command
+is the way back.
 
 ## 6. Installing the frontend server
 

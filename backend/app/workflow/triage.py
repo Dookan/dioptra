@@ -8,7 +8,6 @@ justification (CLAUDE.md → Hard Rules → Auth).
 
 from __future__ import annotations
 
-import re
 import uuid
 from dataclasses import dataclass
 
@@ -18,27 +17,19 @@ from app.analysis.models import STAGE_ORDER, Analysis, Finding, Stage, Verdict
 from app.audit import service as audit
 from app.auth.models import User
 from app.core.clock import utc_now
+
+# Moved to app.core.text in phase 6 (the auth surface needs them and must not
+# import this package); re-exported so every existing import stays valid.
+from app.core.text import CONTROL_CHARS as CONTROL_CHARS
+from app.core.text import MAX_JUSTIFICATION_CHARS as MAX_JUSTIFICATION_CHARS
+from app.core.text import MIN_JUSTIFICATION_CHARS as MIN_JUSTIFICATION_CHARS
+from app.core.text import clean_justification as clean_justification
+from app.core.text import strip_control_chars as strip_control_chars
 from app.workflow.errors import (
     FindingNotFound,
     FindingNotTriageable,
-    JustificationRequired,
     StageLocked,
 )
-
-#: Shortest justification accepted after stripping whitespace. "ok" is not a
-#: reason; ten characters is the floor at which a sentence can exist.
-MIN_JUSTIFICATION_CHARS = 10
-MAX_JUSTIFICATION_CHARS = 4000
-
-#: C0/C1 control characters other than tab, newline and carriage return. JSON
-#: carries them happily; python-docx refuses them ("All strings must be XML
-#: compatible"), and a signed version is immutable — so one such character
-#: would make a version un-exportable as DOCX forever. Stripped at the boundary.
-CONTROL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
-
-
-def strip_control_chars(raw: str) -> str:
-    return CONTROL_CHARS.sub("", raw)
 
 
 @dataclass(frozen=True)
@@ -56,16 +47,6 @@ class TriageStatus:
     def complete(self) -> bool:
         """The E3 gate: every finding has a verdict. An empty analysis has nothing to triage."""
         return self.pending == 0
-
-
-def clean_justification(raw: str) -> str:
-    """Normalize a justification or raise :class:`JustificationRequired`."""
-    text = " ".join(strip_control_chars(raw).split())
-    if len(text) < MIN_JUSTIFICATION_CHARS:
-        raise JustificationRequired(f"justification shorter than {MIN_JUSTIFICATION_CHARS}")
-    if len(text) > MAX_JUSTIFICATION_CHARS:
-        raise JustificationRequired(f"justification longer than {MAX_JUSTIFICATION_CHARS}")
-    return text
 
 
 def get_finding(db: Session, finding_id: uuid.UUID) -> Finding:

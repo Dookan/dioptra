@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from app.core.errors import AppError
 
+# Moved to app.core.errors in phase 6 so the auth surface can raise it without
+# importing this package; re-exported (explicitly, for mypy --strict) so every
+# existing import, code and key stays the same.
+from app.core.errors import JustificationRequired as JustificationRequired
+
 
 class WorkflowError(AppError):
     """Base class for everything the workflow surface rejects."""
@@ -17,13 +22,6 @@ class FindingNotFound(WorkflowError):
     status_code = 404
     code = "finding_not_found"
     message_key = "errors.findings.notFound"
-
-
-class JustificationRequired(WorkflowError):
-    """A sensitive action arrived without a usable written justification."""
-
-    code = "justification_required"
-    message_key = "errors.workflow.justificationRequired"
 
 
 #: Gate reason code → i18n key the UI resolves. Every reason a gate can

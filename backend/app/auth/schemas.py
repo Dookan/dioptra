@@ -7,6 +7,7 @@ counter an attacker could use to probe the lockout state.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -50,3 +51,55 @@ class ErrorResponse(BaseModel):
 
     code: str
     message_key: str
+
+
+# --- Account administration (phase 6, admin only) ---------------------------
+# Caps are the COLUMNS' widths (users.display_name 120, users.email 254): a
+# longer value would pass validation and reach the driver as a 500
+# (tasks/phase6-survey.md §1). The justification's own floor and ceiling are
+# app.core.text's; here only a transport bound.
+
+_JUSTIFICATION_TRANSPORT_MAX = 8000
+
+
+class UserAdminOut(BaseModel):
+    """One account as the admin sees it. No hash, no failure counter: the exact
+    count is the lockout's business, "bloqueada hasta …" is what an admin acts on."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    username: str
+    display_name: str
+    email: str | None
+    role: Role
+    disabled: bool
+    must_change_password: bool
+    last_login_at: datetime | None
+    locked_until: datetime | None
+    created_at: datetime
+
+
+class UserCreateIn(BaseModel):
+    """No justification: creation is the Hard Rule's one recorded exception."""
+
+    username: str = Field(min_length=1, max_length=32)
+    display_name: str = Field(min_length=1, max_length=120)
+    email: str | None = Field(default=None, max_length=254)
+    role: Role
+    password: str = Field(min_length=1, max_length=MAX_PASSWORD_LENGTH)
+
+
+class RoleChangeIn(BaseModel):
+    role: Role
+    justification: str = Field(max_length=_JUSTIFICATION_TRANSPORT_MAX)
+
+
+class StatusChangeIn(BaseModel):
+    disabled: bool
+    justification: str = Field(max_length=_JUSTIFICATION_TRANSPORT_MAX)
+
+
+class PasswordResetIn(BaseModel):
+    password: str = Field(min_length=1, max_length=MAX_PASSWORD_LENGTH)
+    justification: str = Field(max_length=_JUSTIFICATION_TRANSPORT_MAX)

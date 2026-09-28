@@ -7,6 +7,8 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useAuth } from '../auth/auth-context';
+import type { Role } from '../api/auth';
+import { mayOpen } from '../navigation/access';
 import { hrefFor, type Route } from '../navigation/use-route';
 import { useTheme } from '../theme/use-theme';
 import { initials } from './initials';
@@ -24,15 +26,29 @@ interface Props {
   children: ReactNode;
 }
 
-type TabKey = 'home' | 'projects' | 'findings' | 'workflow' | 'report' | 'inventory' | 'audit';
+type TabKey =
+  | 'home'
+  | 'projects'
+  | 'findings'
+  | 'workflow'
+  | 'report'
+  | 'inventory'
+  | 'audit'
+  | 'users';
 
 /**
  * Inicio and Proyectos always; Hallazgos, Workflow and Reporte (mockups 04,
  * 05 and 09) once the route names an analysis — they are meaningless without
  * one; Inventario and Bitácora (mockups 11 and 10) always, after them, as
- * every tabs bar of the mockups shows. Workflow opens the current stage's screen.
+ * every tabs bar of the mockups shows; Usuarios last, as mockup 10 draws it.
+ * Workflow opens the current stage's screen. Every tab goes through the role
+ * map (navigation/access.ts): a role never sees a tab it cannot open.
  */
-function tabsFor(route: Route, stage: string | undefined): { key: TabKey; route: Route }[] {
+function tabsFor(
+  route: Route,
+  stage: string | undefined,
+  role: Role,
+): { key: TabKey; route: Route }[] {
   const tabs: { key: TabKey; route: Route }[] = [
     { key: 'home', route: { kind: 'home' } },
     { key: 'projects', route: { kind: 'projects' } },
@@ -57,8 +73,12 @@ function tabsFor(route: Route, stage: string | undefined): { key: TabKey; route:
       { key: 'report', route: { kind: 'report', id, analysisId } },
     );
   }
-  tabs.push({ key: 'inventory', route: { kind: 'inventory' } }, { key: 'audit', route: { kind: 'audit' } });
-  return tabs;
+  tabs.push(
+    { key: 'inventory', route: { kind: 'inventory' } },
+    { key: 'audit', route: { kind: 'audit' } },
+    { key: 'users', route: { kind: 'users' } },
+  );
+  return tabs.filter((tab) => mayOpen(tab.route.kind, role));
 }
 
 function isActive(tab: Route, route: Route): boolean {
@@ -98,7 +118,7 @@ export function AppShell({ route, onNavigate, context, stage, children }: Props)
         </div>
       </header>
       <nav className="tabsbar" aria-label={t('nav.label')}>
-        {tabsFor(route, stage).map((tab) => (
+        {tabsFor(route, stage, user.role).map((tab) => (
           <a
             key={tab.key}
             className={isActive(tab.route, route) ? 'ptab on' : 'ptab'}

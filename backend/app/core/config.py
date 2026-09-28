@@ -183,6 +183,14 @@ class Settings(BaseSettings):
     #: A finished PDF nobody downloaded is deleted after this long.
     report_job_retention_hours: int = Field(default=24, ge=1, le=24 * 30)
 
+    # --- Mail (phase 6, tasks/phase6-survey.md §6.3) -----------------------------
+    #: The mail PORT ships (``app.notify``) without anything that sends: the
+    #: recovery flow is not built, so there is no SMTP client either, and the
+    #: vulnerability sync stays the platform's only outbound connection. Turning
+    #: this on refuses to boot until the flow and its client land together —
+    #: a switch that silently did nothing would be worse than none.
+    mail_enabled: bool = False
+
     @model_validator(mode="after")
     def _prod_requires_a_secure_refresh_cookie(self) -> Settings:
         """Refuse to boot a production instance that would leak the refresh token.
@@ -199,6 +207,17 @@ class Settings(BaseSettings):
             )
             raise ValueError(message)
         return self
+
+    @field_validator("mail_enabled")
+    @classmethod
+    def _mail_is_not_built_yet(cls, value: bool) -> bool:
+        if value:
+            message = (
+                "DIOPTRA_MAIL_ENABLED=true is not supported yet: this version ships no "
+                "mail client (tasks/phase6-survey.md §6.3); leave it false"
+            )
+            raise ValueError(message)
+        return value
 
     @field_validator("vulndb_osv_base_url", "vulndb_nvd_base_url")
     @classmethod

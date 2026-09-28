@@ -24,7 +24,7 @@ from app.auth.errors import (
     InvalidUsername,
     TokenReuseDetected,
 )
-from app.auth.models import USERNAME_PATTERN, RefreshToken, Role, User
+from app.auth.models import RESERVED_USERNAMES, USERNAME_PATTERN, RefreshToken, Role, User
 from app.auth.passwords import (
     hash_password,
     needs_rehash,
@@ -86,6 +86,8 @@ def create_user(
     # the hole before P1 exposes an admin endpoint on top of it.
     if re.fullmatch(USERNAME_PATTERN, normalised) is None:
         raise InvalidUsername(f"username {normalised!r} does not match the convention")
+    if normalised in RESERVED_USERNAMES:
+        raise InvalidUsername(f"username {normalised!r} is reserved for the platform")
     user = User(
         username=normalised,
         display_name=display_name,

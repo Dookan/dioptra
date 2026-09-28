@@ -1509,6 +1509,47 @@ button.card:focus-visible {
   margin-top: 16px;
 }
 
+/* Mockup 10 draws its two panels 1fr 1fr (inline in the anchor). */
+.cols.users {
+  grid-template-columns: 1fr 1fr;
+}
+
+/* The account list: the anchor's rowline in --ink, rows 8px apart. `.panel ul`
+   would otherwise hand its --t2 / 13px down through the unset row button, and
+   `.panel li`'s margin would stack on `.rowline + .rowline` (mockup fidelity,
+   phase 6). Scoped to this screen: the audit and inventory lists share the
+   same inheritance and wait for their own on-screen look. */
+.cols.users .caselist {
+  color: var(--ink);
+  font-size: inherit;
+}
+
+.cols.users .caselist > li {
+  margin-bottom: 0;
+}
+
+.rowline .linklike .sub {
+  display: block;
+}
+
+/* The anchor dims the avatar of an account that is not in use. */
+.rowline.off .avatar {
+  opacity: 0.6;
+}
+
+/* "+ Invitar" sits at the right of the panel head (index.html, screen 10). */
+.cols.users .panelhead .btn {
+  margin-left: auto;
+}
+
+/* Load-bearing notes (what a change does, why nothing is offered): --t2, not
+   the below-AA --t3 of `.hint`. */
+.cols.users .note {
+  color: var(--t2);
+  font-size: 12.5px;
+  margin: 6px 0 10px;
+}
+
 /* The anchor colours the priority letter inline; tokens only here. */
 .prio.err {
   color: var(--err);
@@ -1817,6 +1858,7 @@ button.card:focus-visible {
 
 @media (max-width: 900px) {
   .cols.inventory,
+  .cols.users,
   .cols.design {
     grid-template-columns: 1fr;
   }

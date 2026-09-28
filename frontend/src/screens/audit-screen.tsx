@@ -1,9 +1,8 @@
 /**
  * The audit log. Mockup anchor: screen 10 "Usuarios y bitácora" — its
  * Bitácora half: "quién hizo qué y cuándo", one sentence per row, filterable
- * by Hoy / Semana / Todo. The Usuarios half (account management) has no
- * endpoint and is not in the plan's day table; it is not built (recorded in
- * tasks/phase5-survey.md §8).
+ * by Hoy / Semana / Todo. The Usuarios half is its own screen since phase 6
+ * (screens/users-screen.tsx, admin only).
  *
  * The server scopes the rows by role; the screen never filters for
  * authorization. Targets and justifications are the writers' text and render
@@ -67,6 +66,11 @@ const KNOWN_ACTIONS = new Set([
   'report.export.request',
   'report.export',
   'report.export.download',
+  'user.create',
+  'user.role.change',
+  'user.disable',
+  'user.enable',
+  'user.password.reset',
 ]);
 
 function Row({ entry }: { entry: AuditEntry }): React.ReactNode {

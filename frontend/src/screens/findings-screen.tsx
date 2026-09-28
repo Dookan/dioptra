@@ -30,7 +30,7 @@ import { widthClass } from "../components/width-class";
 import type { Route } from "../navigation/use-route";
 
 const SEVERITIES: Severity[] = ["critical", "high", "medium", "low", "info"];
-/** Mirrors backend/app/workflow/triage.py::MIN_JUSTIFICATION_CHARS — the server is the gate. */
+/** Mirrors backend/app/core/text.py::MIN_JUSTIFICATION_CHARS — the server is the gate. */
 const MIN_JUSTIFICATION = 10;
 //: How many findings the list paints at once. Chosen so a real analysis stays
 //: responsive: the payload is one request (0.6 MiB for 687 findings, capped at

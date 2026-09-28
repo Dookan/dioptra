@@ -13,6 +13,7 @@ export type Route =
   | { kind: 'projects' }
   | { kind: 'inventory' }
   | { kind: 'audit' }
+  | { kind: 'users' }
   | { kind: 'project'; id: string }
   | { kind: 'findings'; id: string; analysisId: string }
   | { kind: 'plan'; id: string; analysisId: string }
@@ -43,6 +44,7 @@ export function parseHash(hash: string): Route {
   if (hash === '#/projects') return { kind: 'projects' };
   if (hash === '#/inventory') return { kind: 'inventory' };
   if (hash === '#/audit') return { kind: 'audit' };
+  if (hash === '#/users') return { kind: 'users' };
   const nested = ANALYSIS.exec(hash);
   if (nested?.[1] !== undefined && nested[2] !== undefined) {
     const kind = ANALYSIS_KINDS[nested[3] ?? ''] ?? 'findings';
@@ -63,6 +65,8 @@ export function hrefFor(route: Route): string {
       return '#/inventory';
     case 'audit':
       return '#/audit';
+    case 'users':
+      return '#/users';
     case 'project':
       return `#/projects/${route.id}`;
     case 'findings':

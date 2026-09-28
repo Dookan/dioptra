@@ -1,6 +1,6 @@
 # Roles and permissions
 
-> **Status: IN_PROGRESS — roles, sessions and admin-only accounts (P0, `backend/app/auth/`), the E1–E2 rows (P1), the E3 triage / E8 edit-and-sign rows (P2), the E4 test-plan row, the E5 design row (diagram text, cases, approval), the per-stage transition roles (P3, `backend/app/workflow/{router,stages,design}.py`) the E6 test-writing row and the E7 verification row (P4, `backend/app/workflow/{authoring,verify}.py`), the inventory rows and the audit-log read (P5, `backend/app/inventory/router.py`, `backend/app/audit/router.py`) are enforced.**
+> **Status: IN_PROGRESS — roles, sessions and admin-only accounts (P0, `backend/app/auth/`), the E1–E2 rows (P1), the E3 triage / E8 edit-and-sign rows (P2), the E4 test-plan row, the E5 design row (diagram text, cases, approval), the per-stage transition roles (P3, `backend/app/workflow/{router,stages,design}.py`) the E6 test-writing row and the E7 verification row (P4, `backend/app/workflow/{authoring,verify}.py`), the inventory rows and the audit-log read (P5, `backend/app/inventory/router.py`, `backend/app/audit/router.py`) and account administration (phase 6, `backend/app/auth/{admin,admin_router}.py`) are enforced.**
 
 Usernames are initial + lastname, lowercase, no dots: `mmarin`, `cperez`,
 `amedina`. Roles are enforced on EVERY endpoint; the UI only mirrors them.
@@ -10,6 +10,9 @@ Usernames are initial + lastname, lowercase, no dots: `mmarin`, `cperez`,
 | Action | admin | analyst | developer |
 |---|---|---|---|
 | Create/disable users, assign roles | ✓ | — | — |
+| ↳ list accounts (`GET /api/v1/users`) | ✓ | — | — |
+| ↳ create an account (initial password chosen by the admin, changed at first login; no written reason — the Hard Rule's one exception) | ✓ | — | — |
+| ↳ change a role, disable / enable, reset a password (written reason; never on one's own account) | ✓ any OTHER account | — | — |
 | Create project / start analysis (E1–E2) | ✓ | ✓ | — |
 | Triage findings: confirm / discard with justification (E3) | — | ✓ (the audited project's own code; a SAST or secret finding inside a dependency directory is informative and refused with `finding_not_triageable`; an SCA finding and a sensitive artefact stay triageable wherever they sit) | — |
 | Build test plan, choose coverage criterion (E4) | view | view | ✓ |
@@ -38,8 +41,20 @@ authorization surface without a survey (scope-change log, 2026-09-22).
 - A `developer` can never modify findings; an `analyst` can never write test
   content. The separation IS the pedagogy: the analyst audits, the developer
   learns to test.
-- Every sensitive action (triage verdict, gate approval, report sign) MUST
-  carry a written justification → append-only audit log.
+- Every sensitive action (triage verdict, gate approval, report sign, a role
+  change, disabling or enabling an account, a password reset) MUST carry a
+  written justification → append-only audit log. **One exception**
+  (CLAUDE.md → Hard Rules → Auth, `mmarin` 2026-09-23): CREATING an account
+  carries none — its row (`user.create`, who created which username with which
+  role) states it completely.
+- An admin never administers their own account (role, status, password —
+  `cannot_administer_self`), and a change that would leave the factory with no
+  enabled admin is refused, also when two admins act on each other at once
+  (`tasks/phase6-survey.md` §2). No account is ever deleted: disabling is the
+  only removal, so the trail never names a username that no longer exists.
+- `system` is not a username anyone can take: it is the platform's own actor in
+  the audit log. The first admin of an installation is created by
+  `python -m app.auth.bootstrap`, which refuses when an enabled admin exists.
 - Sessions: Argon2id-hashed passwords, short-lived JWT + rotating refresh,
   lockout with backoff after failed attempts.
 - Account creation is admin-only; there is no public signup.

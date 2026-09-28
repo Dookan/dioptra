@@ -93,6 +93,17 @@ _guard_admins(db, *, actor, target):
   PostgreSQL with two connections — the same way `0016` and the role split
   were proven, in a scratch container that is removed afterwards.
 
+**Addendum, found while building (2026-09-28).** Once the actor is re-checked
+under the lock, a separate "no enabled admin would be left" count can never
+fire: the actor is an enabled admin (just verified) and is never the target,
+so the actor always remains. The re-check IS the last-admin guard, and
+`LastAdminProtected` was dropped rather than shipped as dead code (a mutation
+pass would have flagged it as unkillable). The race was then proven on
+PostgreSQL 18 with two connections: A disables B while B, whose object was
+loaded before the wait, disables A — A commits, B is refused and writes
+`authz.denied`, one admin remains. With the lock removed (the negative
+control) both commit and no admin is left.
+
 ## 3. Sessions, per action
 
 | Action | Refresh tokens | Access token in flight | Why |

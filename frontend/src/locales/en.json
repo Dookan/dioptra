@@ -69,7 +69,13 @@
       "passwordChangeRequired": "You must change your password before continuing.",
       "weakPassword": "That password is too short. Use at least 12 characters.",
       "forbidden": "Your role is not allowed to do this.",
-      "invalidUsername": "The username must be initial + lastname, lowercase, with no dots."
+      "invalidUsername": "The username must be initial + lastname, lowercase, with no dots.",
+      "userNotFound": "That account does not exist.",
+      "usernameTaken": "An account with that username already exists.",
+      "emailTaken": "That email already belongs to another account.",
+      "cannotAdministerSelf": "You cannot change your own account here. Your password is changed from your session; your role and status, by another administrator.",
+      "roleUnchanged": "The account already has that role.",
+      "statusUnchanged": "The account is already in that state."
     },
     "ingest": {
       "failed": "The submitted code could not be processed.",
@@ -180,7 +186,8 @@
     "report": "Report",
     "workflow": "Workflow",
     "inventory": "Inventory",
-    "audit": "Audit log"
+    "audit": "Audit log",
+    "users": "Users"
   },
   "stepper": {
     "label": "Process stages",
@@ -852,7 +859,12 @@
       "verification.mutant.equivalent": "justified a mutant as equivalent",
       "report.export.request": "asked for the PDF report",
       "report.export": "prepared the PDF report",
-      "report.export.download": "downloaded the PDF report"
+      "report.export.download": "downloaded the PDF report",
+      "user.create": "created an account",
+      "user.role.change": "changed an account's role",
+      "user.disable": "disabled an account",
+      "user.enable": "enabled an account again",
+      "user.password.reset": "reset an account's password"
     },
     "systemActor": "System"
   },
@@ -889,6 +901,61 @@
       "write_failed": "The server could not store the PDF. You can ask for it again.",
       "artefact_missing": "The file was no longer there. You can ask for it again.",
       "unknown": "Something failed. You can ask for it again."
+    }
+  },
+  "access": {
+    "refusedTitle": "This section is not for your role",
+    "refusedBody": "Your role cannot open this section. If you need it, ask whoever administers the platform.",
+    "backHome": "Back to Home"
+  },
+  "users": {
+    "title": "Users",
+    "subtitle": "Create accounts, change roles, disable them and reset passwords. Every change goes into the audit log with who made it and why.",
+    "panel": "Accounts",
+    "loading": "Loading the accounts…",
+    "pick": "Pick an account from the list to change it, or create a new one.",
+    "self": "This is your account. You change your password from your session; your role and status can only be changed by another administrator.",
+    "state": {
+      "active": "active account",
+      "disabled": "disabled account",
+      "mustChange": "must change the password"
+    },
+    "neverLoggedIn": "never signed in",
+    "lastLogin": "last sign-in: {{date}}",
+    "lockedUntil": "locked until {{date}}",
+    "create": {
+      "open": "Create account",
+      "title": "New account",
+      "note": "You choose the initial password and hand it to the person; they will have to change it the first time they sign in.",
+      "username": "Username",
+      "usernameHint": "Initial + last name, lowercase, no dots. Example: cperez.",
+      "displayName": "Full name",
+      "email": "Email (optional)",
+      "role": "Role",
+      "password": "Initial password (12 characters or more)",
+      "submit": "Create the account",
+      "cancel": "Cancel"
+    },
+    "actions": {
+      "title": "Changes to {{username}}",
+      "reasonLabel": "Why are you making this change?",
+      "reasonHint": "At least 10 characters. It goes into the audit log with the change.",
+      "roleLabel": "Role",
+      "changeRole": "Change the role",
+      "passwordLabel": "New password",
+      "passwordHint": "Ends all their sessions, clears the failed-attempt lock and asks them to change it at sign-in.",
+      "resetPassword": "Reset the password",
+      "disableNote": "Disabling ends all their sessions at once. The account is not deleted: its history stays in the audit log.",
+      "enableNote": "Enabling lets them sign in again with their current password.",
+      "disable": "Disable the account",
+      "enable": "Enable the account again"
+    },
+    "notice": {
+      "created": "Account created. Hand the initial password to the person.",
+      "role": "Role changed.",
+      "reset": "Password reset.",
+      "disabled": "Account disabled.",
+      "enabled": "Account enabled again."
     }
   }
 }
