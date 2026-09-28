@@ -1,6 +1,6 @@
 # Task: Hardening 1.5.1 — recorded debt, and the tool-output cap
 
-> **Status: BUILT 2026-09-28, `/precommit` READY TO COMMIT; the commit hash lands in a follow-up.** A PATCH
+> **Status: DONE 2026-09-28 — commit `6e28e8e`, tag `v1.5.1`.** A PATCH
 > (1.5.0 → 1.5.1): no endpoint added, no request or response shape changed.
 > Survey `tasks/hardening-1.5.1-survey.md`, signed off by `mmarin` the same
 > day (§7.1–§7.4 as recommended; the two widenings of §11.10 accepted).
@@ -150,7 +150,7 @@ layer and Lizard's CSV was cut and parsed short in silence.
       `main`; a short or suffixed SHA passed as a pin; a `.yaml` workflow was
       covered only by the code; an aged symlinked spool; the validators'
       equality edges; the details' end anchors, in both readers
-- [ ] CLAUDE.md + development-phases: 1.5.1 DONE with the commit hash
+- [x] CLAUDE.md + development-phases: 1.5.1 DONE with the commit hash (`6e28e8e`)
 
 ## Non-goals (explicit)
 - A cancel button for analyses — its own phase (1.6.0), survey §10
