@@ -14,6 +14,12 @@ PostgreSQL and SQLite alike. Existing analyses are backfilled ON PURPOSE
 (`tasks/phase9-survey.md` §6.2): leaving them out would strand the one real
 test case this was built for.
 
+The category column stores the enum member's NAME (`SCA`), not its value.
+This backfill first compared against `'sca'`, which no row carries, so the
+SCA exemption never applied; corrected here for fresh databases and by
+`0016_sca_third_party_correction` for databases that already ran it
+(phase-11 precommit panel, 2026-09-28).
+
 Revision ID: 0013_third_party_findings
 Revises: 0012_mutation_measured
 """
@@ -53,7 +59,7 @@ def upgrade() -> None:
     op.execute(
         """
         UPDATE findings SET third_party = true
-         WHERE category <> 'sca'
+         WHERE category <> 'SCA'
            AND (
                path LIKE '.bundle/%'
                OR path LIKE '%/.bundle/%'

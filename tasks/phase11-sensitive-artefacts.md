@@ -1,8 +1,6 @@
 # Task: Phase 11 — Sensitive artefacts committed to the audited tree
 
-> **Status: DONE — closed 2026-09-28; the closing commit's hash is recorded
-> here and in CLAUDE.md by a follow-up commit, as phases 1 and 8 did. Built
-> 2026-09-28.** Survey
+> **Status: DONE — closed 2026-09-28, commit `77d4300`.** Survey
 > `tasks/phase11-survey.md`, signed off by `mmarin` the same day ("todo lo de
 > la fase 11 que recomiendas está bien, lo firmo"). Opened after phase 10
 > closed (`bb81328`); the two never shared a diff.
@@ -124,7 +122,7 @@ at the root and 405 uploaded photos, and nothing in the report said so.
       unchanged after the adversary. **Still open, not this diff's**: the
       migration-`0013` backfill defect, recorded in the scope-change log for
       `mmarin`.
-- [x] CLAUDE.md phase status + `docs/development-phases.md`: Phase 11 → DONE with date; the commit hash lands in the follow-up commit
+- [x] CLAUDE.md phase status + `docs/development-phases.md`: Phase 11 → DONE with date and commit (`77d4300`)
 - [ ] On-screen look by `mmarin` (not a gate): the longer step-8 sentence beside the clock, and "archivos sensibles" in the tool filter
 
 ## Deviations from the survey

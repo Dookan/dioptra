@@ -9,11 +9,14 @@ produced, stored, shown and reported; only the QUEUE gets smaller
 
 from __future__ import annotations
 
+import importlib.util
 import re
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.analysis.models import Stage, ToolCategory
@@ -88,8 +91,13 @@ def test_the_migration_and_the_rule_agree_over_real_paths() -> None:
 
     # The SQL also carries the SCA exemption; the replay must too, or the test
     # is blind to exactly the dimension the backfill was missing (the precommit
-    # security auditor's finding 2 on the remediation round, 2026-09-23).
-    assert "category <> 'sca'" in text
+    # security auditor's finding 2 on the remediation round, 2026-09-23). And
+    # it must compare against what the column STORES — the member's name. The
+    # first version compared against the value `'sca'`, which no row carries,
+    # and this very assertion pinned that wrong literal (phase-11 panel,
+    # 2026-09-28; corrected for migrated databases by 0016).
+    assert f"category <> '{ToolCategory.SCA.name}'" in text
+    assert "category <> 'sca'" not in text
 
     def backfill_says(path: str, category: ToolCategory = ToolCategory.SAST) -> bool:
         if category is ToolCategory.SCA:
@@ -212,3 +220,55 @@ def test_dependency_findings_are_still_listed_and_still_reported(
     assert job.status_code == 202, job.text
     pdf = client.get(f"/api/v1/report-jobs/{job.json()['id']}/download", headers=headers)
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
+
+
+def _migration(name: str) -> ModuleType:
+    path = Path(__file__).resolve().parents[1] / "alembic" / "versions" / f"{name}.py"
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_the_category_column_stores_the_member_name(db: Session) -> None:
+    """What every SQL literal over `findings.category` must be spelled against."""
+    analysis = seed_done_analysis(
+        db, [make_finding(0, category=ToolCategory.SCA, path="package-lock.json")]
+    )
+    stored = db.execute(
+        text("SELECT category FROM findings WHERE analysis_id = :id"), {"id": analysis.id.hex}
+    ).scalar_one()
+    assert stored == ToolCategory.SCA.name == "SCA"
+
+
+def test_the_correction_puts_every_sca_row_back_in_the_queue(db: Session) -> None:
+    rows = [
+        make_finding(0, category=ToolCategory.SCA, path="vendor/acme/lib/composer.lock"),
+        make_finding(1, category=ToolCategory.SCA, path="node_modules/x/package-lock.json"),
+        make_finding(2, category=ToolCategory.SAST, path="vendor/acme/lib/Runner.php"),
+        make_finding(3, category=ToolCategory.SECRET, path="node_modules/x/.npmrc"),
+        make_finding(4, category=ToolCategory.SAST, path="app/Own.php"),
+    ]
+    analysis = seed_done_analysis(db, rows)
+    # The state 0013's backfill left: every dependency path marked, SCA included.
+    for finding in analysis.findings:
+        finding.third_party = is_third_party(finding.path)
+    db.commit()
+
+    correction = _migration("0016_sca_third_party_correction").CORRECTION
+    for _ in range(2):  # idempotent
+        db.execute(text(correction))
+        db.commit()
+    for finding in analysis.findings:
+        db.refresh(finding)
+    assert {f.path: f.third_party for f in analysis.findings} == {
+        "vendor/acme/lib/composer.lock": False,
+        "node_modules/x/package-lock.json": False,
+        "vendor/acme/lib/Runner.php": True,
+        "node_modules/x/.npmrc": True,
+        "app/Own.php": False,
+    }
+    # And the corrected rows agree with the rule the pipeline applies today.
+    for finding in analysis.findings:
+        assert finding.third_party is finding_is_third_party(finding.category, finding.path)

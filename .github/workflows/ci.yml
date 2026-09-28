@@ -175,6 +175,44 @@ jobs:
           DIOPTRA_DATABASE_URL: postgresql+psycopg://dioptra:ci-only-password@localhost:5432/dioptra
           PGURL: postgresql://dioptra:ci-only-password@localhost:5432/dioptra
 
+      - name: The third-party backfill meets vendored SCA and SAST rows
+        # 0013 compared `category <> 'sca'`, but the column stores the member
+        # NAME (`SCA`): the SCA exemption never applied, and the unit test
+        # pinned the same wrong literal because the suite runs on SQLite with
+        # no real backfill (phase-11 panel, 2026-09-28). Prove both paths on
+        # PostgreSQL: a fresh 0013, and 0016 correcting the old wrong result.
+        run: |
+          set -euo pipefail
+          uv run alembic downgrade 0012_mutation_measured
+          psql "$PGURL" -v ON_ERROR_STOP=1 -c "
+            INSERT INTO projects (id, name, created_at, updated_at)
+              VALUES ('00000000-0000-4000-8000-0000000000c1', 'ci-tp', now(), now());
+            INSERT INTO analyses (id, project_id, source_kind, source_ref, status,
+                                  languages, frameworks, lockfiles, created_at)
+              VALUES ('00000000-0000-4000-8000-0000000000c2', '00000000-0000-4000-8000-0000000000c1',
+                      'ZIP', 'ci', 'DONE', '[]', '[]', '[]', now());
+            INSERT INTO findings (id, analysis_id, ordinal, category, tools, rule_id, title,
+                                  severity, path, \"references\", fingerprint)
+              SELECT gen_random_uuid(), '00000000-0000-4000-8000-0000000000c2', v.o, v.c,
+                     '[]', 'ci', 'ci', 'HIGH', v.p, '[]', 'ci-' || v.o
+              FROM (VALUES (0, 'SCA', 'vendor/acme/composer.lock'),
+                           (1, 'SAST', 'vendor/acme/Runner.php'),
+                           (2, 'SAST', 'app/Own.php')) v(o, c, p);"
+          marked() { psql "$PGURL" -tAc "SELECT string_agg(third_party::text, ',' ORDER BY ordinal) FROM findings WHERE rule_id = 'ci';"; }
+          uv run alembic upgrade 0015_analysis_progress
+          test "$(marked)" = "false,true,false"
+          # The state the old 0013 left behind, then the correction.
+          psql "$PGURL" -v ON_ERROR_STOP=1 -c "UPDATE findings SET third_party = true WHERE rule_id = 'ci' AND path LIKE 'vendor/%';"
+          uv run alembic upgrade head
+          test "$(marked)" = "false,true,false"
+          psql "$PGURL" -v ON_ERROR_STOP=1 -c "DELETE FROM projects WHERE name = 'ci-tp';"
+        working-directory: backend
+        env:
+          DIOPTRA_ENV: test
+          DIOPTRA_JWT_SECRET: ci-only-secret-value-at-least-32-chars
+          DIOPTRA_DATABASE_URL: postgresql+psycopg://dioptra:ci-only-password@localhost:5432/dioptra
+          PGURL: postgresql://dioptra:ci-only-password@localhost:5432/dioptra
+
       - name: The audit trail is append-only in the real database
         # The suite runs on SQLite, which cannot exercise the plpgsql trigger.
         # Creating it is not the same as proving it enforces, so assert here that
