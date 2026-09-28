@@ -1,8 +1,7 @@
 # Task: Phase 6 — User administration
 
-> **Status: DONE — built and closed 2026-09-28; the commit hash is recorded
-> here and in CLAUDE.md by a follow-up commit, as phases 1 and 8 did. Version
-> 1.5.0.** Survey `tasks/phase6-survey.md`, signed off by `mmarin` the same day
+> **Status: DONE — built and closed 2026-09-28, commit `e51f5cc`, tagged
+> `v1.5.0`.** Survey `tasks/phase6-survey.md`, signed off by `mmarin` the same day
 > (docs-only commit `80d23bc`, which also wrote the Hard Rule carve-out into
 > CLAUDE.md before any code). Where this file and the survey disagree, the
 > survey wins (column widths, `EmailTaken`, `StatusUnchanged`, the guard, the
@@ -367,8 +366,8 @@ becomes reachable.
       deployment guide (both halves) gives the bootstrap command instead of
       the snippet
 - [x] CLAUDE.md phase status + `docs/development-phases.md`: Phase 6 → DONE
-      with date; the MINOR bump to **1.5.0** (CLAUDE.md → Release rules); the
-      commit hash lands in the follow-up commit
+      with date and commit (`e51f5cc`); the MINOR bump to **1.5.0**
+      (CLAUDE.md → Release rules)
 
 ## Deviations from this file (all recorded in the survey)
 
