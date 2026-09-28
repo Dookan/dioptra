@@ -150,7 +150,10 @@ class Settings(BaseSettings):
     #: NVD yearly feeds mirrored (``nvdcve-2.0-<year>.json.gz``); empty disables NVD.
     vulndb_nvd_years: tuple[int, ...] = (2024, 2025, 2026)
     #: Per-file cap for a downloaded or imported dump, compressed bytes.
-    vulndb_max_dump_bytes: int = Field(default=512 * 1024 * 1024, ge=1024)
+    #: 1 GiB since phase 10's addendum A: the import is streamed to disk, so
+    #: no longer bounded by the API's RAM; OSV's npm dump was 207 MiB on
+    #: 2026-09-28. Also caps each scheduled download (already to disk).
+    vulndb_max_dump_bytes: int = Field(default=1024 * 1024 * 1024, ge=1024)
     vulndb_download_timeout_seconds: int = Field(default=300, ge=10)
     #: Where an uploaded dump waits for the worker; shared by the API and the
     #: worker like the jails (docker-compose.yml → DIOPTRA_DATA_DIR/vulndb).

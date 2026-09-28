@@ -266,7 +266,7 @@ DIOPTRA_API_UPSTREAM=http://10.0.0.20:8000 \
 
 **Topes de subida.** nginx aplica su propia copia de los topes de la API:
 `DIOPTRA_MAX_ZIP_MIB` (1024 por defecto) para el ZIP del código y
-`DIOPTRA_VULNDB_MAX_DUMP_MIB` (513) para el volcado de vulnerabilidades. Si
+`DIOPTRA_VULNDB_MAX_DUMP_MIB` (1025) para el volcado de vulnerabilidades. Si
 cambias `DIOPTRA_MAX_ZIP_BYTES` o `DIOPTRA_VULNDB_MAX_DUMP_BYTES` en el backend,
 cambia también estos en el frontend: `DIOPTRA_MAX_ZIP_MIB × 1048576` debe ser
 igual a `DIOPTRA_MAX_ZIP_BYTES`, y el del volcado lleva 1 MiB más por el
@@ -328,9 +328,10 @@ análisis termina, la cola, el worker y las imágenes de análisis funcionan.
 - **Sin nginx delante, la API aplica sus topes igual.** Desde la fase 10 la
   API comprueba la sesión ANTES de leer el cuerpo y cuenta los bytes del ZIP
   mientras llegan (1 GiB por defecto), sin importar lo que diga la cabecera;
-  el ZIP va al disco, no a la RAM. El volcado de vulnerabilidades sigue
-  pasando por el `/tmp` de la API (512 MiB en RAM), pero solo después de
-  comprobar que quien lo sube es admin o analista.
+  el ZIP va al disco, no a la RAM. El volcado de vulnerabilidades también:
+  se lee por partes, la justificación a memoria y el archivo directo al disco
+  (1 GiB por defecto), y solo después de comprobar que quien lo sube es admin
+  o analista.
 - **Valkey no tiene contraseña**: por eso nunca se publica fuera de la red de
   Docker.
 - **El worker tiene el socket de Docker**, equivalente a root en el backend. Es
@@ -685,7 +686,7 @@ DIOPTRA_API_UPSTREAM=http://10.0.0.20:8000 \
 
 **Upload caps.** nginx applies its own copy of the API's caps:
 `DIOPTRA_MAX_ZIP_MIB` (1024 by default) for the code ZIP and
-`DIOPTRA_VULNDB_MAX_DUMP_MIB` (513) for the vulnerability dump. If you change
+`DIOPTRA_VULNDB_MAX_DUMP_MIB` (1025) for the vulnerability dump. If you change
 `DIOPTRA_MAX_ZIP_BYTES` or `DIOPTRA_VULNDB_MAX_DUMP_BYTES` on the backend,
 change these on the frontend too: `DIOPTRA_MAX_ZIP_MIB × 1048576` must equal
 `DIOPTRA_MAX_ZIP_BYTES`, and the dump's carries 1 MiB more for the form. If
@@ -747,9 +748,10 @@ the analysis finishes, the queue, the worker and the analysis images work.
 - **Without nginx in front, the API still applies its caps.** Since phase 10
   the API checks the session BEFORE reading the body and counts the ZIP's
   bytes as they arrive (1 GiB by default), whatever the header says; the ZIP
-  goes to disk, not to RAM. The vulnerability dump still passes through the
-  API's `/tmp` (512 MiB of RAM), but only after checking that whoever uploads
-  it is an admin or an analyst.
+  goes to disk, not to RAM. So does the vulnerability dump: it is read part by
+  part, the justification to memory and the file straight to disk (1 GiB by
+  default), and only after checking that whoever uploads it is an admin or an
+  analyst.
 - **Valkey has no password**: that is why it is never published outside
   Docker's network.
 - **The worker holds the Docker socket**, which is root-equivalent on the

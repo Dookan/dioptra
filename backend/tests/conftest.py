@@ -7,13 +7,28 @@ enforces in production too.
 
 from __future__ import annotations
 
+import atexit
 import os
+import shutil
 import tempfile
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 import pytest
+
+#: Every scratch directory this harness creates, removed when the run ends —
+#: `mkdtemp` alone left one set per run behind in /tmp (QA panel, phase 10).
+_SCRATCH: list[str] = []
+
+
+def _scratch(prefix: str) -> str:
+    path = tempfile.mkdtemp(prefix=prefix)
+    _SCRATCH.append(path)
+    return path
+
+
+atexit.register(lambda: [shutil.rmtree(path, ignore_errors=True) for path in _SCRATCH])
 
 os.environ.setdefault("DIOPTRA_ENV", "test")
 os.environ.setdefault("DIOPTRA_JWT_SECRET", "test-secret-please-do-not-use-in-production")
@@ -23,20 +38,20 @@ os.environ.setdefault("DIOPTRA_REFRESH_COOKIE_SECURE", "false")
 # jails under a throwaway directory. No broker, no daemon, no network.
 os.environ.setdefault("DIOPTRA_QUEUE_INLINE", "true")
 os.environ.setdefault("DIOPTRA_RUNNER_MODE", "local")
-os.environ.setdefault("DIOPTRA_WORKSPACE_ROOT", tempfile.mkdtemp(prefix="dioptra-test-ws-"))
+os.environ.setdefault("DIOPTRA_WORKSPACE_ROOT", _scratch("dioptra-test-ws-"))
 # Our own rules live in the repository; an empty OSV directory makes the
 # runner "available" so its (fixture or absent) execution is exercised.
 os.environ.setdefault("DIOPTRA_RULES_DIR", str(Path(__file__).resolve().parents[2] / "rules"))
-os.environ.setdefault("DIOPTRA_OSV_DB_DIR", tempfile.mkdtemp(prefix="dioptra-test-osv-"))
+os.environ.setdefault("DIOPTRA_OSV_DB_DIR", _scratch("dioptra-test-osv-"))
 # P4: the E7 attempt directories. A real sandbox run is opt-in (marker
 # `sandbox`); everything else uses a fake executor and never starts a container.
-os.environ.setdefault("DIOPTRA_SANDBOX_RUNS_ROOT", tempfile.mkdtemp(prefix="dioptra-test-runs-"))
+os.environ.setdefault("DIOPTRA_SANDBOX_RUNS_ROOT", _scratch("dioptra-test-runs-"))
 # P5: where an uploaded vulnerability dump waits for the (inline) import job.
 # The sync job itself never reaches the network here: every test that runs it
 # replaces `app.inventory.sync.download` with a fixture writer.
-os.environ.setdefault("DIOPTRA_VULNDB_SPOOL_DIR", tempfile.mkdtemp(prefix="dioptra-test-vulndb-"))
+os.environ.setdefault("DIOPTRA_VULNDB_SPOOL_DIR", _scratch("dioptra-test-vulndb-"))
 # Phase 8: where a finished PDF waits for its requester.
-os.environ.setdefault("DIOPTRA_REPORT_SPOOL_DIR", tempfile.mkdtemp(prefix="dioptra-test-reports-"))
+os.environ.setdefault("DIOPTRA_REPORT_SPOOL_DIR", _scratch("dioptra-test-reports-"))
 
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

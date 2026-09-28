@@ -89,15 +89,11 @@ services:
         condition: service_healthy
     read_only: true
     tmpfs:
-      # SIZED, and RAM. Since phase 10 the ZIP never lands here: the ingest
-      # route authenticates first and streams the raw body to the workspaces
-      # volume under its own byte counter. What still lands here is the
-      # vulnerability-dump import's multipart form — read AFTER the caller is
-      # authenticated since phase 10, so only an admin or an analyst can fill
-      # it — plus WeasyPrint's font cache. A dump bigger than what is free here
-      # fails with an error rather than exhausting the host's memory; OSV's npm
-      # dump (207 MiB on 2026-09-28) fits, and streaming the import to disk is
-      # the planned fix (tasks/phase10-large-zip-ingest.md).
+      # SIZED, and RAM. Since phase 10 no upload lands here: the ZIP is
+      # streamed to the workspaces volume and the vulnerability dump is parsed
+      # part by part straight to the vulndb spool, both after authentication
+      # and under their own byte counters. What remains is WeasyPrint's font
+      # cache and ordinary small request bodies.
       - /tmp:size=512m
     security_opt:
       - no-new-privileges:true
@@ -303,7 +299,7 @@ services:
       # Upload caps nginx enforces before the API; keep them equal to the API's
       # (DIOPTRA_MAX_ZIP_BYTES, DIOPTRA_VULNDB_MAX_DUMP_BYTES) — see .env.example.
       DIOPTRA_MAX_ZIP_MIB: ${DIOPTRA_MAX_ZIP_MIB:-1024}
-      DIOPTRA_VULNDB_MAX_DUMP_MIB: ${DIOPTRA_VULNDB_MAX_DUMP_MIB:-513}
+      DIOPTRA_VULNDB_MAX_DUMP_MIB: ${DIOPTRA_VULNDB_MAX_DUMP_MIB:-1025}
     ports:
       - "${DIOPTRA_HTTP_PORT:-8080}:8080"
     depends_on:

@@ -297,3 +297,122 @@ worker-side acquisition of the git ingest. `archive.py`'s guards are kept
 byte for byte.
 
 Signed off by: `mmarin`  date: 2026-09-28
+
+## Addendum A — the vulnerability-dump import, streamed to disk (2026-09-28)
+
+> **Status: SIGNED OFF 2026-09-28 by `mmarin`** ("dale, con 1 GiB"). Same gate as the survey
+> above: an upload route, so written and signed before any edit. §5 of this
+> survey promised the dump import "the same treatment"; the build kept it on
+> multipart and read the form after authentication, and recorded why
+> (`tasks/phase10-large-zip-ingest.md` → Deviations). This addendum finishes it.
+
+### A.1 What is still wrong
+
+`POST /api/v1/inventory/vulndb/import` ("Importar base de vulnerabilidades")
+sends two things in one multipart body: the dump file and the written
+justification. The route calls Starlette's `request.form()`, which spools the
+WHOLE file into a `SpooledTemporaryFile` in the API's `/tmp` — a 512 MiB tmpfs
+in RAM — and only then does `sync.request_import` copy it to the vulndb spool
+on disk. So:
+
+- the real ceiling of an import is the free RAM of that tmpfs, not
+  `DIOPTRA_VULNDB_MAX_DUMP_BYTES` (512 MiB, the SAME number), and two
+  concurrent imports can already collide;
+- the file is written twice (RAM, then disk);
+- since phase 10 only an authenticated admin or analyst can reach this, so
+  it is a capacity limit, no longer a pre-auth exposure.
+
+**Measured 2026-09-28** against the public OSV bucket and the NVD feeds
+(`HEAD`, no download): npm `all.zip` **207 MiB**, PyPI 33, Go 11, Packagist
+10, Maven 10, RubyGems 5, crates.io 3, NuGet 2; Ubuntu 746, Debian 70, the
+whole of OSV 2.4 GiB (neither used — Dioptra correlates lockfile ecosystems
+only); NVD 23–31 MiB per year gzipped. npm fits today at 40 % of the tmpfs,
+and it only grows.
+
+### A.2 Design
+
+The route stops calling `request.form()`. After `MirrorUser` resolves (the
+route still declares no body parameter), it feeds `request.stream()` into
+python-multipart's streaming `MultipartParser` — the library Starlette itself
+uses, already installed at 0.0.32, **no new dependency** — with callbacks
+that route each part as it arrives:
+
+```
+post_import(request, user: MirrorUser, db):
+    boundary = from Content-Type, else 422 validation_failed
+    declared Content-Length > cap + 1 MiB envelope  → DumpTooLarge (before reading)
+    token = uuid4()
+    parser = MultipartParser(boundary, callbacks, max_header_count=8, max_header_size=4224)
+    on part headers:
+        name = Content-Disposition name; filename = its filename
+        parts seen > 2, or a repeated name, or a name other than
+            "file" / "justification"                      → 422 validation_failed
+        name == "file":
+            kind = dump_kind_for(filename)                → DumpKindUnknown (typed, as today)
+            open vulndb_spool_dir/<token>.<kind>  O_EXCL 0600, dir 0700
+    on part data:
+        "justification": append, refuse past 8000 chars × 4 bytes
+        "file": write (batched, in a thread), count bytes,
+                refuse past DIOPTRA_VULNDB_MAX_DUMP_BYTES → DumpTooLarge
+    at end: both parts present and the file non-empty, else 422 / DumpInvalid
+    then, in the thread pool: sync.accept_import(db, token, kind, justification, actor, ip)
+        = clean_justification → audit vulndb.import.request → commit → enqueue
+          (the enqueue-failure path unchanged: spool removed, EnqueueFailed)
+    ANY failure at any point: the spool file is removed
+```
+
+`sync.request_import(upload: BinaryIO, …)` is split: the copy loop moves to
+the route's streaming writer, and what remains (`accept_import`) keeps every
+existing check and the audit row byte for byte. The worker side
+(`run_import_job`, `importers.py`) does not change at all: it already reads
+the spool from disk with its own entry-count, per-entry and ratio caps.
+
+**Caps**: `DIOPTRA_VULNDB_MAX_DUMP_BYTES` 512 MiB → **1 GiB** (4.9× today's
+npm dump; it would also hold Ubuntu's, if images are ever audited). nginx's
+copy `DIOPTRA_VULNDB_MAX_DUMP_MIB` 513 → **1025** (1 MiB for the multipart
+envelope), with `proxy_request_buffering off` and the same per-packet
+timeouts as the ZIP route. The same setting also caps the scheduled SYNC's
+downloads, which already stream to disk — raising it lets the sync fetch a
+bigger npm dump too, and that is intended. The API's tmpfs stays 512 MiB: it
+no longer holds any upload, only WeasyPrint's font cache.
+
+### A.3 What does NOT change
+
+- The client contract: same route, same multipart body with `file` and
+  `justification`, same 202 `{token}`, same typed errors. The Inventory
+  screen is not touched.
+- The audit rows (`vulndb.import.request` by the API, `vulndb.import` by the
+  worker) and who may import (admin, analyst).
+- The worker's parsing and caps.
+
+### A.4 Tests (hostile input first)
+
+- Every refusal leaves NO file in the vulndb spool and writes no audit row:
+  anonymous / developer (0 body bytes read — the receive-count test), no
+  boundary, a third part, a repeated `file`, an unknown part name, a missing
+  `justification`, a missing `file`, an empty file, a justification over the
+  cap, an unknown file kind, a chunked body over the cap with no
+  Content-Length, a client that disconnects mid-file.
+- A file part whose `filename` is `../../x.zip` or carries NUL: only its
+  extension decides the kind, and the spool name is the token.
+- A file far bigger than the old tmpfs, simulated with a small cap and a
+  large chunked body, is written to disk and never to `/tmp` (assert
+  `tempfile.gettempdir()` gains nothing).
+- The existing import tests pass unchanged — the contract did not move.
+- `test_upload_caps.py` pins 1 GiB ↔ 1025 MiB; a mutation pass over the new
+  streaming writer at close.
+
+### A.5 Decisions for `mmarin`
+
+1. **Build it as described**, with the cap at **1 GiB** → **TAKEN by `mmarin` 2026-09-28.**
+2. Nothing else is open: the contract, the roles and the worker stay as they
+   are.
+
+### A.6 Verdict
+
+**PROCEED** (A.5.1 answered). It reuses the phase-10 ZIP route's shape
+(auth before the body, a counted stream to an `O_EXCL` spool, cleanup on any
+failure) and the parser Starlette already relies on; the only new code is the
+part routing. It removes the last upload that touches the API's RAM.
+
+Signed off by: `mmarin`  date: 2026-09-28

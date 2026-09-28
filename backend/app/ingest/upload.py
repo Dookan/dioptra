@@ -75,6 +75,12 @@ def _open_spool(target: Path) -> BinaryIO:
     return os.fdopen(fd, "wb")
 
 
+def _abandon(out: BinaryIO, target: Path) -> None:
+    """Close and remove a partial spool. Sync, so no cancellation can skip it."""
+    out.close()
+    target.unlink(missing_ok=True)
+
+
 async def spool_body(chunks: AsyncIterator[bytes], target: Path, max_bytes: int) -> int:
     """Copy ``chunks`` into ``target`` (created, ``0600``), refusing past ``max_bytes``.
 
@@ -100,8 +106,10 @@ async def spool_body(chunks: AsyncIterator[bytes], target: Path, max_bytes: int)
         if pending:
             await anyio.to_thread.run_sync(out.write, bytes(pending))
     except BaseException:
-        await anyio.to_thread.run_sync(out.close)
-        await anyio.to_thread.run_sync(lambda: target.unlink(missing_ok=True))
+        # Synchronous on purpose: under a cancellation every await here would
+        # be cancelled too and leave the partial archive behind; closing and
+        # unlinking are microsecond calls (phase-10 addendum panel).
+        _abandon(out, target)
         raise
     await anyio.to_thread.run_sync(out.close)
     return written

@@ -20,7 +20,7 @@ services:
       # Upload caps; they MUST equal the backend host's DIOPTRA_MAX_ZIP_BYTES and
       # DIOPTRA_VULNDB_MAX_DUMP_BYTES (docs/deployment/README.md).
       DIOPTRA_MAX_ZIP_MIB: ${DIOPTRA_MAX_ZIP_MIB:-1024}
-      DIOPTRA_VULNDB_MAX_DUMP_MIB: ${DIOPTRA_VULNDB_MAX_DUMP_MIB:-513}
+      DIOPTRA_VULNDB_MAX_DUMP_MIB: ${DIOPTRA_VULNDB_MAX_DUMP_MIB:-1025}
     ports:
       - "${DIOPTRA_HTTP_PORT:-8080}:8080"
     security_opt:

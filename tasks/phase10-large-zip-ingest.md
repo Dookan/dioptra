@@ -38,7 +38,7 @@ by the worker.
    `MirrorUser` (same multipart contract; see Deviations).
 7. `docker/nginx.conf`, `docker/frontend.Dockerfile`, both Compose files —
    per-route caps from `DIOPTRA_MAX_ZIP_MIB` (1024) and
-   `DIOPTRA_VULNDB_MAX_DUMP_MIB` (513), `proxy_request_buffering off` on the
+   `DIOPTRA_VULNDB_MAX_DUMP_MIB` (1025 since addendum A), `proxy_request_buffering off` on the
    ingest route; `.env.example` documents both sides.
 8. Frontend — `api/client.ts::apiUploadFile` (XHR, upload progress, nginx's
    HTML 413 read as "too large"), `api/projects.ts::ingestZip`, the progress
@@ -81,12 +81,48 @@ by the worker.
     adversary proved (receive-count before auth, commit not flush, the
     mid-upload state, the steps-done bar).
 
+13. **Addendum A — the dump import streamed to disk** (`tasks/phase10-survey.md`
+    → Addendum A, signed off by `mmarin`, "dale, con 1 GiB"):
+    `backend/app/inventory/dump_upload.py` parses the multipart body with
+    python-multipart's streaming parser as it arrives — exactly one `file` and
+    one `justification`, the reason to memory under its 8 000-character cap,
+    the file straight to `<vulndb_spool_dir>/<token>.<kind>` (`O_EXCL`,
+    `0600`) under a byte counter; any refusal removes the partial file.
+    The addendum's panel added: the cleanup runs synchronously so a
+    cancellation cannot skip it (the ZIP spool got the same fix), a body
+    without its closing boundary is refused instead of queued truncated, at
+    most 8 headers per part, and a database failure on the audit row removes
+    the spool too. Its coverage adversary then pinned six more edges (the
+    audit row committed before the job exists, an endless justification cut
+    at its byte bound, the header count per part, the disposition found in
+    any header order, `boundary_of` refusing a non-multipart media type and a
+    boundary over 200 bytes — over 256 the parser's own constructor would
+    raise outside the typed path). Recorded as defence in depth, not as
+    coverage: python-multipart 0.0.32 enforces 8 headers and 4 224 bytes per
+    header line itself, so our two header caps never fire first; they stay so
+    that a library upgrade that relaxes its defaults cannot relax ours.
+    `sync.request_import` became `sync.accept_import` (the audit row and the
+    enqueue, byte for byte). Cap 512 MiB → **1 GiB**, nginx 1025 MiB with
+    request buffering off. The client contract did not move: every existing
+    import test passes unchanged. Tests: `backend/tests/test_dump_upload.py`
+    (40), one of which makes Starlette's `SpooledTemporaryFile` fail and was
+    checked to catch a route that goes back to `request.form()`.
+    Mutation pass on `dump_upload.py` (mutmut 3.8): the first run left 15
+    survivors, five of them real edges that became tests (a file exactly at
+    the cap, a file arriving in many small pieces, the reason's byte bound
+    told apart from the audit's own 4 000-character ceiling by its code, a
+    nested spool directory, a file part with no name) plus a name that is not
+    UTF-8; the rest are log-only `detail` strings, codec-name spellings,
+    `self.part = None` → `""` (only the two real names are ever compared), and
+    the header caps' `>` → `>=`, which python-multipart's own 4 224-byte
+    header limit enforces first. Test count 28.
+
 ## Open, decided by `mmarin` 2026-09-28
-- **The dump import's cap stays at 512 MiB** — lowering it to 200 MiB, the
-  panel's first suggestion, would refuse OSV's npm dump (207 MiB, measured
+- **The dump import's cap is never lowered below the largest dump** —
+  lowering it to 200 MiB, the panel's first suggestion, would refuse OSV's npm dump (207 MiB, measured
   that day against the public bucket; PyPI 33, Go 11, Packagist 10, Maven 10,
   RubyGems 5, crates.io 3, NuGet 2; NVD 23–31 MiB per year gzipped).
-- **Next: an addendum to `tasks/phase10-survey.md`** — stream the dump
+- **DONE (deliverable 13): an addendum to `tasks/phase10-survey.md`** — stream the dump
   import's multipart form part by part (python-multipart, no new dependency),
   the justification to memory and the file straight to disk, with a 1 GiB
   cap on both sides. Same contract for the client. It closes the last RAM
@@ -102,10 +138,9 @@ by the worker.
   directory. No new mount, no new setting.
 - **The dump import keeps multipart** instead of becoming a raw body (§5):
   its written justification (up to 8 000 characters) does not fit a header
-  or a query string. It now reads the form after authentication — the
-  pre-auth half of the residual is closed — but the form still spools into
-  the API's 512 MiB RAM `/tmp`, reachable only by an authenticated admin or
-  analyst. A streamed multipart parser would close that; it is not built.
+  or a query string. The first build read the form after authentication but
+  still through the API's RAM `/tmp`; **addendum A** (below) finished it: the
+  body is parsed part by part, the file straight to disk.
 - **The general `/api/` body cap stays 200 MiB.** No route under it takes an
   upload any more; lowering it is a separate decision.
 - **The file name travels in the query string**, not in a header: a header
@@ -120,8 +155,8 @@ by the worker.
 ## Definition of Done
 - [x] Survey signed off before any edit
 - [x] All deliverables implemented; ruff + mypy + oxlint + `tsc -b` clean
-- [x] All tests passing — 968 backend (non-sandbox) and 140 frontend,
-      2026-09-28, after the precommit panel; ruff, mypy, oxlint, `tsc -b` clean
+- [x] All tests passing — 1 011 backend (non-sandbox) and 141 frontend,
+      2026-09-28, after addendum A and its panel; ruff, mypy, oxlint, `tsc -b` clean
 - [x] nginx template renders and `nginx -t` passes in `nginx:alpine`
 - [x] Walk: `caracas_sonrie-desarrollo.zip` WHOLE (593 MiB, 21 872 entries)
       through the real template in `nginx:alpine` → the API → a real RQ worker
@@ -168,7 +203,7 @@ by the worker.
       `>`, the same bytes written; 4 are `missing_ok=True` → `False`/`None` on
       an unlink whose file this very function created and still holds.
 - [x] `/precommit` returned `READY TO COMMIT` (2026-09-28, five agents; findings in deliverable 12, the two decisions under "Open")
-- [ ] The dump-import addendum (see "Open") signed off and built
+- [x] The dump-import addendum signed off and built (deliverable 13)
 - [ ] Both bars looked at on screen, light and dark
 - [ ] CLAUDE.md phase status + `docs/development-phases.md`: Phase 10 → DONE
 

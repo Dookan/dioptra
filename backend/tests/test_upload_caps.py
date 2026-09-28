@@ -53,6 +53,9 @@ def test_nginx_reads_both_caps_from_the_environment_and_streams_the_zip() -> Non
     dump = conf[conf.index("location = /api/v1/inventory/vulndb/import") :]
     dump = dump[: dump.index("\n    }")]
     assert "client_max_body_size ${DIOPTRA_VULNDB_MAX_DUMP_MIB}m;" in dump
+    # Addendum A: the API parses the dump to disk as it arrives; buffering it
+    # in nginx first would put the whole GiB on the proxy's disk and delay it.
+    assert "proxy_request_buffering off;" in dump
     # The regex location must match the route exactly and nothing beside it.
     pattern = re.compile(r"^/api/v1/projects/[^/]+/ingest$")
     assert pattern.match("/api/v1/projects/3f1c0000-0000-0000-0000-000000000000/ingest")

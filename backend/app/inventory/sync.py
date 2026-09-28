@@ -16,7 +16,6 @@ import time
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import BinaryIO
 from urllib import request as urllib_request
 from urllib.error import HTTPError, URLError
 
@@ -163,7 +162,7 @@ def recent_runs(db: Session, limit: int = 5) -> list[VulnDbSync]:
     return list(db.scalars(statement))
 
 
-def _spool_path(settings: Settings, token: str, kind: str) -> Path:
+def spool_path(settings: Settings, token: str, kind: str) -> Path:
     suffix = {"osv-zip": "zip", "nvd-json": "json", "nvd-json-gz": "json.gz"}[kind]
     return settings.vulndb_spool_dir / f"{token}.{suffix}"
 
@@ -179,7 +178,7 @@ def _sync_one(
 ) -> bool:
     started = utc_now()
     settings.vulndb_spool_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-    spool = _spool_path(settings, f"sync-{uuid.uuid4().hex}", kind)
+    spool = spool_path(settings, f"sync-{uuid.uuid4().hex}", kind)
     try:
         download(
             url,
@@ -336,7 +335,7 @@ def run_import_job(token: str, kind: str, requested_by: str) -> None:
     except ValueError:
         logger.error("refusing import with a malformed token")
         return
-    spool = _spool_path(settings, token, kind)
+    spool = spool_path(settings, token, kind)
     started = utc_now()
     with get_session_factory()() as db:
         try:
@@ -419,60 +418,48 @@ def dump_kind_for(filename: str) -> str:
     raise DumpKindUnknown(filename[:80])
 
 
-def request_import(
+def accept_import(
     db: Session,
     *,
     actor: User,
-    upload: BinaryIO,
-    upload_size: int | None,
-    filename: str,
+    token: str,
+    kind: str,
+    spool: Path,
     justification: str,
     source_ip: str | None,
 ) -> str:
-    """Spool the upload under the byte cap, audit, enqueue. Returns the token."""
-    reason = clean_justification(justification)
-    settings = get_settings()
-    kind = dump_kind_for(filename)
-    if upload_size is not None and upload_size > settings.vulndb_max_dump_bytes:
-        raise DumpTooLarge(f"{upload_size} bytes declared")
-    token = str(uuid.uuid4())
-    settings.vulndb_spool_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
-    spool = _spool_path(settings, token, kind)
-    written = 0
-    try:
-        with spool.open("wb") as out:
-            while True:
-                chunk = upload.read(_COPY_CHUNK)
-                if not chunk:
-                    break
-                written += len(chunk)
-                if written > settings.vulndb_max_dump_bytes:
-                    raise DumpTooLarge(f"{written} bytes streamed")
-                out.write(chunk)
-    except BaseException:
-        spool.unlink(missing_ok=True)
-        raise
-    if written == 0:
-        spool.unlink(missing_ok=True)
-        raise DumpInvalid("empty upload")
-    audit.record(
-        db,
-        actor_username=actor.username,
-        actor_id=actor.id,
-        actor_role=actor.role.value,
-        action="vulndb.import.request",
-        target=f"{kind}:{token}",
-        justification=reason,
-        source_ip=source_ip,
-    )
-    db.commit()
+    """A dump the route already streamed to ``spool``: audit, enqueue, return the token.
+
+    Phase 10, addendum A: the copy loop moved to ``dump_upload.receive_dump``,
+    which writes the file straight to disk as it arrives. Everything that
+    decides whether the import is ACCEPTED stays here, and a refusal removes
+    the spool so nothing waits for a worker that will never be told.
+    """
     from app.core.queue import enqueue_import  # noqa: PLC0415
 
     try:
+        reason = clean_justification(justification)
+        audit.record(
+            db,
+            actor_username=actor.username,
+            actor_id=actor.id,
+            actor_role=actor.role.value,
+            action="vulndb.import.request",
+            target=f"{kind}:{token}",
+            justification=reason,
+            source_ip=source_ip,
+        )
+        db.commit()
+    except BaseException:
+        # A refused reason or a database that cannot take the audit row: no
+        # row means no job, so the streamed file must not stay behind.
+        spool.unlink(missing_ok=True)
+        raise
+    try:
         enqueue_import(token, kind, actor.username)
     except Exception as exc:
-        # A broker outage must not leave a 200 MiB file in the spool the
-        # worker shares, nor a bare 500: the file goes, the client gets the
+        # A broker outage must not leave a large file in the spool the worker
+        # shares, nor a bare 500: the file goes, the client gets the
         # {code, message_key} contract, and the request row stays as the trace.
         spool.unlink(missing_ok=True)
         raise EnqueueFailed(exc.__class__.__name__) from exc

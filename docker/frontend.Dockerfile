@@ -25,7 +25,7 @@ ENV DIOPTRA_API_UPSTREAM=http://api:8000
 # is DIOPTRA_VULNDB_MAX_DUMP_BYTES in MiB + 1 for the multipart envelope.
 # backend/tests/test_upload_caps.py pins these defaults against the API's.
 ENV DIOPTRA_MAX_ZIP_MIB=1024 \
-    DIOPTRA_VULNDB_MAX_DUMP_MIB=513
+    DIOPTRA_VULNDB_MAX_DUMP_MIB=1025
 COPY --from=build /srv/build/dist /usr/share/nginx/html
 
 EXPOSE 8080
