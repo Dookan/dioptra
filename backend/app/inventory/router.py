@@ -12,13 +12,18 @@ import json
 import uuid
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, Form, Request, Response, UploadFile, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import UploadFile as StarletteUploadFile
+from starlette.exceptions import HTTPException
+from starlette.formparsers import MultiPartException
 
 from app.auth.deps import ActiveUser, client_ip, require_roles
 from app.auth.models import Role, User
 from app.core.config import get_settings
+from app.core.errors import ValidationFailed
 from app.db.session import get_db
 from app.ingest import service as ingest_service
 from app.inventory import documents, service, sync
@@ -29,6 +34,8 @@ router = APIRouter(prefix="/api/v1/inventory", tags=["inventory"])
 
 DbSession = Annotated[Session, Depends(get_db)]
 MirrorUser = Annotated[User, Depends(require_roles(Role.ADMIN, Role.ANALYST))]
+#: The import's written reason — the cap `Form(max_length=8000)` used to carry.
+_MAX_JUSTIFICATION = 8000
 
 CYCLONEDX_MEDIA_TYPE = "application/vnd.cyclonedx+json; version=1.6"
 
@@ -200,14 +207,15 @@ def post_sync(
 @router.post(
     "/vulndb/import", response_model=ImportAcceptedOut, status_code=status.HTTP_202_ACCEPTED
 )
-def post_import(
-    request: Request,
-    user: MirrorUser,
-    db: DbSession,
-    file: Annotated[UploadFile, File()],
-    justification: Annotated[str, Form(max_length=8000)],
-) -> ImportAcceptedOut:
-    """ "Importar base de vulnerabilidades": spool the dump; the worker parses it."""
+async def post_import(request: Request, user: MirrorUser, db: DbSession) -> ImportAcceptedOut:
+    """ "Importar base de vulnerabilidades": spool the dump; the worker parses it.
+
+    Phase 10: the form is read HERE, after ``MirrorUser`` resolved, instead of
+    through ``File()`` / ``Form()`` parameters, which FastAPI parses before any
+    dependency — so an anonymous caller used to have its whole body spooled
+    into the API's RAM-backed ``/tmp`` before the 401. The contract (multipart,
+    ``file`` + ``justification``) does not change; only the order does.
+    """
     declared = request.headers.get("content-length")
     if (
         declared is not None
@@ -215,13 +223,34 @@ def post_import(
         and int(declared) > get_settings().vulndb_max_dump_bytes
     ):
         raise DumpTooLarge(f"content-length {declared}")
-    token = sync.request_import(
-        db,
-        actor=user,
-        upload=file.file,
-        upload_size=file.size,
-        filename=file.filename or "",
-        justification=justification,
-        source_ip=client_ip(request),
-    )
+    try:
+        form = await request.form(max_files=1, max_fields=1)
+    except (HTTPException, MultiPartException, KeyError, ValueError) as exc:
+        # Starlette turns its own MultiPartException (two files, no boundary,
+        # a field over its cap) into an HTTPException(400) with free-text
+        # detail — outside our {code, message_key} contract. Both are caught
+        # here (phase-10 panel, reproduced with two files and no boundary).
+        raise ValidationFailed("unreadable multipart body") from exc
+    try:
+        file = form.get("file")
+        justification = form.get("justification")
+        if not isinstance(file, StarletteUploadFile) or not isinstance(justification, str):
+            raise ValidationFailed("file and justification are required")
+        if len(justification) > _MAX_JUSTIFICATION:
+            raise ValidationFailed("justification too long")
+        upload_file = file
+        reason = justification
+        token = await run_in_threadpool(
+            lambda: sync.request_import(
+                db,
+                actor=user,
+                upload=upload_file.file,
+                upload_size=upload_file.size,
+                filename=upload_file.filename or "",
+                justification=reason,
+                source_ip=client_ip(request),
+            )
+        )
+    finally:
+        await form.close()
     return ImportAcceptedOut(token=token)

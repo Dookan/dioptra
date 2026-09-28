@@ -72,8 +72,9 @@ services:
       # WeasyPrint's font cache must land on the tmpfs: the root is read-only.
       XDG_CACHE_HOME: /tmp
     volumes:
-      # The API extracts uploads into the jail; the worker reads them. The API
-      # NEVER gets the Docker socket — only the worker starts containers.
+      # The API spools a ZIP upload here (phase 10); the worker extracts it into
+      # the jail and reads it. The API NEVER gets the Docker socket — only the
+      # worker starts containers.
       - ${DIOPTRA_DATA_DIR:-/var/lib/dioptra}/workspaces:/var/lib/dioptra/workspaces
       # A vulnerability dump uploaded through the panel waits here for the
       # worker's import job; the API only spools it (P5, tasks/phase5-survey.md §2).
@@ -88,13 +89,15 @@ services:
         condition: service_healthy
     read_only: true
     tmpfs:
-      # SIZED: an upload is spooled here before the route's own checks run,
-      # and this tmpfs is RAM. Behind nginx the 200 MiB body cap bounds each
-      # spool; on a two-host deployment the published API port is reachable
-      # without nginx, so this bound is what stops a chunked body filling the
-      # host's memory before authentication (precommit panel, 2026-09-24).
-      # 512 MiB = two 200 MiB uploads in flight plus WeasyPrint's font cache;
-      # a third concurrent upload fails with an error rather than exhausting RAM.
+      # SIZED, and RAM. Since phase 10 the ZIP never lands here: the ingest
+      # route authenticates first and streams the raw body to the workspaces
+      # volume under its own byte counter. What still lands here is the
+      # vulnerability-dump import's multipart form — read AFTER the caller is
+      # authenticated since phase 10, so only an admin or an analyst can fill
+      # it — plus WeasyPrint's font cache. A dump bigger than what is free here
+      # fails with an error rather than exhausting the host's memory; OSV's npm
+      # dump (207 MiB on 2026-09-28) fits, and streaming the import to disk is
+      # the planned fix (tasks/phase10-large-zip-ingest.md).
       - /tmp:size=512m
     security_opt:
       - no-new-privileges:true
@@ -296,6 +299,11 @@ services:
     build:
       context: ..
       dockerfile: docker/frontend.Dockerfile
+    environment:
+      # Upload caps nginx enforces before the API; keep them equal to the API's
+      # (DIOPTRA_MAX_ZIP_BYTES, DIOPTRA_VULNDB_MAX_DUMP_BYTES) — see .env.example.
+      DIOPTRA_MAX_ZIP_MIB: ${DIOPTRA_MAX_ZIP_MIB:-1024}
+      DIOPTRA_VULNDB_MAX_DUMP_MIB: ${DIOPTRA_VULNDB_MAX_DUMP_MIB:-513}
     ports:
       - "${DIOPTRA_HTTP_PORT:-8080}:8080"
     depends_on:

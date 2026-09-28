@@ -37,6 +37,7 @@ from app.analysis.normalizer import (
     normalize_crypto,
     parse_sarif,
 )
+from app.analysis.progress import ACQUIRE, NORMALIZE
 from app.analysis.runners import default_runners
 from app.analysis.runners.base import WORK_DIR, ExecutionResult, Runner, RunnerSpec
 from app.analysis.runners.executor import build_executor
@@ -48,6 +49,7 @@ from app.core.errors import AppError
 from app.db.session import get_session_factory
 from app.ingest.detection import detect
 from app.ingest.git_source import shallow_clone
+from app.ingest.upload import extract_upload
 from app.inventory.models import CryptoAsset
 
 logger = logging.getLogger("dioptra.pipeline")
@@ -99,8 +101,15 @@ def run_pipeline(analysis_id: uuid.UUID | str) -> None:
             logger.exception("analysis %s crashed", identifier)
             analysis.status = AnalysisStatus.FAILED
             analysis.failure_code = "pipeline_error"
+        analysis.current_step = None
         analysis.finished_at = utc_now()
         db.commit()
+
+
+def _enter(db: Session, analysis: Analysis, step: str) -> None:
+    """Record the step the worker is entering, visible to a poll at once."""
+    analysis.current_step = step
+    db.commit()
 
 
 def _execute(db: Session, analysis: Analysis, settings: Settings) -> None:
@@ -108,10 +117,27 @@ def _execute(db: Session, analysis: Analysis, settings: Settings) -> None:
         message = "analysis has no workspace"
         raise AppError(message)
     workspace = Path(analysis.workspace_path)
+    _enter(db, analysis, ACQUIRE)
+    # Acquisition happens HERE, in the worker, for both sources: the git clone
+    # since P1, the ZIP's extraction since phase 10 (`tasks/phase10-survey.md`
+    # §3 option C). The request only spooled the archive; `archive.py`'s
+    # guards run unchanged, just in this process instead of the API's.
+    acquired = False
     if analysis.source_kind is SourceKind.GIT:
         shallow_clone(
             analysis.source_ref, workspace, timeout_seconds=settings.git_clone_timeout_seconds
         )
+        acquired = True
+    elif analysis.source_kind is SourceKind.ZIP:
+        try:
+            extract_upload(workspace, settings)
+        except Exception:
+            # Nothing of a refused archive stays on disk; the row keeps the
+            # typed failure code (`run_pipeline`).
+            shutil.rmtree(workspace.parent, ignore_errors=True)
+            raise
+        acquired = True
+    if acquired:
         detection = detect(workspace)
         analysis.languages = detection.languages
         analysis.frameworks = detection.frameworks
@@ -127,6 +153,7 @@ def _execute(db: Session, analysis: Analysis, settings: Settings) -> None:
     collected = _Collected((WORK_DIR, str(workspace), str(workspace.resolve())))
 
     for runner in default_runners():
+        _enter(db, analysis, runner.name)
         reason = runner.unavailable_reason(settings)
         if reason is not None:
             db.add(
@@ -138,6 +165,7 @@ def _execute(db: Session, analysis: Analysis, settings: Settings) -> None:
                     detail=reason[:500],
                 )
             )
+            db.commit()
             continue
         spec = runner.spec(settings, workspace=workspace, out_dir=out_dir)
         result = executor.run(spec, workspace=workspace, out_dir=out_dir)
@@ -148,6 +176,10 @@ def _execute(db: Session, analysis: Analysis, settings: Settings) -> None:
             _record(
                 db, analysis, runner, f"{runner.name}-history", history_spec, history, collected
             )
+        # Each tool's coverage row and raw output are durable as soon as the
+        # tool ends. The next `_enter` would commit them too; this makes the
+        # per-tool durability explicit instead of a side effect of the next step.
+        db.commit()
 
     # Raw outputs and coverage rows are durable before anything is normalized:
     # a normalizer bug must never lose a tool's result.
@@ -163,6 +195,7 @@ def _execute(db: Session, analysis: Analysis, settings: Settings) -> None:
     if not ran_security:
         raise NoToolRan("no SAST/SCA/secret tool produced a report")
 
+    _enter(db, analysis, NORMALIZE)
     findings = normalize(collected.reports, collected.roots)
     # The audited project's OWN findings rank before dependency ones, and the
     # normalizer's worst-first order is preserved inside each group because

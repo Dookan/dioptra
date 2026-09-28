@@ -55,8 +55,9 @@ def test_analyst_registers_and_ingests_a_zip(
     archive = make_zip({"index.js": "const x = req.body;\n", "package.json": "{}"})
     response = client.post(
         f"/api/v1/projects/{project_id}/ingest",
-        files={"file": ("src.zip", archive, "application/zip")},
-        headers=headers,
+        content=archive,
+        params={"filename": "src.zip"},
+        headers={**headers, "Content-Type": "application/zip"},
     )
     assert response.status_code == 202, response.text
     body = response.json()
@@ -137,17 +138,23 @@ def test_developer_cannot_register_or_ingest(client: TestClient, developer: User
     assert client.post("/api/v1/projects", json=PROJECT, headers=headers).status_code == 403
 
 
-def test_zip_slip_upload_is_rejected(client: TestClient, analyst: User) -> None:
+def test_zip_slip_upload_fails_the_analysis_with_its_typed_code(
+    client: TestClient, analyst: User
+) -> None:
+    """Phase 10: extraction is the worker's, so a hostile archive is ACCEPTED
+    (202, spooled) and then refused by the same guard, recorded on the row."""
     headers = login(client, analyst.username)
     project_id = client.post("/api/v1/projects", json=PROJECT, headers=headers).json()["id"]
     archive = make_zip({"../../evil.js": "x"})
     response = client.post(
         f"/api/v1/projects/{project_id}/ingest",
-        files={"file": ("evil.zip", archive, "application/zip")},
-        headers=headers,
+        content=archive,
+        params={"filename": "evil.zip"},
+        headers={**headers, "Content-Type": "application/zip"},
     )
-    assert response.status_code == 422
-    assert response.json()["code"] == "zip_slip_detected"
+    assert response.status_code == 202, response.text
+    assert response.json()["status"] == "failed"
+    assert response.json()["failure_code"] == "zip_slip_detected"
     assert "Traceback" not in response.text
 
 
@@ -158,8 +165,13 @@ def test_oversized_declared_upload_is_refused_before_reading(
     project_id = client.post("/api/v1/projects", json=PROJECT, headers=headers).json()["id"]
     response = client.post(
         f"/api/v1/projects/{project_id}/ingest",
-        files={"file": ("src.zip", make_zip({"a.js": "1"}), "application/zip")},
-        headers={**headers, "Content-Length": str(500 * 1024 * 1024)},
+        content=make_zip({"a.js": "1"}),
+        params={"filename": "src.zip"},
+        headers={
+            **headers,
+            "Content-Length": str(2 * 1024 * 1024 * 1024),
+            "Content-Type": "application/zip",
+        },
     )
     assert response.status_code == 413
     assert response.json()["code"] == "zip_too_large"
@@ -172,10 +184,12 @@ def test_rejected_upload_leaves_no_directory_behind(client: TestClient, analyst:
     project_id = client.post("/api/v1/projects", json=PROJECT, headers=headers).json()["id"]
     response = client.post(
         f"/api/v1/projects/{project_id}/ingest",
-        files={"file": ("evil.zip", make_zip({"../../evil.js": "x"}), "application/zip")},
-        headers=headers,
+        content=make_zip({"../../evil.js": "x"}),
+        params={"filename": "evil.zip"},
+        headers={**headers, "Content-Type": "application/zip"},
     )
-    assert response.status_code == 422
+    assert response.json()["failure_code"] == "zip_slip_detected"
+    # Neither the jail, nor the spooled archive, nor their directory survives.
     project_dir = get_settings().workspace_root / project_id
     assert not project_dir.exists() or not any(project_dir.iterdir())
 
@@ -217,8 +231,9 @@ def test_report_exports_after_an_inline_run(client: TestClient, analyst: User, f
     archive = make_zip({"index.js": "// const old = 1;\n// return x;\n// if (a) {\n"})
     analysis_id = client.post(
         f"/api/v1/projects/{project_id}/ingest",
-        files={"file": ("src.zip", archive, "application/zip")},
-        headers=headers,
+        content=archive,
+        params={"filename": "src.zip"},
+        headers={**headers, "Content-Type": "application/zip"},
     ).json()["id"]
     response = client.get(f"/api/v1/analyses/{analysis_id}/report?format={fmt}", headers=headers)
     assert response.status_code == 200, response.text

@@ -122,6 +122,9 @@ class Analysis(Base):
     )
     #: Typed failure code (``IngestError.code``), never a message or a trace.
     failure_code: Mapped[str | None] = mapped_column(String(64), default=None)
+    #: The pipeline step the worker is on (``analysis/progress.py``: the
+    #: acquisition, each tool by name, the normalisation); NULL when idle.
+    current_step: Mapped[str | None] = mapped_column(String(32), default=None)
     #: Workflow stage of this ingested version. E1 (register) is the project's;
     #: an analysis is born at E2 and only ``app.workflow.stages.advance`` moves it.
     stage: Mapped[Stage] = mapped_column(_text_enum(Stage, 12), default=Stage.CODE, index=True)

@@ -125,6 +125,65 @@ export async function apiUpload<T>(
   return (await response.json()) as T;
 }
 
+/** Upload progress in bytes, as the browser reports it while sending. */
+export type UploadProgress = (loaded: number, total: number) => void;
+
+function errorFromText(status: number, text: string): ApiError {
+  try {
+    const body = JSON.parse(text) as ErrorBody;
+    if (typeof body.code === 'string' && typeof body.message_key === 'string') {
+      return new ApiError(status, body.code, body.message_key, { context: stringMap(body.context) });
+    }
+  } catch {
+    // Not the API's JSON: a proxy or a gateway answered.
+  }
+  // nginx refuses an over-cap body itself, with an HTML 413 the API never
+  // saw: that is still "too large", not an internal error.
+  if (status === 413) return new ApiError(status, 'zip_too_large', 'errors.ingest.zipTooLarge');
+  return new ApiError(status, 'internal_error', 'errors.internal');
+}
+
+/**
+ * A file sent as the RAW request body (phase 10: the ZIP ingest).
+ *
+ * XMLHttpRequest rather than fetch because only XHR reports UPLOAD progress,
+ * and a 1 GiB archive on a slow LAN is minutes of sending with nothing else
+ * on screen. Same auth and error contract as `apiFetch`.
+ */
+export function apiUploadFile<T>(
+  path: string,
+  file: Blob,
+  accessToken: string | null,
+  onProgress?: UploadProgress,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE}${path}`);
+    if (accessToken) xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+    xhr.setRequestHeader('Content-Type', 'application/zip');
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress?.(event.loaded, event.total);
+    };
+    const unreachable = () => {
+      reject(new ApiError(0, 'network_unreachable', 'errors.network'));
+    };
+    xhr.onerror = unreachable;
+    xhr.onabort = unreachable;
+    xhr.onload = () => {
+      if (xhr.status < 200 || xhr.status >= 300) {
+        reject(errorFromText(xhr.status, xhr.responseText));
+        return;
+      }
+      try {
+        resolve(JSON.parse(xhr.responseText) as T);
+      } catch (cause) {
+        reject(new ApiError(xhr.status, 'internal_error', 'errors.internal', { cause }));
+      }
+    };
+    xhr.send(file);
+  });
+}
+
 export interface Download {
   blob: Blob;
   filename: string;

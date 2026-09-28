@@ -81,7 +81,12 @@
       "invalidArchive": "The file is not a valid ZIP.",
       "forbiddenHost": "The repository address points to a forbidden network.",
       "invalidUrl": "The repository address is not valid (HTTPS only).",
-      "repoUnreachable": "The repository could not be reached."
+      "repoUnreachable": "The repository could not be reached.",
+      "uploadTooLarge": "The ZIP file is larger than {{limit_mib}} MiB, the maximum allowed.",
+      "uploadMediaType": "The file must be sent as a ZIP, not as a form.",
+      "uploadInterrupted": "The upload stopped before it finished. Try again.",
+      "uploadMissing": "The uploaded file was no longer on the server when the analysis started. Upload it again.",
+      "enqueueFailed": "The analysis could not be queued: the queue is not answering. Try again in a moment."
     },
     "projects": {
       "installedAtInFuture": "The installation date cannot be later than today.",
@@ -212,7 +217,25 @@
     "coverage": "Tool coverage",
     "detected": "Detected",
     "failedBody": "The analysis could not finish. Code:",
-    "findingsCount": "{{count}} finding(s)"
+    "findingsCount": "{{count}} finding(s)",
+    "progress": {
+      "label": "Step {{index}} of {{total}}: {{step}}",
+      "count": "Step {{index}} of {{total}}",
+      "elapsed": "Running for {{time}}",
+      "step": {
+        "acquire": {
+          "zip": "unpacking the code",
+          "git": "cloning the repository"
+        },
+        "semgrep": "looking for insecure patterns (Semgrep)",
+        "gitleaks": "looking for secrets (Gitleaks)",
+        "osv-scanner": "checking vulnerable dependencies (OSV)",
+        "syft": "building the component inventory (Syft)",
+        "lizard": "measuring complexity (Lizard)",
+        "cloc": "counting lines per language (cloc)",
+        "normalize": "storing the findings"
+      }
+    }
   },
   "projects": {
     "title": "Projects",
@@ -263,7 +286,10 @@
       "duration": "Usually takes a few minutes.",
       "gitLabel": "Or the repository's HTTPS address",
       "gitSubmit": "Clone and analyze",
-      "privacy": "Everything stays on this server: no tool queries external services."
+      "privacy": "Everything stays on this server: no tool queries external services.",
+      "uploading": "Uploading the file…",
+      "received": "File received. Preparing the analysis…",
+      "percent": "{{percent}}%"
     },
     "explain": {
       "title": "What are we going to review?",

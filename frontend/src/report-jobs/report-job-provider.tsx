@@ -19,6 +19,7 @@ import { saveDownload } from '../api/projects';
 import * as api from '../api/report-jobs';
 import { useAuth } from '../auth/auth-context';
 import { ReportJobContext, type ReportJobState } from './report-job-context';
+import { clock } from '../components/clock';
 
 export const POLL_MS = 2000;
 export const READY_CLOSE_MS = 4000;
@@ -34,11 +35,6 @@ const KNOWN_REASONS = new Set([
 
 function reasonKey(detail: string | null): string {
   return `reportJob.reason.${detail !== null && KNOWN_REASONS.has(detail) ? detail : 'unknown'}`;
-}
-
-function clock(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  return `${String(minutes)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
 function errorKeyOf(error: unknown): string {

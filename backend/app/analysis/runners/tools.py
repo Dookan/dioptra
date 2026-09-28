@@ -23,6 +23,48 @@ OSV_CONFIG = f"{RULES_DIR}/osv-scanner/osv-scanner.toml"
 OSV_DB_DIR = "/osvdb"
 
 
+_MEMORY_UNITS = {"b": 1 / (1024 * 1024), "k": 1 / 1024, "m": 1, "g": 1024}
+#: Below this per-job share a scan is not worth parallelising: jobs are cut
+#: until each gets at least this much, so jobs × share never exceeds the box.
+_MIN_JOB_MIB = 512
+
+
+def _memory_mib(raw: str) -> int:
+    """Docker's memory spelling (`2g`, `2gb`, `512m`, bare bytes) in MiB; 0 if unreadable."""
+    text = raw.strip().lower()
+    if len(text) >= 2 and text.endswith("b") and text[-2] in "kmg":
+        text = text[:-1]  # `2gb` is docker's other spelling of `2g`
+    unit = _MEMORY_UNITS.get(text[-1:])
+    number = text[:-1] if unit is not None else text
+    try:
+        return int(float(number) * (unit if unit is not None else _MEMORY_UNITS["b"]))
+    except ValueError:
+        return 0
+
+
+def semgrep_budget(settings: Settings) -> tuple[int, int]:
+    """(jobs, max-memory MiB per file) that fit INSIDE the runner's limits.
+
+    Found by the phase-10 walk (2026-09-28): on a 1.4 GiB tree Semgrep died
+    with `semgrep-core exited with -9` — the kernel's OOM kill — because it
+    sizes its parallelism from the HOST's cores (it saw 8 and ran 7 jobs) while
+    the container is capped at `runner_cpus` and `runner_memory` (2 and 2 GiB).
+    So: one job per CPU the container actually has, but never more jobs than
+    the memory can give `_MIN_JOB_MIB` each, and a per-file memory cap that
+    leaves every job its share plus one share of headroom. A rule that would
+    pass the cap on one pathological file (minified bundles) is dropped FOR
+    THAT FILE — Semgrep notes it in its raw output, which is stored — instead
+    of the kernel killing the whole scan and the layer becoming a coverage gap.
+    """
+    try:
+        cpus = max(1, int(float(settings.runner_cpus)))
+    except ValueError:
+        cpus = 1
+    memory_mib = _memory_mib(settings.runner_memory)
+    jobs = max(1, min(cpus, memory_mib // _MIN_JOB_MIB))
+    return jobs, max(128, memory_mib // (jobs + 1))
+
+
 def _paths_are_translated_by_executor(workspace: Path, out_dir: Path) -> None:
     """Runners receive the real paths but never embed them.
 
@@ -51,6 +93,7 @@ class SemgrepRunner:
 
     def spec(self, settings: Settings, *, workspace: Path, out_dir: Path) -> RunnerSpec:
         _paths_are_translated_by_executor(workspace, out_dir)
+        jobs, max_memory = semgrep_budget(settings)
         return RunnerSpec(
             tool=self.name,
             category=self.category,
@@ -73,6 +116,10 @@ class SemgrepRunner:
                 "30",
                 "--max-target-bytes",
                 "2000000",
+                "--jobs",
+                str(jobs),
+                "--max-memory",
+                str(max_memory),
                 "--disable-version-check",
                 WORK_DIR,
             ),

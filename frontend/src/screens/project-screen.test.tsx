@@ -79,6 +79,11 @@ function renderProject(routes: Routes, role: Role = 'analyst') {
   return calls;
 }
 
+/** What the page's live regions currently say (the sentences a reader hears). */
+function liveTexts(): string[] {
+  return screen.queryAllByRole('status').map((node) => node.textContent ?? '');
+}
+
 async function signIn(username = 'mmarin') {
   const user = userEvent.setup();
   await user.type(await screen.findByLabelText(es.login.username), username);
@@ -141,6 +146,255 @@ describe('project screen', () => {
     await user.click(screen.getByRole('button', { name: es.project.ingest.uploadSubmit }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(es.errors.ingest.zipSlip);
+  });
+
+  it('sends the ZIP as the raw body, named in the query, and shows it moving', async () => {
+    let answer: (response: { status: number; body: unknown }) => void = () => undefined;
+    const calls = renderProject({
+      [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [] },
+      [`/api/v1/projects/${PROJECT.id}/ingest`]: () =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+    });
+    const user = await signIn();
+
+    const input = await screen.findByLabelText(es.project.ingest.zipLabel);
+    const zip = new File(['PK-some-bytes'], 'código fuente.zip', { type: 'application/zip' });
+    await user.upload(input, zip);
+    // The live region exists, empty, BEFORE the upload has anything to say.
+    const region = screen
+      .getAllByRole('status')
+      .find((node) => node.classList.contains('srlive') && node.textContent === '');
+    expect(region).toBeDefined();
+    await user.click(screen.getByRole('button', { name: es.project.ingest.uploadSubmit }));
+    await waitFor(() => {
+      expect(region?.textContent).toBe(es.project.ingest.received);
+    });
+
+    // Every byte sent, the server not answered yet: the screen says so, and
+    // the sentence reaches the live region that was mounted before it.
+    await waitFor(() => {
+      expect(liveTexts()).toContain(es.project.ingest.received);
+    });
+    // The fake XHR hands `calls` the request init as a second argument the
+    // fetch signature does not declare.
+    const call = (calls.mock.calls as unknown as [string, unknown][]).find(
+      ([path]) => path === `/api/v1/projects/${PROJECT.id}/ingest`,
+    );
+    const init = call?.[1] as RequestInit & { url: string; headers: Record<string, string> };
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe(zip);
+    expect(init.headers['Content-Type']).toBe('application/zip');
+    expect(init.headers.Authorization).toBe('Bearer an-access-token');
+    expect(init.url).toContain(`?filename=${encodeURIComponent('código fuente.zip')}`);
+
+    answer({ status: 202, body: analysis('queued') });
+    await waitFor(() => {
+      expect(screen.queryAllByText(es.project.ingest.received)).toHaveLength(0);
+    });
+  });
+
+  it('shows the upload mid-way: the live sentence, the floored bar, hidden visuals', async () => {
+    renderProject({ [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [] } });
+    // An upload that reports 98 % and never answers: the in-between state the
+    // default fake (which jumps straight to 100 %) never lets the screen show.
+    class HeldXhr {
+      readonly upload: { onprogress: ((event: ProgressEvent) => void) | null } = {
+        onprogress: null,
+      };
+      onload = null;
+      onerror = null;
+      onabort = null;
+      open(): void {}
+      setRequestHeader(): void {}
+      send(): void {
+        this.upload.onprogress?.({ lengthComputable: true, loaded: 98, total: 100 } as ProgressEvent);
+      }
+    }
+    const user = await signIn();
+    vi.stubGlobal('XMLHttpRequest', HeldXhr);
+    await user.upload(
+      await screen.findByLabelText(es.project.ingest.zipLabel),
+      new File(['PK'], 'big.zip', { type: 'application/zip' }),
+    );
+    await user.click(screen.getByRole('button', { name: es.project.ingest.uploadSubmit }));
+
+    await waitFor(() => {
+      expect(liveTexts()).toContain(es.project.ingest.uploading);
+    });
+    // 98 % floors to the 95 step: the bar never reads "done" before the text.
+    expect(document.querySelector('.panel .progress .pfill')).toHaveClass('w95');
+    const visible = screen
+      .getAllByText(es.project.ingest.uploading)
+      .find((node) => node.getAttribute('role') !== 'status');
+    expect(visible?.closest('[aria-hidden="true"]')).not.toBeNull();
+    expect(screen.getByText('98 %').closest('[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  it('fills the analysis bar with the steps DONE, not the one running', async () => {
+    const running = {
+      ...analysis('queued'),
+      status: 'running',
+      started_at: null,
+      progress: { step: 'semgrep', index: 2, total: 8 },
+    };
+    renderProject({
+      [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [running] },
+    });
+    await signIn();
+    await waitFor(() => {
+      expect(document.querySelector('.card .progress .pfill')).toHaveClass('w15');
+    });
+  });
+
+  it('mounts the card live region while the analysis is still queued', async () => {
+    renderProject({
+      [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [analysis('queued')] },
+    });
+    await signIn();
+    await waitFor(() => {
+      expect(document.querySelectorAll('.card .srlive[role="status"]')).toHaveLength(1);
+    });
+    expect(document.querySelector('.card .srlive')?.textContent).toBe('');
+  });
+
+  it.each([
+    ['zip_slip_detected', es.errors.ingest.zipSlip],
+    ['zip_too_large', es.errors.ingest.zipTooLarge],
+    ['zip_too_many_entries', es.errors.ingest.tooManyEntries],
+    ['zip_bomb', es.errors.ingest.zipBomb],
+    ['invalid_archive', es.errors.ingest.invalidArchive],
+    ['upload_missing', es.errors.ingest.uploadMissing],
+    ['repo_unreachable', es.errors.ingest.repoUnreachable],
+    ['no_tool_ran', es.errors.analysis.noToolRan],
+    ['analysis_enqueue_failed', es.errors.ingest.enqueueFailed],
+  ])('explains the worker failure %s in plain words', async (code, sentence) => {
+    const failed = { ...analysis('queued'), status: 'failed', failure_code: code };
+    renderProject({
+      [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [failed] },
+    });
+    await signIn();
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(sentence);
+    expect(alert).toHaveTextContent(code);
+  });
+
+  it('names the limit when the upload is too large', async () => {
+    renderProject({
+      [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [] },
+      [`/api/v1/projects/${PROJECT.id}/ingest`]: {
+        status: 413,
+        body: {
+          code: 'zip_too_large',
+          message_key: 'errors.ingest.uploadTooLarge',
+          context: { limit_mib: '1024' },
+        },
+      },
+    });
+    const user = await signIn();
+    await user.upload(
+      await screen.findByLabelText(es.project.ingest.zipLabel),
+      new File(['PK'], 'big.zip', { type: 'application/zip' }),
+    );
+    await user.click(screen.getByRole('button', { name: es.project.ingest.uploadSubmit }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      es.errors.ingest.uploadTooLarge.replace('{{limit_mib}}', '1024'),
+    );
+  });
+
+  it('reads a proxy 413 with no JSON as too large, not as an internal error', async () => {
+    renderProject({
+      [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [] },
+      [`/api/v1/projects/${PROJECT.id}/ingest`]: { status: 413 },
+    });
+    const user = await signIn();
+    await user.upload(
+      await screen.findByLabelText(es.project.ingest.zipLabel),
+      new File(['PK'], 'big.zip', { type: 'application/zip' }),
+    );
+    await user.click(screen.getByRole('button', { name: es.project.ingest.uploadSubmit }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(es.errors.ingest.zipTooLarge);
+  });
+
+  it('explains in plain words an archive the worker refused', async () => {
+    const failed = { ...analysis('queued'), status: 'failed', failure_code: 'zip_bomb' };
+    renderProject({
+      [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [failed] },
+    });
+    await signIn();
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(es.errors.ingest.zipBomb);
+    expect(alert).toHaveTextContent('zip_bomb');
+  });
+
+  it('names the step a running analysis is on, with its place and its clock', async () => {
+    const running = {
+      ...analysis('queued'),
+      status: 'running',
+      started_at: new Date(Date.now() - 125_000).toISOString(),
+      progress: { step: 'semgrep', index: 2, total: 8 },
+    };
+    renderProject({
+      [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [running] },
+    });
+    await signIn();
+
+    const sentence = es.analysis.progress.label
+      .replace('{{index}}', '2')
+      .replace('{{total}}', '8')
+      .replace('{{step}}', es.analysis.progress.step.semgrep);
+    await waitFor(() => {
+      expect(liveTexts()).toContain(sentence);
+    });
+    // Shown too, but the visible copy and the clock are never announced: the
+    // clock changes every second.
+    const visible = screen.getAllByText(sentence).find((node) => node.getAttribute('role') !== 'status');
+    expect(visible?.closest('[aria-hidden="true"]')).not.toBeNull();
+    const clockText = await screen.findByText(/^Lleva 2:0[5-9]$/);
+    expect(clockText.closest('[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  it('says which acquisition runs: unpacking a ZIP, cloning a repository', async () => {
+    const cloning = {
+      ...analysis('queued'),
+      source_kind: 'git',
+      status: 'running',
+      started_at: null,
+      progress: { step: 'acquire', index: 1, total: 8 },
+    };
+    renderProject({
+      [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [cloning] },
+    });
+    await signIn();
+
+    const cloningSentence = es.analysis.progress.label
+      .replace('{{index}}', '1')
+      .replace('{{total}}', '8')
+      .replace('{{step}}', es.analysis.progress.step.acquire.git);
+    await waitFor(() => {
+      expect(liveTexts()).toContain(cloningSentence);
+    });
+    expect(screen.queryByText(/^Lleva /)).toBeNull();
+  });
+
+  it('shows only the count for a step it has no words for', async () => {
+    const future = {
+      ...analysis('queued'),
+      status: 'running',
+      progress: { step: 'trivy', index: 5, total: 9 },
+    };
+    renderProject({
+      [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [future] },
+    });
+    await signIn();
+
+    await waitFor(() => {
+      expect(liveTexts()).toContain('Paso 5 de 9');
+    });
   });
 
   it('keeps the downloads disabled until the analysis is done', async () => {

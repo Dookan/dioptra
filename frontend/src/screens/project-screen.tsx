@@ -6,6 +6,7 @@
  */
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 import { ApiError } from '../api/client';
 import * as api from '../api/projects';
@@ -17,6 +18,8 @@ import { AppShell } from '../components/app-shell';
 import { stageIndex } from '../components/stages';
 import { SeverityBadge, StatusBadge, ToolBadge } from '../components/status-badge';
 import { Stepper } from '../components/stepper';
+import { widthClass } from '../components/width-class';
+import { clock } from '../components/clock';
 import type { Route } from '../navigation/use-route';
 
 const POLL_MS = 3000;
@@ -36,6 +39,96 @@ function stageKey(stage: number): 'code' | 'triage' | 'plan' | 'later' {
   if (stage === 2) return 'triage';
   if (stage === 3) return 'plan';
   return 'later';
+}
+
+/**
+ * The plain-words reason for a failure code the WORKER records. Since phase 10
+ * the ZIP is extracted there, so a hostile or oversized archive is refused on
+ * the analysis row rather than in the upload's response — the same sentence
+ * the upload used to show, then the code. Unknown codes show only the code.
+ */
+const FAILURE_KEYS: Readonly<Record<string, string>> = {
+  zip_slip_detected: 'errors.ingest.zipSlip',
+  zip_too_large: 'errors.ingest.zipTooLarge',
+  zip_too_many_entries: 'errors.ingest.tooManyEntries',
+  zip_bomb: 'errors.ingest.zipBomb',
+  invalid_archive: 'errors.ingest.invalidArchive',
+  upload_missing: 'errors.ingest.uploadMissing',
+  repo_unreachable: 'errors.ingest.repoUnreachable',
+  no_tool_ran: 'errors.analysis.noToolRan',
+  analysis_enqueue_failed: 'errors.ingest.enqueueFailed',
+};
+
+function failureKey(code: string | null): string | null {
+  return code === null ? null : (FAILURE_KEYS[code] ?? null);
+}
+
+/** Steps the screen has words for; any other name shows only the count. */
+const PROGRESS_STEPS = new Set([
+  'acquire',
+  'semgrep',
+  'gitleaks',
+  'osv-scanner',
+  'syft',
+  'lizard',
+  'cloc',
+  'normalize',
+]);
+
+/** The sentence naming a running analysis' step, or '' when it is not running. */
+function progressSentence(t: TFunction, analysis: Analysis): string {
+  const progress = analysis.progress;
+  if (analysis.status !== 'running' || progress === null) return '';
+  if (!PROGRESS_STEPS.has(progress.step)) {
+    return t('analysis.progress.count', { index: progress.index, total: progress.total });
+  }
+  const stepKey =
+    progress.step === 'acquire' ? `acquire.${analysis.source_kind}` : progress.step;
+  return t('analysis.progress.label', {
+    index: progress.index,
+    total: progress.total,
+    step: t(`analysis.progress.step.${stepKey}`),
+  });
+}
+
+/**
+ * The running analysis, step by step (phase 10). The bar counts steps done;
+ * the sentence names the step and the clock says how long it has run,
+ * because the steps are nothing like equal (Semgrep was 6 of 8 minutes on a
+ * real 593 MiB system) and a bar alone would look frozen. Everything here is
+ * `aria-hidden`: the card's own always-mounted live region announces the
+ * sentence (`AnalysisCard`), and the clock, which ticks every second, is
+ * never announced.
+ */
+function AnalysisProgressBar({ analysis }: { analysis: Analysis }): React.ReactNode {
+  const { t } = useTranslation();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => {
+      clearInterval(timer);
+    };
+  }, []);
+  const progress = analysis.progress;
+  if (progress === null) return null;
+  const started = analysis.started_at === null ? null : Date.parse(analysis.started_at);
+  return (
+    <div className="progress wide" aria-hidden="true">
+      <div className="plabel">
+        <span>{progressSentence(t, analysis)}</span>
+        {started !== null && (
+          <span className="clock">
+            {t('analysis.progress.elapsed', { time: clock((now - started) / 1000) })}
+          </span>
+        )}
+      </div>
+      <div className="pbar">
+        <div className={`pfill ${widthClass(progress.index - 1, progress.total)}`} />
+      </div>
+    </div>
+  );
 }
 
 function stageFor(analyses: Analysis[]): number {
@@ -59,12 +152,17 @@ function IngestCard({
   const fileRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState('');
-  const [errorKey, setErrorKey] = useState<string | null>(null);
+  const [error, setError] = useState<{ key: string; context: Record<string, string> } | null>(
+    null,
+  );
   const [busy, setBusy] = useState(false);
+  // Bytes sent of the ZIP in flight (phase 10): a 1 GiB archive is minutes of
+  // sending, and the screen must say it is moving.
+  const [sent, setSent] = useState<{ loaded: number; total: number } | null>(null);
 
   async function submit(action: () => Promise<Analysis>): Promise<void> {
     if (accessToken === null) return;
-    setErrorKey(null);
+    setError(null);
     setBusy(true);
     try {
       const analysis = await action();
@@ -72,18 +170,37 @@ function IngestCard({
       setUrl('');
       if (fileRef.current) fileRef.current.value = '';
       onQueued(analysis);
-    } catch (error) {
-      setErrorKey(error instanceof ApiError ? error.messageKey : 'errors.internal');
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError
+          ? { key: caught.messageKey, context: caught.context }
+          : { key: 'errors.internal', context: {} },
+      );
     } finally {
       setBusy(false);
+      setSent(null);
     }
   }
 
   function handleZip(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     if (file === null || accessToken === null) return;
-    void submit(() => api.ingestZip(accessToken, projectId, file));
+    setSent({ loaded: 0, total: file.size });
+    void submit(() =>
+      api.ingestZip(accessToken, projectId, file, (loaded, total) => {
+        setSent({ loaded, total });
+      }),
+    );
   }
+
+  const percent =
+    sent === null || sent.total <= 0 ? 0 : Math.min(100, Math.floor((100 * sent.loaded) / sent.total));
+  const uploadSentence =
+    sent === null
+      ? ''
+      : percent < 100
+        ? t('project.ingest.uploading')
+        : t('project.ingest.received');
 
   function handleGit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -95,9 +212,9 @@ function IngestCard({
     <section className="panel">
       <h5>{t('project.ingest.section')}</h5>
       <p className="desc">{t('project.ingest.intro')}</p>
-      {errorKey !== null && (
+      {error !== null && (
         <p className="alert" role="alert">
-          {t(errorKey)}
+          {t(error.key, error.context)}
         </p>
       )}
       <form onSubmit={handleZip} noValidate>
@@ -120,6 +237,27 @@ function IngestCard({
           </button>
           <span className="hint">{t('project.ingest.duration')}</span>
         </div>
+        {/* The live region is ALWAYS mounted and only its text changes: a
+            region inserted together with its first sentence is the
+            announcement screen readers drop (the phase-8 toast rule). The
+            visible bar is aria-hidden, and so is the percentage, which
+            changes many times a second. */}
+        <span className="srlive" role="status">
+          {uploadSentence}
+        </span>
+        {sent !== null && (
+          <div className="progress wide" aria-hidden="true">
+            <div className="plabel">
+              <span>{uploadSentence}</span>
+              {percent < 100 && <span>{t('project.ingest.percent', { percent })}</span>}
+            </div>
+            <div className="pbar">
+              {/* Floored to the bar's 5-point steps, like the number beside it:
+                  the bar must never read "done" while the text says 97 %. */}
+              <div className={`pfill ${widthClass(percent - (percent % 5), 100)}`} />
+            </div>
+          </div>
+        )}
       </form>
       <form onSubmit={handleGit} noValidate>
         <div className="field">
@@ -230,6 +368,7 @@ function AnalysisCard({
   const { user } = useAuth();
   const canStartReview = user?.role === 'analyst' || user?.role === 'admin';
   const languages = Object.entries(analysis.languages);
+  const reason = failureKey(analysis.failure_code);
   const total = SEVERITIES.reduce((sum, level) => sum + (analysis.finding_counts[level] ?? 0), 0);
   const when = new Date(analysis.created_at).toLocaleString(i18n.resolvedLanguage, {
     dateStyle: 'medium',
@@ -244,8 +383,15 @@ function AnalysisCard({
         <span className="mono">{analysis.source_ref}</span>
         <span className="sub">{when}</span>
       </div>
+      {/* Mounted with the card, before the analysis runs, so the first step
+          is announced too; the visible bar below is aria-hidden. */}
+      <span className="srlive" role="status">
+        {progressSentence(t, analysis)}
+      </span>
+      {analysis.status === 'running' && <AnalysisProgressBar analysis={analysis} />}
       {analysis.status === 'failed' && (
         <p className="alert" role="alert">
+          {reason !== null && <>{t(reason)} </>}
           {t('analysis.failedBody')} <span className="mono">{analysis.failure_code ?? ''}</span>
         </p>
       )}

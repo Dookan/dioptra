@@ -58,9 +58,16 @@ class Settings(BaseSettings):
     #: Root of every per-analysis jail. Audited code is extracted under
     #: ``<root>/<project_id>/<analysis_id>/src`` and never anywhere else.
     workspace_root: Path = Path("/var/lib/dioptra/workspaces")
-    max_zip_bytes: int = Field(default=200 * 1024 * 1024, ge=1024)
-    max_unpacked_bytes: int = Field(default=1024 * 1024 * 1024, ge=1024)
-    max_zip_entries: int = Field(default=50_000, ge=1)
+    #: Phase 10 (tasks/phase10-survey.md): 1 GiB compressed, 8 GiB unpacked,
+    #: 300 000 entries — a real system shipped 593 MiB / 1.42 GiB / 21 872.
+    #: The upload is streamed to disk AFTER authentication and extracted by the
+    #: worker, so none of these numbers is bounded by the API's RAM any more.
+    #: nginx carries its own copy of the first one (`DIOPTRA_MAX_ZIP_MIB`,
+    #: docker/frontend.Dockerfile); `tests/test_upload_caps.py` keeps the two
+    #: defaults equal.
+    max_zip_bytes: int = Field(default=1024 * 1024 * 1024, ge=1024)
+    max_unpacked_bytes: int = Field(default=8 * 1024 * 1024 * 1024, ge=1024)
+    max_zip_entries: int = Field(default=300_000, ge=1)
     max_zip_ratio: int = Field(default=100, ge=2)
     git_clone_timeout_seconds: int = Field(default=300, ge=10)
 

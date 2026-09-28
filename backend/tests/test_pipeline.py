@@ -89,8 +89,9 @@ def _ingest(client: TestClient, headers: dict[str, str]) -> str:
         archive.writestr(".gitleaksignore", "/work/index.js:generic-api-key:1\n")
     response = client.post(
         f"/api/v1/projects/{project['id']}/ingest",
-        files={"file": ("src.zip", buffer.getvalue(), "application/zip")},
-        headers=headers,
+        content=buffer.getvalue(),
+        params={"filename": "src.zip"},
+        headers={**headers, "Content-Type": "application/zip"},
     )
     assert response.status_code == 202, response.text
     analysis_id: str = response.json()["id"]

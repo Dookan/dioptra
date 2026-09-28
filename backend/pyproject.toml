@@ -152,6 +152,9 @@ only_mutate = [
     # tree meets. The normalizer is already listed above (P7a).
     "app/ingest/archive.py",
     "app/ingest/git_source.py",
+    # Phase 10 close (2026-09-28): the upload that streams a hostile archive
+    # to disk after authentication, and the worker's extraction of it.
+    "app/ingest/upload.py",
 ]
 pytest_add_cli_args_test_selection = [
     "tests/test_gates.py",
@@ -173,6 +176,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_normalizer.py",
     "tests/test_ingest_archive.py",
     "tests/test_ingest_git.py",
+    "tests/test_upload_ingest.py",
     "tests/test_inventory_crypto.py",
     # Its end-to-end pipeline case fails under mutmut's copied tree (P1 close,
     # 2026-09-24); the unit cases of the crypto path are what this pass needs.

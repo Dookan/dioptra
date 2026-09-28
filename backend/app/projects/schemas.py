@@ -87,6 +87,18 @@ class TriageOut(BaseModel):
     third_party: int = 0
 
 
+class ProgressOut(BaseModel):
+    """Where a RUNNING analysis is (phase 10): the step's name and its place.
+
+    ``index`` counts steps, not time — Semgrep alone is most of a long run —
+    so the screen shows the step's name and the elapsed time beside the bar.
+    """
+
+    step: str
+    index: int
+    total: int
+
+
 class AnalysisOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -104,6 +116,8 @@ class AnalysisOut(BaseModel):
     created_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    #: Only while RUNNING; ``analysis/progress.py``.
+    progress: ProgressOut | None = None
     #: Every finding by severity, verdicts ignored.
     finding_counts: dict[str, int] = Field(default_factory=dict)
     #: What the report prints: false positives left out (mirrors `Finding.in_report`).

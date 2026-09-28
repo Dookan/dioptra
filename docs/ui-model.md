@@ -138,6 +138,45 @@ Added to `docs/mockups/index.html` on 2026-08-28, same tokens and principles:
   Both are `mmarin`'s call. nginx already allows it: `proxy_read_timeout 600s`
   on `/api/`, so the request is not cut off.
 
+## Subida del ZIP (screen 03) — phase 10, 2026-09-28
+
+- "Subir y analizar" now shows a **progress bar under the form** while the
+  archive is sent (`.progress.upload`: the anchor's `.pbar` / `.pfill`, full
+  width, stepped `w0`…`w100` classes because the CSP forbids inline styles).
+  The sentence "Subiendo el archivo…" is announced by a visually hidden
+  `role="status"` region (`.srlive`) that is mounted EMPTY with the form and
+  only changes its text — a region inserted already filled is the
+  announcement screen readers drop (phase-8 rule; the panel caught the first
+  version doing exactly that). The visible bar, its copy of the sentence and
+  the percentage are `aria-hidden`; the bar is floored to the same 5-point
+  steps as the number so it never reads "done" beside "97 %". At
+  100 % the sentence becomes "Archivo recibido. Preparando el análisis…",
+  which is true: the server answers once the last byte is on disk.
+- **Why** (`tasks/phase10-survey.md`): the cap went from 200 MiB to 1 GiB, and
+  a GiB on a slow LAN is minutes of sending. `fetch` reports no upload
+  progress, so this one request uses `XMLHttpRequest`
+  (`api/client.ts::apiUploadFile`).
+- A too-large refusal names the limit ("pesa más de 1024 MiB"); nginx's own
+  HTML 413, which the API never sees, reads as "too large" rather than as an
+  internal error.
+- A hostile or broken archive is now refused by the WORKER, so it shows on the
+  analysis card, not under the button: the card says the same plain sentence
+  the upload used to show (`errors.ingest.*`), then the code.
+- **The analysis has its own bar too** (`mmarin`, same day): while an
+  analysis RUNS, its card shows "Paso N de 8: <what the step does in plain
+  words, then the tool's name>", a bar of steps done and "Lleva m:ss". The
+  bar counts steps, not time — one tool is most of a long run — so the step is
+  named and the clock shown; the card's own `.srlive` region, mounted while
+  the analysis is still queued, announces each step, and the visible block
+  and its ticking clock are `aria-hidden`. Both bars share `.progress.wide`.
+  An acquisition says "descomprimiendo el código" for a ZIP and
+  "clonando el repositorio" for git; a step the screen has no words for shows
+  only "Paso N de M".
+- Recorded deviation: mockup 03 draws no upload progress; it follows the
+  anchor's own `.progress` element from screens 02, 04 and 09.
+- **Not checked on screen yet** — no test applies `components.css`; the bar's
+  width and both themes need the usual look.
+
 ## Registro (screen 03) — 2026-09-23
 
 - "Fecha de instalación" is our own calendar picker

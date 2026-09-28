@@ -20,6 +20,12 @@ COPY docker/nginx.conf /etc/nginx/templates/default.conf.template
 # Where /api/ is forwarded. Same host (Compose): the `api` service. Separate
 # hosts: the backend's LAN address, e.g. -e DIOPTRA_API_UPSTREAM=http://10.0.0.20:8000
 ENV DIOPTRA_API_UPSTREAM=http://api:8000
+# Upload caps nginx enforces before the API (phase 10). They MUST equal the
+# API's own: DIOPTRA_MAX_ZIP_MIB × 1 MiB = DIOPTRA_MAX_ZIP_BYTES, and the dump's
+# is DIOPTRA_VULNDB_MAX_DUMP_BYTES in MiB + 1 for the multipart envelope.
+# backend/tests/test_upload_caps.py pins these defaults against the API's.
+ENV DIOPTRA_MAX_ZIP_MIB=1024 \
+    DIOPTRA_VULNDB_MAX_DUMP_MIB=513
 COPY --from=build /srv/build/dist /usr/share/nginx/html
 
 EXPOSE 8080

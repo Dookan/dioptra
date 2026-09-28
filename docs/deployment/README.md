@@ -114,6 +114,12 @@ libres durante la construcción** (caché de compilación), la base de datos, el
 código extraído de cada análisis (se conserva mientras exista el análisis), la
 base OSV local (0,2–1 GB según ecosistemas) y el espacio de PDFs (tope 2 GiB).
 
+**Cada ZIP que se sube ocupa, mientras se analiza, su propio tamaño más el de
+su código descomprimido.** Con los topes por defecto (1 GiB comprimido, 8 GiB
+descomprimido) cuenta hasta ~9 GB por subida simultánea en
+`DIOPTRA_DATA_DIR/workspaces`. El ZIP se borra en cuanto se descomprime; el
+código descomprimido se queda mientras exista el análisis.
+
 ### Servidor frontend
 
 | Recurso | Mínimo |
@@ -258,6 +264,18 @@ DIOPTRA_API_UPSTREAM=http://10.0.0.20:8000 \
 (`DIOPTRA_API_BIND:DIOPTRA_API_PORT`). nginx escucha en `DIOPTRA_HTTP_PORT`
 (8080 por defecto).
 
+**Topes de subida.** nginx aplica su propia copia de los topes de la API:
+`DIOPTRA_MAX_ZIP_MIB` (1024 por defecto) para el ZIP del código y
+`DIOPTRA_VULNDB_MAX_DUMP_MIB` (513) para el volcado de vulnerabilidades. Si
+cambias `DIOPTRA_MAX_ZIP_BYTES` o `DIOPTRA_VULNDB_MAX_DUMP_BYTES` en el backend,
+cambia también estos en el frontend: `DIOPTRA_MAX_ZIP_MIB × 1048576` debe ser
+igual a `DIOPTRA_MAX_ZIP_BYTES`, y el del volcado lleva 1 MiB más por el
+formulario. Si no coinciden, manda el menor.
+
+`DIOPTRA_API_UPSTREAM` va **sin barra final** (`http://10.0.0.20:8000`, no
+`…:8000/`): con barra, nginx se niega a arrancar ("proxy_pass cannot have URI
+part in location given by regular expression").
+
 **HTTPS.** nginx habla HTTP en el 8080. El proxy TLS de la institución debe
 publicar `https://dioptra.<institución>` y reenviar al `http://10.0.0.10:8080`.
 Sin HTTPS no se puede iniciar sesión en producción: la cookie de sesión es
@@ -307,11 +325,12 @@ análisis termina, la cola, el worker y las imágenes de análisis funcionan.
   contraseñas. Protégelo con el firewall de §4 (solo el frontend llega al
   8000, regla en `DOCKER-USER`) o con una VLAN dedicada. TLS en ese tramo no
   está construido.
-- **Sin nginx delante, la API no tiene el tope de 200 MiB por petición.** Si
-  alguien llega directo al 8000, lo que acota una subida es el `/tmp` de la API
-  (512 MiB en RAM): una tercera subida grande simultánea falla con error en vez
-  de agotar la memoria. Un tope propio en la API está previsto como siguiente
-  paso.
+- **Sin nginx delante, la API aplica sus topes igual.** Desde la fase 10 la
+  API comprueba la sesión ANTES de leer el cuerpo y cuenta los bytes del ZIP
+  mientras llegan (1 GiB por defecto), sin importar lo que diga la cabecera;
+  el ZIP va al disco, no a la RAM. El volcado de vulnerabilidades sigue
+  pasando por el `/tmp` de la API (512 MiB en RAM), pero solo después de
+  comprobar que quien lo sube es admin o analista.
 - **Valkey no tiene contraseña**: por eso nunca se publica fuera de la red de
   Docker.
 - **El worker tiene el socket de Docker**, equivalente a root en el backend. Es
@@ -513,6 +532,12 @@ building** (build cache), the database, the extracted code of each analysis
 (kept while the analysis exists), the local OSV data (0.2–1 GB depending on
 ecosystems) and the PDF spool (capped at 2 GiB).
 
+**Each uploaded ZIP takes, while it is analysed, its own size plus its
+unpacked code.** With the default caps (1 GiB compressed, 8 GiB unpacked)
+plan up to ~9 GB per concurrent upload in `DIOPTRA_DATA_DIR/workspaces`. The
+ZIP is deleted as soon as it is unpacked; the unpacked code stays as long as
+the analysis exists.
+
 ### Frontend server
 
 | Resource | Minimum |
@@ -658,6 +683,18 @@ DIOPTRA_API_UPSTREAM=http://10.0.0.20:8000 \
 (`DIOPTRA_API_BIND:DIOPTRA_API_PORT`). nginx listens on `DIOPTRA_HTTP_PORT`
 (8080 by default).
 
+**Upload caps.** nginx applies its own copy of the API's caps:
+`DIOPTRA_MAX_ZIP_MIB` (1024 by default) for the code ZIP and
+`DIOPTRA_VULNDB_MAX_DUMP_MIB` (513) for the vulnerability dump. If you change
+`DIOPTRA_MAX_ZIP_BYTES` or `DIOPTRA_VULNDB_MAX_DUMP_BYTES` on the backend,
+change these on the frontend too: `DIOPTRA_MAX_ZIP_MIB × 1048576` must equal
+`DIOPTRA_MAX_ZIP_BYTES`, and the dump's carries 1 MiB more for the form. If
+they differ, the smaller one decides.
+
+`DIOPTRA_API_UPSTREAM` takes **no trailing slash** (`http://10.0.0.20:8000`,
+not `…:8000/`): with one, nginx refuses to start ("proxy_pass cannot have URI
+part in location given by regular expression").
+
 **HTTPS.** nginx speaks HTTP on 8080. The institution's TLS proxy publishes
 `https://dioptra.<institution>` and forwards to `http://10.0.0.10:8080`.
 Without HTTPS nobody can sign in in production: the session cookie is
@@ -707,10 +744,12 @@ the analysis finishes, the queue, the worker and the analysis images work.
   and passwords. Protect it with the §4 firewall (only the frontend reaches
   8000, rule in `DOCKER-USER`) or a dedicated VLAN. TLS on that hop is not
   built.
-- **Without nginx in front, the API has no 200 MiB per-request cap.** If
-  someone reaches port 8000 directly, what bounds an upload is the API's `/tmp`
-  (512 MiB of RAM): a third large concurrent upload fails with an error instead
-  of exhausting memory. A cap of the API's own is planned as the next step.
+- **Without nginx in front, the API still applies its caps.** Since phase 10
+  the API checks the session BEFORE reading the body and counts the ZIP's
+  bytes as they arrive (1 GiB by default), whatever the header says; the ZIP
+  goes to disk, not to RAM. The vulnerability dump still passes through the
+  API's `/tmp` (512 MiB of RAM), but only after checking that whoever uploads
+  it is an admin or an analyst.
 - **Valkey has no password**: that is why it is never published outside
   Docker's network.
 - **The worker holds the Docker socket**, which is root-equivalent on the

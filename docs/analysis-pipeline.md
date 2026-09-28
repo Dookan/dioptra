@@ -34,12 +34,34 @@ Security Top 10 when the target is an API), severity computed with CVSS 3.1.
    mitigation "bundle and serve locally, version-pinned". It is among the
    initial own rules of P1 day 7.
 
+**Acquisition is the worker's** (phase 10, 2026-09-28): a ZIP reaches the
+pipeline as a spooled file the API streamed to disk after authentication, and
+the job extracts it (`ingest/upload.py::extract_upload`, the unchanged
+`archive.py` guards) before the first runner, exactly as it clones a git URL.
+Caps: 1 GiB compressed, 8 GiB unpacked, 300 000 entries.
+
 Every analysis container runs with `--network none`: OSV-Scanner in offline
 mode against a local OSV database directory mounted read-only (in P1 that
 directory is seeded from the OSV dump file, the same dump the P5 mirror
 imports — no mirror table exists before P5), Semgrep with `--metrics=off`,
 Trivy with its database mounted and updates disabled. A runner that needs
 the network to work is misconfigured, not an exception.
+
+**Semgrep is sized to its container, not to the host** (found by the phase-10
+walk, 2026-09-28): it picks its parallelism from the cores it can SEE, which
+inside a `--cpus 2` container are still the host's (it ran 7 jobs on an
+8-core machine), so on a 1.4 GiB tree it outgrew `--memory 2g` and the kernel
+killed it (`semgrep-core exited with -9`) — the SAST layer became a coverage
+gap. `runners/tools.py::semgrep_budget` now passes `--jobs` = the runner's
+CPUs (cut until each job has at least 512 MiB) and `--max-memory` = its
+memory over jobs + 1 (682 MiB at the defaults): a rule that would exceed that
+on one file is dropped for that file instead of the whole scan dying.
+**Recorded limit**: that drop is noted only in Semgrep's own raw output, which
+is stored (`raw_tool_outputs`) but not read — the report's "Cobertura de
+herramientas" shows Semgrep as RAN. The same was already true of the files
+`--timeout 30` and `--max-target-bytes` skip; surfacing Semgrep's per-file
+errors as a partial-coverage note is a 1.x item. Measured on the same
+tree: 386 s, 1 034 results, under the 600 s runner timeout.
 
 Every runner has a timeout and CPU/RAM limits, and its raw output is persisted
 before normalization (the plan's day 7), so a normalizer bug never loses a

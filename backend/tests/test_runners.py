@@ -31,6 +31,7 @@ from app.analysis.runners.tools import (
     SemgrepRunner,
     SyftRunner,
     default_runners,
+    semgrep_budget,
 )
 from app.core.config import Settings, get_settings
 
@@ -369,6 +370,40 @@ def test_osv_runner_is_a_coverage_gap_without_a_database(
     assert runner.unavailable_reason(missing) is not None
     assert runner.unavailable_reason(missing) is not None
     assert "missing" in str(runner.unavailable_reason(missing))
+
+
+@pytest.mark.parametrize(
+    ("cpus", "memory", "budget"),
+    [
+        ("2", "2g", (2, 682)),  # the shipped defaults: 2048 MiB over 3 shares
+        ("2", "2gb", (2, 682)),  # docker also accepts the two-letter unit
+        ("2", "2048MB", (2, 682)),
+        ("4", "8g", (4, 1638)),
+        ("1.5", "512m", (1, 256)),  # fractional CPUs round down
+        ("1.9", "8g", (1, 4096)),  # …even with memory to spare: never rounded up
+        ("0.5", "1g", (1, 512)),  # never zero jobs
+        ("8", "1g", (2, 341)),  # more CPUs than the memory can feed: jobs cut
+        ("2", "3221225472", (2, 1024)),  # a bare docker value is bytes
+        ("x", "?", (1, 128)),  # unreadable settings fall to the safe side
+    ],
+)
+def test_semgrep_fits_inside_the_runner_limits(
+    settings: Settings, cpus: str, memory: str, budget: tuple[int, int]
+) -> None:
+    """Phase-10 walk: Semgrep sized its jobs from the HOST (7 on 8 cores) inside
+    a 2-CPU, 2 GiB container and the kernel killed it on a 1.4 GiB tree."""
+    tuned = settings.model_copy(update={"runner_cpus": cpus, "runner_memory": memory})
+    assert semgrep_budget(tuned) == budget
+
+
+def test_semgrep_argv_carries_its_budget(settings: Settings, dirs: tuple[Path, Path]) -> None:
+    workspace, out_dir = dirs
+    argv = SemgrepRunner().spec(settings, workspace=workspace, out_dir=out_dir).argv
+    jobs, memory = semgrep_budget(settings)
+    assert argv[argv.index("--jobs") + 1] == str(jobs)
+    assert argv[argv.index("--max-memory") + 1] == str(memory)
+    # The target stays last: every flag must come before it.
+    assert argv[-1] == "/work"
 
 
 def test_semgrep_runner_needs_the_rules_directory(

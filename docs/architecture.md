@@ -52,7 +52,7 @@ Error contract: every failure is `{code, message_key}` (a stable i18n key, never
 
 ## Data flow (one analysis)
 
-ingest (E2) → job queued → per-tool containers (Semgrep, Gitleaks, OSV,
+ingest (E2: a ZIP is streamed to disk after authentication, or a git URL validated) → job queued → the worker extracts or clones → per-tool containers (Semgrep, Gitleaks, OSV,
 Lizard/cloc **+ SBOM generation**) → SARIF outputs → normalizer (CWE→OWASP
 map, CVSS, dedupe) → findings + SBOM persisted → triage (E3, VEX verdicts on
 SCA findings) → risk matrix (E4) → AST briefs + Mermaid diagrams (E5) →

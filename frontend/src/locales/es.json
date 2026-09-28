@@ -81,7 +81,12 @@
       "invalidArchive": "El archivo no es un ZIP válido.",
       "forbiddenHost": "La dirección del repositorio apunta a una red no permitida.",
       "invalidUrl": "La dirección del repositorio no es válida (solo HTTPS).",
-      "repoUnreachable": "No se pudo acceder al repositorio."
+      "repoUnreachable": "No se pudo acceder al repositorio.",
+      "uploadTooLarge": "El archivo ZIP pesa más de {{limit_mib}} MiB, el máximo permitido.",
+      "uploadMediaType": "El archivo debe enviarse como ZIP, no como formulario.",
+      "uploadInterrupted": "La subida se cortó antes de terminar. Vuelve a intentarlo.",
+      "uploadMissing": "El archivo subido ya no estaba en el servidor cuando empezó el análisis. Súbelo de nuevo.",
+      "enqueueFailed": "No se pudo poner el análisis en cola: la cola no responde. Intenta de nuevo en un momento."
     },
     "projects": {
       "installedAtInFuture": "La fecha de instalación no puede ser posterior a hoy.",
@@ -212,7 +217,25 @@
     "coverage": "Cobertura de herramientas",
     "detected": "Detectado",
     "failedBody": "El análisis no pudo completarse. Código:",
-    "findingsCount": "{{count}} hallazgo(s)"
+    "findingsCount": "{{count}} hallazgo(s)",
+    "progress": {
+      "label": "Paso {{index}} de {{total}}: {{step}}",
+      "count": "Paso {{index}} de {{total}}",
+      "elapsed": "Lleva {{time}}",
+      "step": {
+        "acquire": {
+          "zip": "descomprimiendo el código",
+          "git": "clonando el repositorio"
+        },
+        "semgrep": "buscando patrones inseguros (Semgrep)",
+        "gitleaks": "buscando secretos (Gitleaks)",
+        "osv-scanner": "revisando dependencias vulnerables (OSV)",
+        "syft": "armando el inventario de componentes (Syft)",
+        "lizard": "midiendo la complejidad (Lizard)",
+        "cloc": "contando líneas por lenguaje (cloc)",
+        "normalize": "guardando los hallazgos"
+      }
+    }
   },
   "projects": {
     "title": "Proyectos",
@@ -263,7 +286,10 @@
       "duration": "Suele tardar unos minutos.",
       "gitLabel": "O la dirección HTTPS del repositorio",
       "gitSubmit": "Clonar y analizar",
-      "privacy": "Todo queda en este servidor: ninguna herramienta consulta servicios externos."
+      "privacy": "Todo queda en este servidor: ninguna herramienta consulta servicios externos.",
+      "uploading": "Subiendo el archivo…",
+      "received": "Archivo recibido. Preparando el análisis…",
+      "percent": "{{percent}} %"
     },
     "explain": {
       "title": "¿Qué vamos a revisar?",

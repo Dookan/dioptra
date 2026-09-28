@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import shutil
 import uuid
 from datetime import date
-from pathlib import Path
-from typing import BinaryIO
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -16,9 +13,7 @@ from app.audit import service as audit
 from app.auth.models import User
 from app.core.config import get_settings
 from app.core.queue import enqueue_pipeline
-from app.ingest.archive import ExtractionLimits, extract_zip
-from app.ingest.detection import detect
-from app.ingest.errors import AnalysisNotFound, ProjectNotFound, ZipTooLarge
+from app.ingest.errors import AnalysisEnqueueFailed, AnalysisNotFound, ProjectNotFound
 from app.ingest.git_source import validate_repository_url
 from app.projects.models import Project, System
 
@@ -91,22 +86,24 @@ def _jail_for(project_id: uuid.UUID, analysis_id: uuid.UUID) -> str:
     return str(root / str(project_id) / str(analysis_id) / "src")
 
 
-def ingest_zip(
+def accept_zip(
     db: Session,
     *,
     project: Project,
     actor: User,
-    upload: BinaryIO,
-    upload_size: int | None,
+    analysis_id: uuid.UUID,
     filename: str,
     source_ip: str | None,
 ) -> Analysis:
-    """Stage E2 from an archive: extract into the jail, detect, queue the pipeline."""
-    settings = get_settings()
-    if upload_size is not None and upload_size > settings.max_zip_bytes:
-        raise ZipTooLarge(f"{upload_size} bytes")
+    """Stage E2 from an archive the route already SPOOLED (phase 10).
 
+    Records the analysis, audits and queues; the worker extracts
+    (``ingest/upload.py::extract_upload``) before the runners. Languages and
+    frameworks are therefore empty in the 202 and arrive with the pipeline, as
+    they already did for a git ingest.
+    """
     analysis = Analysis(
+        id=analysis_id,
         project_id=project.id,
         source_kind=SourceKind.ZIP,
         source_ref=filename[:512],
@@ -115,29 +112,7 @@ def ingest_zip(
     )
     db.add(analysis)
     db.flush()
-    jail = _jail_for(project.id, analysis.id)
-    analysis.workspace_path = jail
-
-    try:
-        extract_zip(
-            upload,
-            Path(jail),
-            ExtractionLimits(
-                max_entries=settings.max_zip_entries,
-                max_unpacked_bytes=settings.max_unpacked_bytes,
-                max_ratio=settings.max_zip_ratio,
-            ),
-        )
-    except Exception:
-        # The archive removes the jail itself; the analysis directory around
-        # it belongs to a row that is about to be rolled back.
-        shutil.rmtree(Path(jail).parent, ignore_errors=True)
-        raise
-    detection = detect(Path(jail))
-    analysis.languages = detection.languages
-    analysis.frameworks = detection.frameworks
-    analysis.lockfiles = detection.lockfiles
-
+    analysis.workspace_path = _jail_for(project.id, analysis.id)
     audit.record(
         db,
         actor_username=actor.username,
@@ -150,8 +125,26 @@ def ingest_zip(
     # The worker (or the inline runner) opens its own session: the row must be
     # visible before the job exists.
     db.commit()
-    enqueue_pipeline(analysis.id)
+    _enqueue_or_fail(db, analysis)
     return analysis
+
+
+def _enqueue_or_fail(db: Session, analysis: Analysis) -> None:
+    """Queue the pipeline; a broker outage closes the row instead of stranding it.
+
+    The row is already committed (the worker opens its own session), so a
+    failed enqueue used to leave it QUEUED forever — and, for a ZIP, with its
+    archive discarded by the route (phase-10 panel). It becomes FAILED with a
+    code the analysis card explains, and the client gets the typed 503.
+    """
+    try:
+        enqueue_pipeline(analysis.id)
+    except Exception as exc:
+        db.rollback()
+        analysis.status = AnalysisStatus.FAILED
+        analysis.failure_code = AnalysisEnqueueFailed.code
+        db.commit()
+        raise AnalysisEnqueueFailed(exc.__class__.__name__) from exc
 
 
 def ingest_git(
@@ -184,5 +177,5 @@ def ingest_git(
         source_ip=source_ip,
     )
     db.commit()
-    enqueue_pipeline(analysis.id)
+    _enqueue_or_fail(db, analysis)
     return analysis

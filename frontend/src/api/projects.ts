@@ -1,5 +1,12 @@
 /** Project, analysis and finding endpoints. Mirrors backend/app/projects/schemas.py. */
-import { ApiError, apiDownload, apiFetch, apiUpload, type Download } from './client';
+import {
+  ApiError,
+  apiDownload,
+  apiFetch,
+  apiUploadFile,
+  type Download,
+  type UploadProgress,
+} from './client';
 
 export type { Download };
 
@@ -63,6 +70,16 @@ export interface ToolRun {
   duration_ms: number | null;
 }
 
+/**
+ * Where a running analysis is: the step's name and its place among the
+ * pipeline's steps. It counts steps, not time — one tool is most of a run.
+ */
+export interface AnalysisProgress {
+  step: string;
+  index: number;
+  total: number;
+}
+
 export interface Analysis {
   id: string;
   project_id: string;
@@ -78,6 +95,8 @@ export interface Analysis {
   created_at: string;
   started_at: string | null;
   finished_at: string | null;
+  /** Only while running: the pipeline step the worker is on (phase 10). */
+  progress: AnalysisProgress | null;
   /** Every finding by severity, verdicts ignored. */
   finding_counts: Partial<Record<Severity, number>>;
   /** What the report prints: false positives left out. */
@@ -289,10 +308,25 @@ export function listFindings(accessToken: string, analysisId: string): Promise<F
   });
 }
 
-export function ingestZip(accessToken: string, projectId: string, file: File): Promise<Analysis> {
-  const form = new FormData();
-  form.append('file', file, file.name);
-  return apiUpload<Analysis>(`/projects/${encodeURIComponent(projectId)}/ingest`, form, accessToken);
+/**
+ * Stage E2 from a ZIP: the archive is the raw body and its name a query
+ * parameter (phase 10 — the server streams it to disk after checking the
+ * session, and the worker extracts it). A header could not carry a name with
+ * accents; the query string can.
+ */
+export function ingestZip(
+  accessToken: string,
+  projectId: string,
+  file: File,
+  onProgress?: UploadProgress,
+): Promise<Analysis> {
+  const name = encodeURIComponent(file.name);
+  return apiUploadFile<Analysis>(
+    `/projects/${encodeURIComponent(projectId)}/ingest?filename=${name}`,
+    file,
+    accessToken,
+    onProgress,
+  );
 }
 
 export function ingestGit(accessToken: string, projectId: string, url: string): Promise<Analysis> {

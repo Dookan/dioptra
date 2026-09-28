@@ -902,6 +902,33 @@ button.card:focus-visible {
   margin-bottom: 3px;
 }
 
+/* A full-width progress block (phase 10): the ZIP upload's bar under the
+   ingest form and a running analysis' step bar on its card. */
+.progress.wide {
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* The m:ss clock ticks every second; fixed-width digits keep it still. */
+.progress .clock {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A live region that is always in the accessibility tree and never seen:
+   screen readers drop the first sentence of a region inserted already
+   filled, so the region is mounted empty and only its text changes. */
+.srlive {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .pbar {
   display: block;
   height: 7px;
