@@ -5,10 +5,15 @@
 > is the PHP/Laravel + Java/Spring wave cut from P5. It is NOT part of the work
 > plan's P0–P5 roadmap: the plan gave mockup 10's "Usuarios" half no day, and
 > `tasks/phase5-survey.md` §8 recorded it as not built for exactly that reason.
-> **Nothing here may be implemented until `tasks/phase6-survey.md` exists with a
-> `## Verdict` signed off by `mmarin`** — this is an auth surface, so the
-> plan-first investigation gate is mandatory (CLAUDE.md → Agent Behavioral
-> Rules), and the scope-change log needs its entry first.
+> **Survey `tasks/phase6-survey.md` SIGNED OFF 2026-09-28 by `mmarin`.** It
+> corrects this file where the two disagree — read its §1, §2 and §6 first:
+> schema caps are the columns' (`display_name` 120, `email` 254); `EmailTaken`
+> (409) and `StatusUnchanged` (422) join the error table; the last-admin guard
+> is a locked re-check of the actor and the count; a reset clears the
+> lockout; a bootstrap command for the first production admin is added; mail
+> recovery never applies to admins; deliverable 8 narrows to the `Mailer`
+> protocol, `NullMailer` and the settings (`SmtpMailer` lands with the
+> recovery flow). The Hard Rule carve-out is in CLAUDE.md.
 
 ## Why it exists
 
@@ -131,7 +136,7 @@ becomes reachable.
      decision 4. It carries NO password hash and no `failed_attempts`: the
      exact count is the lockout's business, "bloqueada hasta …" is the fact an
      admin acts on.
-   - `UserCreateIn {username ≤32, display_name ≤200, email? ≤200, role: Role,
+   - `UserCreateIn {username ≤32, display_name ≤120, email? ≤254, role: Role,
      password ≤MAX_PASSWORD_LENGTH}` — no justification (decision 2).
    - `RoleChangeIn {role: Role, justification}` ·
      `StatusChangeIn {disabled: bool, justification}` ·
@@ -282,8 +287,8 @@ becomes reachable.
 
 ## Definition of Done
 
-- [ ] `tasks/phase6-survey.md` written and signed off by `mmarin` before any edit
-- [ ] Scope-change log entry recorded (second cycle opened)
+- [x] `tasks/phase6-survey.md` written and signed off by `mmarin` before any edit (2026-09-28)
+- [x] Scope-change log entry recorded (2026-09-28, survey signed); Hard Rule carve-out written into CLAUDE.md
 - [ ] All deliverables implemented; ruff + mypy + oxlint + tsc clean
 - [ ] All specified tests passing (pytest / Vitest), denial cases included
 - [ ] Mutation pass on `app/auth/admin.py` (mutmut, phase-close) — we apply to
@@ -328,7 +333,7 @@ becomes reachable.
   and the status bar's "4 usuarios · 3 proyectos activos": they need per-user
   aggregates that do not exist, and Bitácora already answers "what has this
   person done". Deviation recorded.
-- **Consolidating the eleven per-ACTION role checks** scattered through the
+- **Consolidating the ten per-ACTION role checks** scattered through the
   screens (`user?.role === 'developer'` and friends) into the same named
   vocabulary as the route map. Worth doing and adjacent, but it touches every
   screen and belongs in its own diff; deliverable 9 covers routes and tabs,
