@@ -54,11 +54,19 @@ set -a
 . ./.env
 set +a
 
+# Three states, not two: running (nothing to do), STOPPED — which is what a
+# reboot leaves, and `docker run` then fails on the taken name — or absent.
+# A stopped container is started again with its data, never recreated.
 if ! docker ps --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
-  echo "starting $PG_CONTAINER (postgres:18-alpine on 127.0.0.1:$PG_PORT)"
-  docker run -d --name "$PG_CONTAINER" -p "127.0.0.1:$PG_PORT:5432" \
-    -e POSTGRES_USER=dioptra -e "POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD in .env}" \
-    -e POSTGRES_DB=dioptra postgres:18-alpine >/dev/null
+  if docker ps -a --format '{{.Names}}' | grep -qx "$PG_CONTAINER"; then
+    echo "starting the existing $PG_CONTAINER"
+    docker start "$PG_CONTAINER" >/dev/null
+  else
+    echo "creating $PG_CONTAINER (postgres:18-alpine on 127.0.0.1:$PG_PORT)"
+    docker run -d --name "$PG_CONTAINER" -p "127.0.0.1:$PG_PORT:5432" \
+      -e POSTGRES_USER=dioptra -e "POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD in .env}" \
+      -e POSTGRES_DB=dioptra postgres:18-alpine >/dev/null
+  fi
 fi
 # A fresh container initialises the cluster on a temporary server that listens
 # on the Unix socket only; TCP readiness is the signal that init has finished.
