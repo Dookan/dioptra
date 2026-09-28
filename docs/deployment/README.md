@@ -270,6 +270,22 @@ cambia también estos en el frontend: `DIOPTRA_MAX_ZIP_MIB × 1048576` debe ser
 igual a `DIOPTRA_MAX_ZIP_BYTES`, y el del volcado lleva 1 MiB más por el
 formulario. Si no coinciden, manda el menor.
 
+**Análisis detenidos y salida de las herramientas (1.5.1).** Tres ajustes del
+backend, con valores por defecto que no hace falta tocar:
+`DIOPTRA_ANALYSIS_STALE_MINUTES` (120) cierra como "se detuvo sin terminar" un
+análisis que lleva más de eso ejecutándose, porque su worker murió; debe ser
+mayor que el tiempo máximo del pipeline (`DIOPTRA_RUNNER_TIMEOUT_SECONDS × 8 +
+DIOPTRA_GIT_CLONE_TIMEOUT_SECONDS`) o la API se niega a arrancar.
+`DIOPTRA_ANALYSIS_QUEUE_RETENTION_HOURS` (24) hace lo mismo con uno que lleva
+más de eso en cola. En los dos casos se borran sus archivos, y también los
+`upload.zip` que ningún análisis va a leer. `DIOPTRA_MAX_TOOL_PARSE_BYTES`
+(256 MiB) es lo máximo que se interpreta de la salida de una herramienta;
+se guarda en la base una copia recortada a `DIOPTRA_MAX_TOOL_OUTPUT_BYTES`
+(32 MiB). El worker interpreta la salida en memoria y necesita varias veces
+su tamaño (medido: 26 MiB de salida de Semgrep, 158 MiB de pico, unas 6
+veces), así que al tope por defecto puede llegar a ~1,5 GiB; en un servidor
+con poca memoria, bájalo, y si lo subes, sube también la memoria del worker.
+
 `DIOPTRA_API_UPSTREAM` va **sin barra final** (`http://10.0.0.20:8000`, no
 `…:8000/`): con barra, nginx se niega a arrancar ("proxy_pass cannot have URI
 part in location given by regular expression").
@@ -687,6 +703,21 @@ DIOPTRA_API_UPSTREAM=http://10.0.0.20:8000 \
 change these on the frontend too: `DIOPTRA_MAX_ZIP_MIB × 1048576` must equal
 `DIOPTRA_MAX_ZIP_BYTES`, and the dump's carries 1 MiB more for the form. If
 they differ, the smaller one decides.
+
+**Stopped analyses and tool output (1.5.1).** Three backend settings whose
+defaults need no change: `DIOPTRA_ANALYSIS_STALE_MINUTES` (120) closes as
+"stopped without finishing" an analysis that has been running longer than
+that because its worker died; it must exceed the pipeline's maximum time
+(`DIOPTRA_RUNNER_TIMEOUT_SECONDS × 8 + DIOPTRA_GIT_CLONE_TIMEOUT_SECONDS`) or
+the API refuses to start. `DIOPTRA_ANALYSIS_QUEUE_RETENTION_HOURS` (24) does
+the same for one queued longer than that. Both remove its files, and the
+`upload.zip` spools no analysis will read. `DIOPTRA_MAX_TOOL_PARSE_BYTES`
+(256 MiB) is the most of a tool's output that is read; the database keeps a
+copy cut at `DIOPTRA_MAX_TOOL_OUTPUT_BYTES` (32 MiB). The worker reads the output in
+memory and needs several times its size (measured: 26 MiB of Semgrep output,
+a 158 MiB peak, about 6×), so at the default cap it can reach ~1.5 GiB; on a
+host with little memory lower it, and if you raise it, raise the worker's
+memory too.
 
 `DIOPTRA_API_UPSTREAM` takes **no trailing slash** (`http://10.0.0.20:8000`,
 not `…:8000/`): with one, nginx refuses to start ("proxy_pass cannot have URI

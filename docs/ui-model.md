@@ -186,6 +186,26 @@ Added to `docs/mockups/index.html` on 2026-08-28, same tokens and principles:
   the analysis', read right. No test applies `components.css`, so a change to
   `.progress.wide`, `.srlive` or the clock needs the same look again.
 
+## Cobertura de herramientas en la tarjeta del análisis (screen 03) — 1.5.1, 2026-09-28
+
+- A tool that RAN but dropped files now carries a sentence beside its badge
+  ("cobertura parcial: 96 archivos con reglas omitidas (84 por error de
+  sintaxis, 6 por memoria, …); los archivos de más de 2 MB no se analizan y no
+  se cuentan aquí" — the note never reads as a complete count), and an output
+  too large to read says its size ("la salida de la herramienta pesa N MiB, más
+  que el tope de M MiB, y no se interpretó" — "salida", never "informe", which
+  a reader would take for the institutional report). The server stores English
+  machine text; the screen words the
+  shapes it defines through `analysis.toolDetail.*` in both locales and shows
+  any other detail (a tool's own exit message) as it came, as text
+  (`project-screen.tsx::toolDetail`).
+- A failed card can now read "El análisis se detuvo sin terminar: el proceso
+  que lo ejecutaba se cayó o la cola lo perdió. Vuelve a enviar el código."
+  ("Vuelve a enviar el código": it may have been a ZIP or a repository;
+  `analysis_abandoned`, closed by the sweep), and Bitácora tells the sweep's
+  row as "cerró un análisis que se detuvo sin terminar".
+- No new element, class or token: the existing `.sub` and `.alert` lines.
+
 ## Registro (screen 03) — 2026-09-23
 
 - "Fecha de instalación" is our own calendar picker

@@ -105,6 +105,24 @@ describe('audit screen', () => {
     expect(String(first?.[0])).toContain('since=');
   });
 
+  it('tells the sweep closing a stopped analysis as a sentence (1.5.1)', async () => {
+    renderAudit([
+      {
+        id: 'e-4',
+        occurred_at: '2026-09-28T16:00:00Z',
+        actor_username: 'system',
+        actor_role: null,
+        action: 'analysis.abandon',
+        target: '5b0e… was running',
+        outcome: 'ok',
+        justification: null,
+      },
+    ]);
+    await signIn();
+    expect(await screen.findByText(es.audit.action['analysis.abandon'])).toBeTruthy();
+    expect(screen.queryByText('analysis.abandon')).toBeNull();
+  });
+
   it('switches the window and asks the server again', async () => {
     const calls = renderAudit([]);
     const user = await signIn();

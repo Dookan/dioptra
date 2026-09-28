@@ -75,16 +75,45 @@ gap. `runners/tools.py::semgrep_budget` now passes `--jobs` = the runner's
 CPUs (cut until each job has at least 512 MiB) and `--max-memory` = its
 memory over jobs + 1 (682 MiB at the defaults): a rule that would exceed that
 on one file is dropped for that file instead of the whole scan dying.
-**Recorded limit**: that drop is noted only in Semgrep's own raw output, which
-is stored (`raw_tool_outputs`) but not read — the report's "Cobertura de
-herramientas" shows Semgrep as RAN. The same was already true of the files
-`--timeout 30` and `--max-target-bytes` skip; surfacing Semgrep's per-file
-errors as a partial-coverage note is a 1.x item. Measured on the same
-tree: 386 s, 1 034 results, under the 600 s runner timeout.
+**Since 1.5.1 those drops are read** (`tasks/hardening-1.5.1-survey.md` §3):
+a SARIF tool declares each file it could not fully scan in
+`runs[].invocations[].toolExecutionNotifications`, and
+`normalizer.execution_notes` turns them into the coverage row's detail —
+counts only (files, and drops by syntax error / memory / time / other), never
+a file name from the audited tree — with the status left RAN. The report and
+the project screen word it ("cobertura parcial: N archivos con reglas
+omitidas…"). Files over `--max-target-bytes` are NOT in the SARIF, and the
+report says the note does not count them. Measured on the same tree: 386 s,
+1 034 results, under the 600 s runner timeout.
+
+**A report is parsed WHOLE or not at all** (1.5.1, §1 of the same survey).
+The storage cap (`DIOPTRA_MAX_TOOL_OUTPUT_BYTES`, 32 MiB) used to be the parse
+cap too: on that tree Semgrep's SARIF passed 32 MiB — each result carries its
+matched lines, tens of kilobytes on a minified bundle — was cut, did not
+parse, and the analysis ended with Semgrep FAILED and no SAST finding; Lizard's
+CSV was cut the same way and parsed SHORT, as RAN, with nothing saying so.
+Now the executor reads the report once (`O_NOFOLLOW`, a regular file only — the
+output directory is writable by the analysis container), stores the capped
+copy as evidence and hands the normalizer the whole document up to
+`DIOPTRA_MAX_TOOL_PARSE_BYTES` (256 MiB). Over that, the run is FAILED with
+its size in the detail, for every tool alike — never a partial parse.
 
 Every runner has a timeout and CPU/RAM limits, and its raw output is persisted
 before normalization (the plan's day 7), so a normalizer bug never loses a
 tool's result.
+
+**An analysis a dead worker left behind is closed** (1.5.1,
+`analysis/sweep.py`): at API start-up and before each ingest, an analysis
+RUNNING for longer than `DIOPTRA_ANALYSIS_STALE_MINUTES` (120, floored above
+the pipeline's RQ timeout) or QUEUED for longer than
+`DIOPTRA_ANALYSIS_QUEUE_RETENTION_HOURS` (24) becomes FAILED
+`analysis_abandoned`, audited by `system` (`analysis.abandon`), and its files
+are removed; an `upload.zip` spool older than the stale window with no row, or
+beside a finished row, is removed too. The pipeline claims its row QUEUED →
+RUNNING and closes it RUNNING → DONE/FAILED through conditional updates, so a
+duplicate message is a no-op and a worker still alive cannot revive an
+abandoned row; a jail that already exists when extraction starts is refused
+(`upload_missing`), never analysed as if whole.
 
 Languages (analysis runners and, since P3 day 14, the tree-sitter AST layer of
 E5): wave 1 JS/TS + Python (P1–P4). Wave 2 was **cut to a second cycle on

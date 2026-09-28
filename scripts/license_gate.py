@@ -8,6 +8,13 @@ dependencies is a poor trade.
 
 Usage:
     python scripts/license_gate.py [--backend-venv PATH] [--node-modules PATH]
+                                   [--workflows DIR] [--action-licenses FILE]
+
+GitHub Actions are dependencies too (hardening 1.5.1): the proprietary
+`gitleaks/gitleaks-action` ran in CI until 2026-09-24 because the gate read
+only Python and npm trees. Every `uses:` of every workflow must now name an
+action declared in `.github/action-licenses.json` with a free licence, and be
+pinned by a full commit SHA — a tag can be moved by whoever controls it.
 
 Exit status 0 when every dependency is free, 1 otherwise (offenders listed).
 """
@@ -285,6 +292,78 @@ def collect(backend_venv: Path | None, node_modules: Path | None) -> list[Packag
     return packages
 
 
+#: `uses: owner/repo[/path]@ref`, optionally a list item, optionally a comment.
+_USES = re.compile(r"^\s*(?:-\s+)?uses:\s*(?P<ref>[^\s#\"']+)\s*(?:#.*)?$")
+#: Any line that DECLARES a `uses` key, in any YAML spelling (flow style,
+#: quoted key): one the strict form above does not match is refused, never
+#: skipped — a step the reader cannot see is a step the gate never checked.
+_USES_KEY = re.compile(r"""(?:^|[\s{,])["']?uses["']?\s*:""")
+_ACTION = re.compile(
+    r"^(?P<repo>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)(?:/[A-Za-z0-9_./-]*)?@(?P<ref>[^@\s]+)$"
+)
+_COMMIT = re.compile(r"^[0-9a-f]{40}$")
+
+
+def read_action_licenses(manifest: Path) -> dict[str, str]:
+    """``owner/repo`` (lower-cased) → declared licence, from the reviewed manifest."""
+    document = json.loads(manifest.read_text(encoding="utf-8"))
+    actions = document.get("actions") if isinstance(document, dict) else None
+    if not isinstance(actions, dict):
+        message = f"{manifest}: expected an object with an 'actions' map"
+        raise SystemExit(message)
+    declared: dict[str, str] = {}
+    for name, entry in actions.items():
+        licence = entry.get("license") if isinstance(entry, dict) else None
+        declared[str(name).lower()] = licence if isinstance(licence, str) else ""
+    return declared
+
+
+def read_workflow_actions(
+    workflows: Path, licences: dict[str, str]
+) -> tuple[list[Package], list[Violation]]:
+    """Every action the workflows use, as packages; structural refusals as violations."""
+    if not workflows.is_dir():
+        message = f"{workflows} does not exist; pass --skip-actions where no workflow applies"
+        raise SystemExit(message)
+    packages: list[Package] = []
+    refused: list[Violation] = []
+    files = sorted([*workflows.glob("*.yml"), *workflows.glob("*.yaml")])
+    for path in files:
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if line.lstrip().startswith("#") or not _USES_KEY.search(line):
+                continue
+            where = f"{path.name}:{number}"
+            match = _USES.match(line)
+            if match is None:
+                refused.append(_refusal(where, line.strip(), "a `uses:` the gate cannot read"))
+                continue
+            ref = match.group("ref")
+            if ref.startswith("./"):
+                continue  # an action of this repository: our own code
+            if ref.startswith("docker://"):
+                refused.append(_refusal(where, ref, "a docker:// image carries no licence to check"))
+                continue
+            action = _ACTION.match(ref)
+            if action is None:
+                refused.append(_refusal(where, ref, "not an owner/repo@ref reference"))
+                continue
+            repo, version = action.group("repo"), action.group("ref")
+            if not _COMMIT.match(version):
+                refused.append(
+                    _refusal(where, ref, "pinned by a movable tag or branch, not a 40-hex commit SHA")
+                )
+            licence = licences.get(repo.lower())
+            if licence is None:
+                refused.append(_refusal(where, ref, "not declared in the action licence manifest"))
+                continue
+            packages.append(Package("actions", repo, version, licence))
+    return packages, refused
+
+
+def _refusal(where: str, ref: str, reason: str) -> Violation:
+    return Violation(package=Package("actions", ref[:200], where, ""), reason=reason)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backend-venv", type=Path, default=Path("backend/.venv"))
@@ -297,6 +376,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--skip-python", action="store_true")
     parser.add_argument("--skip-node", action="store_true")
+    # Anchored to this repository, not to the caller's working directory.
+    github = Path(__file__).resolve().parents[1] / ".github"
+    parser.add_argument("--workflows", type=Path, default=github / "workflows")
+    parser.add_argument("--action-licenses", type=Path, default=github / "action-licenses.json")
+    parser.add_argument(
+        "--skip-actions",
+        action="store_true",
+        help="inside an image, where no workflow exists (implied by --php-manifest)",
+    )
     args = parser.parse_args(argv)
 
     if args.php_manifest is not None:
@@ -307,7 +395,13 @@ def main(argv: list[str] | None = None) -> int:
             None if args.skip_python else args.backend_venv,
             None if args.skip_node else args.node_modules,
         )
-    violations = evaluate(packages)
+    refused: list[Violation] = []
+    if args.php_manifest is None and not args.skip_actions:
+        actions, refused = read_workflow_actions(
+            args.workflows, read_action_licenses(args.action_licenses)
+        )
+        packages.extend(actions)
+    violations = [*refused, *evaluate(packages)]
 
     print(f"license gate: checked {len(packages)} packages")
     if not violations:

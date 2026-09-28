@@ -432,19 +432,18 @@ def test_discarding_a_directory_that_never_existed_is_quiet(tmp_path: Path) -> N
     upload.discard(tmp_path / "never" / "created")
 
 
-def test_a_tree_extracted_before_phase_10_is_left_alone(tmp_path: Path) -> None:
-    """A pre-phase-10 row has its jail and no spool: nothing to do, nothing raised."""
+def test_a_jail_that_already_exists_is_refused_not_analysed(tmp_path: Path) -> None:
+    """Only the worker extracts, once per claimed row: an existing jail is a half
+    extraction a killed worker left behind, never a tree to analyse
+    (`tasks/hardening-1.5.1-survey.md` §11.10b). The spool beside it is dropped."""
     jail = tmp_path / "an" / "src"
     jail.mkdir(parents=True)
     (jail / "index.js").write_text("const a = 1;\n", encoding="utf-8")
-    upload.extract_upload(jail, get_settings())
-    assert (jail / "index.js").is_file()
-    # And a stray spool beside such a jail is dropped, not left to fill the disk.
     spool = jail.parent / upload.UPLOAD_NAME
     spool.write_bytes(b"PK")
-    upload.extract_upload(jail, get_settings())
+    with pytest.raises(UploadMissing, match="already exists"):
+        upload.extract_upload(jail, get_settings())
     assert not spool.exists()
-    assert (jail / "index.js").is_file()
 
 
 @pytest.mark.parametrize(
@@ -595,3 +594,10 @@ def test_a_broker_outage_closes_the_git_analysis_too(
     assert [(row.status, row.failure_code) for row in rows] == [
         (AnalysisStatus.FAILED, "analysis_enqueue_failed")
     ]
+
+
+def test_an_existing_jail_with_no_spool_beside_it_is_refused_too(tmp_path: Path) -> None:
+    jail = tmp_path / "an" / "src"
+    jail.mkdir(parents=True)
+    with pytest.raises(UploadMissing, match="already exists"):
+        upload.extract_upload(jail, get_settings())

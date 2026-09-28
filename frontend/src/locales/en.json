@@ -102,7 +102,8 @@
       "notReady": "The analysis has not finished yet.",
       "sbomInvalid": "The generated component inventory is not valid.",
       "normalization": "A tool's output could not be interpreted.",
-      "noToolRan": "No analysis tool could run. Check the installation."
+      "noToolRan": "No analysis tool could run. Check the installation.",
+      "abandoned": "The analysis stopped without finishing: the process running it died or the queue lost it. Send the code again."
     },
     "report": {
       "renderFailed": "The report could not be generated.",
@@ -221,6 +222,12 @@
       "timeout": "timed out"
     },
     "coverage": "Tool coverage",
+    "toolDetail": {
+      "partial_one": "partial coverage: {{count}} file with rules skipped ({{syntax}} syntax errors, {{memory}} out of memory, {{timeout}} timed out, {{other}} other); files over 2 MB are not scanned and not counted here",
+      "partial_other": "partial coverage: {{count}} files with rules skipped ({{syntax}} syntax errors, {{memory}} out of memory, {{timeout}} timed out, {{other}} other); files over 2 MB are not scanned and not counted here",
+      "tooLarge": "the tool's output weighs {{size}} MiB, over the {{cap}} MiB limit, and was not read",
+      "truncated": "the tool's output arrived cut short and was not read"
+    },
     "detected": "Detected",
     "failedBody": "The analysis could not finish. Code:",
     "findingsCount": "{{count}} finding(s)",
@@ -840,6 +847,7 @@
       "project.create": "registered a system",
       "analysis.ingest.zip": "uploaded a system's code (ZIP)",
       "analysis.ingest.git": "cloned a system's code (git)",
+      "analysis.abandon": "closed an analysis that stopped without finishing",
       "finding.verdict.confirmed": "confirmed a finding as real",
       "finding.verdict.false_positive": "discarded a finding as a false positive",
       "report.edit": "edited a report section",

@@ -46,6 +46,7 @@ const KNOWN_ACTIONS = new Set([
   'project.create',
   'analysis.ingest.zip',
   'analysis.ingest.git',
+  'analysis.abandon',
   'finding.verdict.confirmed',
   'finding.verdict.false_positive',
   'report.edit',

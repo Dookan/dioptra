@@ -19,6 +19,16 @@ ARG LIZARD_VERSION=1.17.31
 ARG GITLEAKS_VERSION=8.28.0
 ARG OSV_SCANNER_VERSION=2.2.4
 ARG SYFT_VERSION=1.36.0
+# The digests are LITERALS, as in docker/sandbox-php.Dockerfile: a checksum
+# file downloaded from the same release as the binary catches corruption, not
+# a replaced release. Taken 2026-09-28 from each vendor's checksum file, and
+# checked the same day against the artefacts served AND the binaries of the
+# image built on 2026-09-21 (`tasks/hardening-1.5.1-survey.md` §4, §11.10a).
+# A version bump changes BOTH lines; backend/tests/test_tool_pins.py keeps
+# Gitleaks' pair equal to .github/workflows/ci.yml.
+ARG GITLEAKS_SHA256=a65b5253807a68ac0cafa4414031fd740aeb55f54fb7e55f386acb52e6a840eb
+ARG OSV_SCANNER_SHA256=7702cd1e5d9f5059dd9570f4ad967f27d3c5f5391b371ec937b384c238177f55
+ARG SYFT_SHA256=0d196c884396f17f9627611f96d02d2b30f184e7ba6db244fcf02fc9446b4424
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -31,23 +41,20 @@ RUN apt-get update \
 
 RUN pip install --no-cache-dir "semgrep==${SEMGREP_VERSION}" "lizard==${LIZARD_VERSION}"
 
-# Release binaries, verified against each vendor's checksum file.
+# Release binaries, verified against the digests pinned above.
 RUN set -eux; \
     cd /tmp; \
     curl -fsSLO "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"; \
-    curl -fsSLO "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"; \
-    grep " gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz\$" "gitleaks_${GITLEAKS_VERSION}_checksums.txt" | sha256sum -c -; \
+    echo "${GITLEAKS_SHA256}  gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | sha256sum -c -; \
     tar -xzf "gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" gitleaks; \
     install -m 0755 gitleaks /usr/local/bin/gitleaks; \
     \
     curl -fsSLo osv-scanner "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_linux_amd64"; \
-    curl -fsSLo osv-sums "https://github.com/google/osv-scanner/releases/download/v${OSV_SCANNER_VERSION}/osv-scanner_SHA256SUMS"; \
-    grep " osv-scanner_linux_amd64\$" osv-sums | sed 's/osv-scanner_linux_amd64/osv-scanner/' | sha256sum -c -; \
+    echo "${OSV_SCANNER_SHA256}  osv-scanner" | sha256sum -c -; \
     install -m 0755 osv-scanner /usr/local/bin/osv-scanner; \
     \
     curl -fsSLO "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_amd64.tar.gz"; \
-    curl -fsSLO "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_checksums.txt"; \
-    grep " syft_${SYFT_VERSION}_linux_amd64.tar.gz\$" "syft_${SYFT_VERSION}_checksums.txt" | sha256sum -c -; \
+    echo "${SYFT_SHA256}  syft_${SYFT_VERSION}_linux_amd64.tar.gz" | sha256sum -c -; \
     tar -xzf "syft_${SYFT_VERSION}_linux_amd64.tar.gz" syft; \
     install -m 0755 syft /usr/local/bin/syft; \
     rm -rf /tmp/*

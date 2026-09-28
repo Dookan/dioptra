@@ -193,13 +193,21 @@ def test_entering_a_step_commits_it_rather_than_flushing() -> None:
     calls: list[str] = []
 
     class Recorder:
+        def execute(self, statement: object) -> object:
+            del statement
+            calls.append("execute")
+            return type("Result", (), {"rowcount": 1})()
+
         def commit(self) -> None:
             calls.append("commit")
 
         def flush(self) -> None:
             calls.append("flush")
 
+        def refresh(self, instance: object) -> None:
+            del instance
+            calls.append("refresh")
+
     analysis = Analysis(project_id=uuid.uuid4(), source_kind=SourceKind.ZIP, source_ref="x")
     pipeline._enter(Recorder(), analysis, "syft")  # type: ignore[arg-type]
-    assert analysis.current_step == "syft"
-    assert calls == ["commit"]
+    assert calls == ["execute", "commit", "refresh"]

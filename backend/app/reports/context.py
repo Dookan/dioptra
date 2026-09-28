@@ -8,6 +8,7 @@ job, at render time, per output format.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -150,13 +151,41 @@ def _finding_context(finding: Finding) -> dict[str, Any]:
     }
 
 
+_PARTIAL_DETAIL = re.compile(
+    r"^partial: (?P<files>\d+) files; syntax=(?P<syntax>\d+) memory=(?P<memory>\d+) "
+    r"timeout=(?P<timeout>\d+) other=(?P<other>\d+)$"
+)
+_TOO_LARGE_DETAIL = re.compile(r"^output too large: (?P<size>\d+) MiB > (?P<cap>\d+) MiB$")
+_TRUNCATED_DETAIL = "output truncated and not parsed"
+
+
+def tool_detail_text(detail: str | None) -> str:
+    """The coverage row's detail in the report's words.
+
+    The pipeline stores English machine text (no Spanish under
+    ``analysis/``); the shapes hardening 1.5.1 added are worded here from
+    ``strings.json``. Anything else — a tool's own exit message — is shown as
+    it is, escaped like every cell.
+    """
+    if not detail:
+        return ""
+    words = _S["tool_detail"]
+    if match := _PARTIAL_DETAIL.match(detail):
+        return str(words["partial"]).format(**match.groupdict())
+    if match := _TOO_LARGE_DETAIL.match(detail):
+        return str(words["too_large"]).format(**match.groupdict())
+    if detail == _TRUNCATED_DETAIL:
+        return str(words["truncated"])
+    return detail
+
+
 def _tool_run_context(run: ToolRun) -> dict[str, Any]:
     return {
         "tool": run.tool,
         "category": run.category.value,
         "status": run.status.value,
         "status_label": TOOL_STATUS_LABELS[run.status],
-        "detail": run.detail or "",
+        "detail": tool_detail_text(run.detail),
     }
 
 

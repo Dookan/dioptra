@@ -1,0 +1,20 @@
+{
+  "_comment": "Every GitHub Action a workflow uses, with its licence as read in its LICENSE file at the pinned commit. Reviewed by a person; scripts/license_gate.py refuses an action absent from this map or whose licence is not free, and a `uses:` not pinned by a 40-hex commit SHA taken from the UPSTREAM repository's own tag (git ls-remote), never a fork (hardening 1.5.1).",
+  "actions": {
+    "actions/checkout": {
+      "license": "MIT",
+      "checked": "2026-09-28",
+      "pinned": "fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 = refs/tags/v5 = refs/tags/v5.1.0"
+    },
+    "actions/setup-node": {
+      "license": "MIT",
+      "checked": "2026-09-28",
+      "pinned": "249970729cb0ef3589644e2896645e5dc5ba9c38 = refs/tags/v6 = refs/tags/v6.5.0"
+    },
+    "astral-sh/setup-uv": {
+      "license": "MIT",
+      "checked": "2026-09-28",
+      "pinned": "37802adc94f370d6bfd71619e3f0bf239e1f3b78 = refs/tags/v7^{} = refs/tags/v7.6.0"
+    }
+  }
+}

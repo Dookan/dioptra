@@ -56,8 +56,38 @@ const FAILURE_KEYS: Readonly<Record<string, string>> = {
   upload_missing: 'errors.ingest.uploadMissing',
   repo_unreachable: 'errors.ingest.repoUnreachable',
   no_tool_ran: 'errors.analysis.noToolRan',
+  analysis_abandoned: 'errors.analysis.abandoned',
   analysis_enqueue_failed: 'errors.ingest.enqueueFailed',
 };
+
+const PARTIAL_DETAIL =
+  /^partial: (\d+) files; syntax=(\d+) memory=(\d+) timeout=(\d+) other=(\d+)$/;
+const TOO_LARGE_DETAIL = /^output too large: (\d+) MiB > (\d+) MiB$/;
+
+/**
+ * A coverage row's detail in the reader's language (hardening 1.5.1). The
+ * server stores English machine text; the shapes it defines are worded here,
+ * anything else — a tool's own exit message — is shown as it came, as text.
+ */
+function toolDetail(t: TFunction, detail: string): string {
+  const partial = PARTIAL_DETAIL.exec(detail);
+  if (partial) {
+    const [, files, syntax, memory, timeout, other] = partial;
+    return t('analysis.toolDetail.partial', {
+      count: Number(files),
+      syntax,
+      memory,
+      timeout,
+      other,
+    });
+  }
+  const tooLarge = TOO_LARGE_DETAIL.exec(detail);
+  if (tooLarge) {
+    return t('analysis.toolDetail.tooLarge', { size: tooLarge[1], cap: tooLarge[2] });
+  }
+  if (detail === 'output truncated and not parsed') return t('analysis.toolDetail.truncated');
+  return detail;
+}
 
 function failureKey(code: string | null): string | null {
   return code === null ? null : (FAILURE_KEYS[code] ?? null);
@@ -427,7 +457,7 @@ function AnalysisCard({
             <li key={run.tool} className="row tight">
               <span className="mono">{run.tool}</span>
               <ToolBadge status={run.status} />
-              {run.detail && <span className="sub">{run.detail}</span>}
+              {run.detail && <span className="sub">{toolDetail(t, run.detail)}</span>}
             </li>
           ))}
         </ul>

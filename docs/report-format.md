@@ -120,3 +120,8 @@ of the analyst's, so they are absent from the editor's section list
   format.** The scan appears in "Cobertura de herramientas" as `artefacts`.
 - Coverage gaps (a tool that could not run, tests that could not execute) are
   reported explicitly — the current manual template already does this; keep it.
+  Since 1.5.1 a tool that RAN but dropped files says so in its detail cell
+  ("cobertura parcial: N archivos con reglas omitidas…", from
+  `strings.json` → `tool_detail`), and a report too large to parse says its
+  size; the pipeline stores English machine text and `reports/context.py::tool_detail_text`
+  words it.

@@ -102,7 +102,8 @@
       "notReady": "El análisis todavía no terminó.",
       "sbomInvalid": "El inventario de componentes generado no es válido.",
       "normalization": "La salida de una herramienta no se pudo interpretar.",
-      "noToolRan": "Ninguna herramienta de análisis pudo ejecutarse. Revisa la instalación."
+      "noToolRan": "Ninguna herramienta de análisis pudo ejecutarse. Revisa la instalación.",
+      "abandoned": "El análisis se detuvo sin terminar: el proceso que lo ejecutaba se cayó o la cola lo perdió. Vuelve a enviar el código."
     },
     "report": {
       "renderFailed": "No se pudo generar el reporte.",
@@ -221,6 +222,12 @@
       "timeout": "tiempo agotado"
     },
     "coverage": "Cobertura de herramientas",
+    "toolDetail": {
+      "partial_one": "cobertura parcial: {{count}} archivo con reglas omitidas ({{syntax}} por error de sintaxis, {{memory}} por memoria, {{timeout}} por tiempo, {{other}} por otra causa); los archivos de más de 2 MB no se analizan y no se cuentan aquí",
+      "partial_other": "cobertura parcial: {{count}} archivos con reglas omitidas ({{syntax}} por error de sintaxis, {{memory}} por memoria, {{timeout}} por tiempo, {{other}} por otra causa); los archivos de más de 2 MB no se analizan y no se cuentan aquí",
+      "tooLarge": "la salida de la herramienta pesa {{size}} MiB, más que el tope de {{cap}} MiB, y no se interpretó",
+      "truncated": "la salida de la herramienta llegó recortada y no se interpretó"
+    },
     "detected": "Detectado",
     "failedBody": "El análisis no pudo completarse. Código:",
     "findingsCount": "{{count}} hallazgo(s)",
@@ -840,6 +847,7 @@
       "project.create": "registró un sistema",
       "analysis.ingest.zip": "subió el código de un sistema (ZIP)",
       "analysis.ingest.git": "clonó el código de un sistema (git)",
+      "analysis.abandon": "cerró un análisis que se detuvo sin terminar",
       "finding.verdict.confirmed": "confirmó un hallazgo como real",
       "finding.verdict.false_positive": "descartó un hallazgo como falso positivo",
       "report.edit": "editó una sección del reporte",

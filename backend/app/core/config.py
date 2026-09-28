@@ -70,6 +70,15 @@ class Settings(BaseSettings):
     max_zip_entries: int = Field(default=300_000, ge=1)
     max_zip_ratio: int = Field(default=100, ge=2)
     git_clone_timeout_seconds: int = Field(default=300, ge=10)
+    #: Hardening 1.5.1 (`tasks/hardening-1.5.1-survey.md` §5.1): nothing used to
+    #: close an analysis whose worker died, so it stayed RUNNING (or QUEUED,
+    #: when its message was lost) forever with up to 9 GiB on disk. The sweep
+    #: closes a RUNNING one started longer ago than this — floored ABOVE the
+    #: pipeline's RQ timeout (``core/queue.py``: runner × 8 + clone) so a live
+    #: pipeline can never be abandoned — and a QUEUED one after the retention
+    #: window: with one worker a queue of large analyses legitimately waits.
+    analysis_stale_minutes: int = Field(default=120, ge=10, le=7 * 24 * 60)
+    analysis_queue_retention_hours: int = Field(default=24, ge=1, le=24 * 30)
 
     #: RQ broker. ``queue_inline`` runs every job synchronously in the calling
     #: process — the test suite and single-process development need no broker.
@@ -102,7 +111,15 @@ class Settings(BaseSettings):
     #: rule on every line.
     max_findings_per_analysis: int = Field(default=2000, ge=100)
     #: Caps on what is read back from a tool: hostile output must not fill the DB.
+    #: This bounds the STORED copy (`raw_tool_outputs`, evidence) only.
     max_tool_output_bytes: int = Field(default=32 * 1024 * 1024, ge=1024)
+    #: What the normalizer may PARSE, read from the report file itself. It used
+    #: to be the storage cap too, so a 33 MiB SARIF was cut, did not parse, and
+    #: the SAST layer of a large tree was lost — and Lizard's CSV was cut and
+    #: parsed as if whole (`tasks/hardening-1.5.1-survey.md` §1, §11.2). A
+    #: report over this cap is a FAILED run that says its size, never a partial
+    #: parse. Never below the storage cap (validator).
+    max_tool_parse_bytes: int = Field(default=256 * 1024 * 1024, ge=1024)
 
     # --- E7 sandbox (P4 day 17) -------------------------------------------
     # The analysis containers PARSE hostile code; the sandbox EXECUTES it, so
@@ -205,6 +222,27 @@ class Settings(BaseSettings):
                 "DIOPTRA_REFRESH_COOKIE_SECURE must stay true when DIOPTRA_ENV=prod: "
                 "serve the app over HTTPS instead of weakening the cookie"
             )
+            raise ValueError(message)
+        return self
+
+    @model_validator(mode="after")
+    def _stale_analysis_is_past_the_pipeline_timeout(self) -> Settings:
+        pipeline_timeout = self.runner_timeout_seconds * 8 + self.git_clone_timeout_seconds
+        if self.analysis_stale_minutes * 60 <= pipeline_timeout:
+            message = (
+                "DIOPTRA_ANALYSIS_STALE_MINUTES must exceed the pipeline's job timeout "
+                f"({pipeline_timeout} s = runner timeout x 8 + clone timeout)"
+            )
+            raise ValueError(message)
+        if self.analysis_queue_retention_hours * 60 < self.analysis_stale_minutes:
+            message = "DIOPTRA_ANALYSIS_QUEUE_RETENTION_HOURS must cover the stale window"
+            raise ValueError(message)
+        return self
+
+    @model_validator(mode="after")
+    def _parse_cap_holds_the_stored_copy(self) -> Settings:
+        if self.max_tool_parse_bytes < self.max_tool_output_bytes:
+            message = "DIOPTRA_MAX_TOOL_PARSE_BYTES must be at least DIOPTRA_MAX_TOOL_OUTPUT_BYTES"
             raise ValueError(message)
         return self
 

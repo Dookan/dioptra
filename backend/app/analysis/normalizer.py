@@ -186,6 +186,63 @@ def parse_sarif(text: str | bytes) -> dict[str, Any]:
     return document
 
 
+# --- execution notes (hardening 1.5.1, item 2) --------------------------------
+
+#: What a tool reports it could NOT do lives in
+#: ``runs[].invocations[].toolExecutionNotifications`` (SARIF 2.1.0 §3.20.21):
+#: Semgrep writes one per file a rule was dropped on (a parse error, a rule
+#: over ``--timeout`` or ``--max-memory``). Bounded: the document is hostile.
+MAX_NOTIFICATIONS = 10_000
+_NOTE_TEXT_CAP = 2_000
+_NOTE_PATH = re.compile(r"(/[^\s:]+)")
+#: The fixed, ENGLISH shape of the note (a machine detail like every other);
+#: the report and the screen word it (`reports/context.py`, the project screen).
+PARTIAL_NOTE = (
+    "partial: {files} files; syntax={syntax} memory={memory} timeout={timeout} other={other}"
+)
+
+
+def execution_notes(document: dict[str, Any]) -> str | None:
+    """Counts of the drops a SARIF document declares, or ``None`` when it declares none.
+
+    Counts only: the message names a file of the audited tree, and a note
+    carrying it would put a hostile string in the coverage table for nothing.
+    Distinct files are counted from the message's first path-like token; a
+    notification that names none counts as one file of its own.
+    """
+    counts = {"syntax": 0, "memory": 0, "timeout": 0, "other": 0}
+    paths: set[str] = set()
+    unnamed = 0
+    seen = 0
+    for run in _list(document.get("runs")):
+        for invocation in _list(_dict(run).get("invocations")):
+            for raw in _list(_dict(invocation).get("toolExecutionNotifications")):
+                if seen >= MAX_NOTIFICATIONS:
+                    break
+                note = _dict(raw)
+                if note.get("level") == "note":
+                    continue
+                seen += 1
+                kind = str(_dict(note.get("descriptor")).get("id", ""))[:80].lower()
+                if "timeout" in kind:
+                    counts["timeout"] += 1
+                elif "memory" in kind:
+                    counts["memory"] += 1
+                elif "syntax" in kind or "parse" in kind:
+                    counts["syntax"] += 1
+                else:
+                    counts["other"] += 1
+                text = str(_dict(note.get("message")).get("text", ""))[:_NOTE_TEXT_CAP]
+                match = _NOTE_PATH.search(text.split("\n", 1)[0])
+                if match is None:
+                    unnamed += 1
+                else:
+                    paths.add(match.group(1)[:MAX_PATH])
+    if seen == 0:
+        return None
+    return PARTIAL_NOTE.format(files=len(paths) + unnamed, **counts)
+
+
 # --- small hostile-input helpers ----------------------------------------------
 
 

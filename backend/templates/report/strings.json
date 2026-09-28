@@ -25,6 +25,11 @@
     "missing": "no disponible",
     "timeout": "tiempo agotado"
   },
+  "tool_detail": {
+    "partial": "cobertura parcial: {files} archivos con reglas omitidas ({syntax} por error de sintaxis, {memory} por memoria, {timeout} por tiempo, {other} por otra causa); los archivos de más de 2 MB no se analizan y esta nota no los cuenta",
+    "too_large": "la salida de la herramienta pesa {size} MiB, más que el tope de {cap} MiB, y no se interpretó",
+    "truncated": "la salida de la herramienta llegó recortada y no se interpretó"
+  },
   "months": [
     "Enero",
     "Febrero",

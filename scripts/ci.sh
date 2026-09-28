@@ -58,7 +58,7 @@ run_supply_chain() {
     docker run --rm --network none \
       -v "$(pwd)/scripts/license_gate.py:/tmp/license_gate.py:ro" \
       "${DIOPTRA_SANDBOX_IMAGE:-dioptra-sandbox:latest}" \
-      python3 /tmp/license_gate.py --backend-venv /usr/local --node-modules /opt/dioptra-js/node_modules
+      python3 /tmp/license_gate.py --backend-venv /usr/local --node-modules /opt/dioptra-js/node_modules --skip-actions
   else
     echo "sandbox image not built here — build it (docker compose build sandbox-image) to check its licences"
   fi

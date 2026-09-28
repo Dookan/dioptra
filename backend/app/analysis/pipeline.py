@@ -15,6 +15,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.analysis import artefacts
@@ -35,6 +36,7 @@ from app.analysis.normalizer import (
     NormalizationError,
     NormalizedFinding,
     ToolReport,
+    execution_notes,
     normalize,
     normalize_crypto,
     parse_sarif,
@@ -81,38 +83,99 @@ class _Collected:
         self.cloc: dict[str, Any] = {}
 
 
+class AnalysisAbandoned(AppError):
+    """The sweep closed this analysis while its worker still ran: stop, write nothing."""
+
+    status_code = 409
+    code = "analysis_abandoned"
+    message_key = "errors.analysis.abandoned"
+
+
 def run_pipeline(analysis_id: uuid.UUID | str) -> None:
-    """RQ entry point. Never raises: the outcome is written to the row."""
+    """RQ entry point. Never raises: the outcome is written to the row.
+
+    The row moves QUEUED → RUNNING → DONE/FAILED only through CONDITIONAL
+    updates (`tasks/hardening-1.5.1-survey.md` §2, §11.5): a second message
+    for the same id — a duplicate delivery or a broker write — finds the row
+    no longer QUEUED and does nothing, and a worker still alive after the
+    sweep abandoned its row can neither move it on nor turn it back into
+    DONE. The report sweep has the same shape (`reports/jobs.py::_finish`).
+    """
     identifier = uuid.UUID(str(analysis_id))
     settings = get_settings()
     with get_session_factory()() as db:
+        claimed = db.execute(
+            update(Analysis)
+            .where(Analysis.id == identifier, Analysis.status == AnalysisStatus.QUEUED)
+            .values(status=AnalysisStatus.RUNNING, started_at=utc_now())
+        )
+        db.commit()
+        if _rowcount(claimed) == 0:
+            logger.warning("analysis %s is not queued; its job is ignored", identifier)
+            return
         analysis = db.get(Analysis, identifier)
-        if analysis is None:
+        if analysis is None:  # deleted between the claim and the read
             logger.error("analysis %s vanished before the job ran", identifier)
             return
-        analysis.status = AnalysisStatus.RUNNING
-        analysis.started_at = utc_now()
-        db.commit()
+        db.refresh(analysis)
+        outcome, failure_code = AnalysisStatus.DONE, None
         try:
             _execute(db, analysis, settings)
-            analysis.status = AnalysisStatus.DONE
+        except AnalysisAbandoned:
+            db.rollback()
+            logger.warning("analysis %s was abandoned by the sweep while it ran", identifier)
+            return
         except AppError as exc:
             logger.warning("analysis %s failed: %s (%s)", identifier, exc.code, exc.detail)
-            analysis.status = AnalysisStatus.FAILED
-            analysis.failure_code = exc.code
+            outcome, failure_code = AnalysisStatus.FAILED, exc.code
         except Exception:
             logger.exception("analysis %s crashed", identifier)
-            analysis.status = AnalysisStatus.FAILED
-            analysis.failure_code = "pipeline_error"
-        analysis.current_step = None
-        analysis.finished_at = utc_now()
-        db.commit()
+            outcome, failure_code = AnalysisStatus.FAILED, "pipeline_error"
+        _close(db, identifier, outcome, failure_code)
+
+
+def _rowcount(result: object) -> int:
+    count = getattr(result, "rowcount", 0)
+    return count if isinstance(count, int) else 0
+
+
+def _close(
+    db: Session, identifier: uuid.UUID, outcome: AnalysisStatus, failure_code: str | None
+) -> None:
+    """RUNNING → ``outcome``, only while the row is still RUNNING."""
+    values: dict[str, Any] = {
+        "status": outcome,
+        "current_step": None,
+        "finished_at": utc_now(),
+    }
+    if failure_code is not None:
+        values["failure_code"] = failure_code
+    closed = db.execute(
+        update(Analysis)
+        .where(Analysis.id == identifier, Analysis.status == AnalysisStatus.RUNNING)
+        .values(**values)
+    )
+    db.commit()
+    if _rowcount(closed) == 0:
+        logger.warning("analysis %s was closed by the sweep before it finished", identifier)
 
 
 def _enter(db: Session, analysis: Analysis, step: str) -> None:
-    """Record the step the worker is entering, visible to a poll at once."""
-    analysis.current_step = step
+    """Record the step the worker is entering, visible to a poll at once.
+
+    Conditional like the transitions: once the sweep has closed the row, the
+    next step raises ``AnalysisAbandoned`` and the job stops instead of
+    running the remaining tools for an analysis nobody will read.
+    """
+    entered = db.execute(
+        update(Analysis)
+        .where(Analysis.id == analysis.id, Analysis.status == AnalysisStatus.RUNNING)
+        .values(current_step=step)
+    )
     db.commit()
+    if _rowcount(entered) == 0:
+        raise AnalysisAbandoned(str(analysis.id))
+    db.refresh(analysis)
 
 
 def _execute(db: Session, analysis: Analysis, settings: Settings) -> None:
@@ -436,12 +499,27 @@ def _record(
     )
     status = result.status
     detail = result.detail
-    if status is ToolStatus.RAN and result.output is not None:
+    # Parse the WHOLE document, never the stored copy: that copy is capped for
+    # the database, and a cut SARIF or CSV either fails to parse (the SAST
+    # layer lost) or parses short in silence (Lizard) — survey §1, §11.2.
+    document = result.parseable
+    if status is ToolStatus.RAN and result.output is not None and document is None:
+        status = ToolStatus.FAILED
+        detail = "output truncated and not parsed"
+    elif status is ToolStatus.RAN and document is not None:
         try:
-            _collect(runner, spec, result.output, collected)
+            _collect(runner, spec, document, collected)
         except (NormalizationError, SbomInvalid, ValueError) as exc:
             status = ToolStatus.FAILED
             detail = f"output rejected: {exc.__class__.__name__}"
+        else:
+            if runner.name == "semgrep" and collected.reports:
+                # Semgrep writes each file it DROPPED rules on into its SARIF;
+                # the coverage row used to read RAN with nothing beside it
+                # (`tasks/hardening-1.5.1-survey.md` §3). Status stays RAN.
+                # Semgrep only: the note's words ("reglas omitidas", files
+                # over 2 MB) describe Semgrep, not the other scanners.
+                detail = execution_notes(collected.reports[-1].sarif) or detail
     db.add(
         ToolRun(
             analysis_id=analysis.id,

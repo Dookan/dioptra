@@ -88,6 +88,17 @@ async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
             sweep_and_requeue(db, settings)
     except Exception:  # noqa: BLE001 — logged; start-up continues
         logger.warning("could not sweep the report spool at start-up", exc_info=True)
+    # Hardening 1.5.1: analyses a dead worker left RUNNING or QUEUED, and the
+    # `upload.zip` spools no pipeline will take (`analysis/sweep.py`). It also
+    # runs before every ingest, so a failure here costs nothing.
+    try:
+        from app.analysis.sweep import sweep_quietly  # noqa: PLC0415
+        from app.db.session import get_session_factory  # noqa: PLC0415
+
+        with get_session_factory()() as db:
+            sweep_quietly(db, settings)
+    except Exception:  # noqa: BLE001 — logged; start-up continues
+        logger.warning("could not sweep the analyses at start-up", exc_info=True)
     yield
 
 

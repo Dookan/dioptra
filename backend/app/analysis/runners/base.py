@@ -44,7 +44,13 @@ class RunnerSpec:
 
 @dataclass(frozen=True)
 class ExecutionResult:
-    """What came back from one run. ``output`` is the raw report, if any."""
+    """What came back from one run.
+
+    ``output`` is the report as STORED (capped, ``truncated`` says so);
+    ``document`` is the whole report, read once from the same descriptor, and
+    is what the normalizer parses. An executor that cut ``output`` always sets
+    ``document`` or refuses the run: a cut document is never parsed.
+    """
 
     status: ToolStatus
     exit_code: int | None
@@ -53,6 +59,14 @@ class ExecutionResult:
     truncated: bool
     duration_ms: int
     detail: str | None
+    document: bytes | None = None
+
+    @property
+    def parseable(self) -> bytes | None:
+        """The bytes the normalizer may read: the whole document, never a cut copy."""
+        if self.document is not None:
+            return self.document
+        return None if self.truncated else self.output
 
 
 class Executor(Protocol):

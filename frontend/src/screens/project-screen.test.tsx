@@ -268,6 +268,7 @@ describe('project screen', () => {
     ['upload_missing', es.errors.ingest.uploadMissing],
     ['repo_unreachable', es.errors.ingest.repoUnreachable],
     ['no_tool_ran', es.errors.analysis.noToolRan],
+    ['analysis_abandoned', es.errors.analysis.abandoned],
     ['analysis_enqueue_failed', es.errors.ingest.enqueueFailed],
   ])('explains the worker failure %s in plain words', async (code, sentence) => {
     const failed = { ...analysis('queued'), status: 'failed', failure_code: code };
@@ -278,6 +279,45 @@ describe('project screen', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(sentence);
     expect(alert).toHaveTextContent(code);
+  });
+
+  it('words the coverage details the server stores as machine text (1.5.1)', async () => {
+    const run = (tool: string, category: string, status: string, detail: string) => ({
+      tool,
+      category,
+      status,
+      detail,
+      duration_ms: 10,
+    });
+    const done = {
+      ...analysis('done'),
+      tool_runs: [
+        run('semgrep', 'sast', 'ran', 'partial: 96 files; syntax=90 memory=6 timeout=0 other=0'),
+        run('lizard', 'metrics', 'failed', 'output too large: 300 MiB > 256 MiB'),
+        run('cloc', 'metrics', 'failed', 'output truncated and not parsed'),
+        run('gitleaks', 'secret', 'failed', 'exit 2: boom'),
+        run('osv-scanner', 'sca', 'ran', 'partial: 2 files; syntax=1 memory=0 timeout=0 other=1 and more'),
+      ],
+    };
+    renderProject({ [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [done] } });
+    await signIn();
+    const partial = es.analysis.toolDetail.partial_other
+      .replace('{{count}}', '96')
+      .replace('{{syntax}}', '90')
+      .replace('{{memory}}', '6')
+      .replace('{{timeout}}', '0')
+      .replace('{{other}}', '0');
+    expect(await screen.findByText(partial)).toBeTruthy();
+    const tooLarge = es.analysis.toolDetail.tooLarge
+      .replace('{{size}}', '300')
+      .replace('{{cap}}', '256');
+    expect(screen.getByText(tooLarge)).toBeTruthy();
+    expect(screen.getByText(es.analysis.toolDetail.truncated)).toBeTruthy();
+    // A tool's own message is not one of ours: shown as it came.
+    expect(screen.getByText('exit 2: boom')).toBeTruthy();
+    expect(
+      screen.getByText('partial: 2 files; syntax=1 memory=0 timeout=0 other=1 and more'),
+    ).toBeTruthy();
   });
 
   it('names the limit when the upload is too large', async () => {

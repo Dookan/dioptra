@@ -130,9 +130,14 @@ def extract_upload(workspace: Path, settings: Settings) -> None:
     """
     spool = workspace.parent / UPLOAD_NAME
     if workspace.exists():
-        # Extracted in the request by a pre-phase-10 build: nothing to do.
+        # Only the worker extracts since phase 10, and the pipeline claims a row
+        # once (QUEUED → RUNNING), so a jail that already exists here is the
+        # remains of an extraction a killed worker left half done. Analysing it
+        # would report on a partial tree as if it were whole: refuse, and the
+        # caller removes it (`tasks/hardening-1.5.1-survey.md` §11.10b).
         spool.unlink(missing_ok=True)
-        return
+        message = f"{workspace} already exists before extraction"
+        raise UploadMissing(message)
     if not spool.is_file():
         raise UploadMissing(str(spool))
     try:

@@ -13,7 +13,9 @@ isolation, which is why ``runner_mode`` defaults to ``docker``.
 
 from __future__ import annotations
 
+import os
 import shutil
+import stat
 import subprocess
 import time
 import uuid
@@ -39,13 +41,65 @@ def _stderr_text(raw: bytes | None) -> str:
 
 def read_output(path: Path, cap: int) -> tuple[bytes | None, bool]:
     """Read the report file back, never more than ``cap`` bytes."""
-    if not path.is_file():
+    report = read_report(path, store_cap=cap, parse_cap=cap)
+    if report is None:
         return None, False
-    with path.open("rb") as handle:
-        data = handle.read(cap + 1)
-    if len(data) > cap:
-        return data[:cap], True
-    return data, False
+    return report.stored, report.truncated
+
+
+@dataclass(frozen=True)
+class ReportRead:
+    """One report file, read ONCE from one descriptor.
+
+    ``stored`` is the capped copy for ``raw_tool_outputs``; ``document`` is the
+    whole file when it fits the parse cap, else ``None`` and ``size`` says why.
+    """
+
+    stored: bytes
+    truncated: bool
+    document: bytes | None
+    size: int
+
+
+def read_report(path: Path, *, store_cap: int, parse_cap: int) -> ReportRead | None:
+    """Open the report without following a link and read it once.
+
+    ``out_dir`` is writable by the analysis container, and code execution
+    inside that container is an accepted residual (`docs/threat-model.md` →
+    Analysis containers): a report replaced by a symlink must not make the
+    worker read one of ITS files. So ``O_NOFOLLOW``, ``fstat`` on that same
+    descriptor, a regular file only — and the size check and the bytes come
+    from the one descriptor, never a second ``open``. ``None`` means "no
+    report", exactly like a missing file.
+    """
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0))
+    except OSError:
+        return None
+    try:
+        info = os.fstat(fd)
+    except OSError:
+        os.close(fd)
+        return None
+    if not stat.S_ISREG(info.st_mode):
+        os.close(fd)
+        return None
+    with os.fdopen(fd, "rb") as handle:
+        data = handle.read(parse_cap + 1)
+        if len(data) > parse_cap:
+            # Keep the evidence copy; the size is the descriptor's, not a re-read.
+            size = max(len(data), info.st_size)
+            return ReportRead(stored=data[:store_cap], truncated=True, document=None, size=size)
+    return ReportRead(
+        stored=data[:store_cap],
+        truncated=len(data) > store_cap,
+        document=data,
+        size=len(data),
+    )
+
+
+def _mib(value: int) -> int:
+    return value // (1024 * 1024)
 
 
 def _finish(
@@ -56,11 +110,15 @@ def _finish(
     out_dir: Path,
     started: float,
     cap: int,
+    parse_cap: int,
 ) -> ExecutionResult:
-    """Classify a completed process: RAN when the exit code is normal AND the report exists."""
+    """Classify a completed process: RAN when the exit code is normal AND the report is whole."""
     duration_ms = int((time.monotonic() - started) * 1000)
-    output, truncated = read_output(out_dir / spec.output_file, cap)
-    if exit_code in spec.ok_exit_codes and output is not None:
+    report = read_report(out_dir / spec.output_file, store_cap=cap, parse_cap=parse_cap)
+    output = report.stored if report is not None else None
+    truncated = report.truncated if report is not None else False
+    document = report.document if report is not None else None
+    if exit_code in spec.ok_exit_codes and report is not None and document is not None:
         return ExecutionResult(
             status=ToolStatus.RAN,
             exit_code=exit_code,
@@ -69,8 +127,13 @@ def _finish(
             truncated=truncated,
             duration_ms=duration_ms,
             detail=None,
+            document=document,
         )
-    if output is None and exit_code in spec.ok_exit_codes:
+    if report is not None and document is None:
+        # English machine text, like every detail: the report and the screen
+        # word it (`tasks/hardening-1.5.1-survey.md` §11.3).
+        detail = f"output too large: {_mib(report.size)} MiB > {_mib(parse_cap)} MiB"
+    elif report is None and exit_code in spec.ok_exit_codes:
         detail = f"exit {exit_code} but no report written ({spec.output_file})"
     else:
         tail = stderr.strip()[-DETAIL_TAIL:]
@@ -157,6 +220,7 @@ def _run_process(
     cwd: Path | None,
     out_dir: Path,
     cap: int,
+    parse_cap: int,
     on_timeout: Callable[[], None] | None = None,
 ) -> ExecutionResult:
     started = time.monotonic()
@@ -181,6 +245,7 @@ def _run_process(
         out_dir=out_dir,
         started=started,
         cap=cap,
+        parse_cap=parse_cap,
     )
 
 
@@ -265,6 +330,7 @@ class DockerExecutor:
             cwd=None,
             out_dir=out_dir,
             cap=self._settings.max_tool_output_bytes,
+            parse_cap=self._settings.max_tool_parse_bytes,
             on_timeout=kill_container,
         )
 
@@ -301,7 +367,12 @@ class LocalExecutor:
                 detail=f"{argv[0]} not found on PATH",
             )
         return _run_process(
-            spec, argv, cwd=workspace, out_dir=out_dir, cap=self._settings.max_tool_output_bytes
+            spec,
+            argv,
+            cwd=workspace,
+            out_dir=out_dir,
+            cap=self._settings.max_tool_output_bytes,
+            parse_cap=self._settings.max_tool_parse_bytes,
         )
 
 

@@ -11,6 +11,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.analysis.models import Analysis, Severity
 from app.analysis.progress import progress_of
+from app.analysis.sweep import sweep_quietly
 from app.auth.deps import ActiveUser, client_ip, require_roles
 from app.auth.models import Role, User
 from app.core.clock import utc_now
@@ -130,6 +131,8 @@ async def ingest_zip(
     if declared is not None and declared.isdigit() and int(declared) > settings.max_zip_bytes:
         raise upload.too_large(settings.max_zip_bytes, f"content-length {declared}")
     project = await run_in_threadpool(service.get_project, db, project_id)
+    # Before a new spool lands, clear the ones a dead process left (1.5.1).
+    await run_in_threadpool(sweep_quietly, db, settings)
     analysis_id = uuid.uuid4()
     directory = upload.analysis_dir(settings, project.id, analysis_id)
     try:
@@ -173,6 +176,7 @@ def ingest_git(
 ) -> AnalysisOut:
     """Stage E2: clone a public HTTPS repository (in the worker, never here)."""
     project = service.get_project(db, project_id)
+    sweep_quietly(db, get_settings())
     analysis = service.ingest_git(
         db, project=project, actor=user, url=payload.url, source_ip=client_ip(request)
     )

@@ -187,3 +187,121 @@ def test_a_folded_prose_license_header_does_not_hide_the_classifier(tmp_path: Pa
     packages = read_python_packages(site_packages)
     assert [(p.name, p.license) for p in packages] == [("libcst", "MIT License")]
     assert evaluate(packages) == []
+
+
+# --- GitHub Actions (hardening 1.5.1) -------------------------------------------
+
+from license_gate import read_action_licenses, read_workflow_actions  # noqa: E402
+
+REPO = Path(__file__).resolve().parents[1]
+SHA = "fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09"
+FREE = {"actions/checkout": "MIT", "evil/closed": "proprietary"}
+
+
+def _workflow(tmp_path: Path, *lines: str) -> Path:
+    directory = tmp_path / "workflows"
+    directory.mkdir(exist_ok=True)
+    body = "jobs:\n  a:\n    steps:\n" + "".join(f"      {line}\n" for line in lines)
+    (directory / "ci.yml").write_text(body, encoding="utf-8")
+    return directory
+
+
+def _reasons(tmp_path: Path, *lines: str) -> list[str]:
+    packages, refused = read_workflow_actions(_workflow(tmp_path, *lines), FREE)
+    return [v.reason for v in [*refused, *evaluate(packages)]]
+
+
+def test_the_repositorys_own_workflows_pass_the_gate() -> None:
+    packages, refused = read_workflow_actions(
+        REPO / ".github" / "workflows",
+        read_action_licenses(REPO / ".github" / "action-licenses.json"),
+    )
+    assert refused == []
+    assert evaluate(packages) == []
+    assert packages, "the workflows use actions; the reader must see them"
+    assert all(len(package.version) == 40 for package in packages)
+
+
+def test_a_free_action_pinned_by_commit_passes(tmp_path: Path) -> None:
+    assert _reasons(tmp_path, f"- uses: actions/checkout@{SHA} # v5.1.0") == []
+    assert _reasons(tmp_path, f"- uses: Actions/Checkout/sub/path@{SHA}") == []
+
+
+def test_a_local_action_is_our_own_code(tmp_path: Path) -> None:
+    assert _reasons(tmp_path, "- uses: ./.github/actions/setup") == []
+
+
+@pytest.mark.parametrize(
+    ("line", "reason"),
+    [
+        ("- uses: actions/checkout@v5", "movable tag"),
+        ("- uses: actions/checkout@main", "movable tag"),
+        (f"- uses: unknown/action@{SHA}", "not declared"),
+        (f"- uses: evil/closed@{SHA}", "PROPRIETARY"),
+        ("- uses: docker://alpine:3.20", "docker://"),
+        ("- uses: just-a-name", "owner/repo@ref"),
+        (f'- uses: "actions/checkout@{SHA}"', "cannot read"),
+        (f"- {{uses: actions/checkout@{SHA}}}", "cannot read"),
+        (f'- "uses": actions/checkout@{SHA}', "cannot read"),
+        (f"- uses: actions/checkout@{SHA[:7]}", "commit SHA"),
+        (f"- uses: actions/checkout@{SHA[:39]}", "commit SHA"),
+        (f"- uses: actions/checkout@{SHA}x", "commit SHA"),
+        (f"- uses: actions/checkout@{SHA}-evil", "commit SHA"),
+    ],
+)
+def test_every_other_shape_is_refused(tmp_path: Path, line: str, reason: str) -> None:
+    reasons = _reasons(tmp_path, line)
+    assert reasons, line
+    assert any(reason.lower() in r.lower() for r in reasons), reasons
+
+
+def test_a_comment_or_prose_about_uses_is_not_a_step(tmp_path: Path) -> None:
+    assert _reasons(tmp_path, "# - uses: actions/checkout@v5", "- run: echo this uses git") == []
+
+
+def test_main_fails_on_an_unpinned_action_and_passes_once_pinned(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    manifest = tmp_path / "licences.json"
+    manifest.write_text(json.dumps({"actions": {"actions/checkout": {"license": "MIT"}}}))
+    base = ["--skip-python", "--skip-node", "--action-licenses", str(manifest)]
+    tagged = _workflow(tmp_path, "- uses: actions/checkout@v5")
+    assert main([*base, "--workflows", str(tagged)]) == 1
+    assert "commit SHA" in capsys.readouterr().err
+    pinned = _workflow(tmp_path, f"- uses: actions/checkout@{SHA}")
+    assert main([*base, "--workflows", str(pinned)]) == 0
+    assert main([*base, "--skip-actions", "--workflows", str(tmp_path / "none")]) == 0
+
+
+def test_a_missing_workflows_directory_fails_closed(tmp_path: Path) -> None:
+    with pytest.raises(SystemExit, match="does not exist"):
+        read_workflow_actions(tmp_path / "absent", FREE)
+
+
+def test_a_malformed_manifest_fails_closed(tmp_path: Path) -> None:
+    manifest = tmp_path / "m.json"
+    manifest.write_text(json.dumps(["actions/checkout"]))
+    with pytest.raises(SystemExit, match="actions"):
+        read_action_licenses(manifest)
+    manifest.write_text(json.dumps({"actions": {"a/b": "MIT"}}))
+    assert read_action_licenses(manifest) == {"a/b": ""}
+
+
+def test_a_yaml_extension_is_read_too(tmp_path: Path) -> None:
+    directory = tmp_path / "workflows"
+    directory.mkdir()
+    (directory / "ci.yaml").write_text(
+        "jobs:\n  a:\n    steps:\n      - uses: actions/checkout@v5\n", encoding="utf-8"
+    )
+    _, refused = read_workflow_actions(directory, FREE)
+    assert [violation.reason for violation in refused] == [
+        "pinned by a movable tag or branch, not a 40-hex commit SHA"
+    ]
+
+
+def test_main_fails_on_a_declared_but_non_free_action(tmp_path: Path) -> None:
+    manifest = tmp_path / "licences.json"
+    manifest.write_text(json.dumps({"actions": {"evil/closed": {"license": "proprietary"}}}))
+    workflows = _workflow(tmp_path, f"- uses: evil/closed@{SHA}")
+    argv = ["--skip-python", "--skip-node", "--action-licenses", str(manifest)]
+    assert main([*argv, "--workflows", str(workflows)]) == 1
