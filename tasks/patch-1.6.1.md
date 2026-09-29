@@ -1,7 +1,6 @@
 # Task: Patch 1.6.1 — the worker's memory cap, and tidying
 
-> **Status: DONE 2026-09-29 — the commit hash is recorded here and in
-> CLAUDE.md by a follow-up commit.** A PATCH (1.6.0 → 1.6.1): no endpoint, no
+> **Status: DONE 2026-09-29 — commit `679da00`, tag `v1.6.1`.** A PATCH (1.6.0 → 1.6.1): no endpoint, no
 > request or response shape, no migration. Asked by `mmarin` ("dale, cierra
 > la 1.6.0 y haz la 1.6.1") from the recorded small items. No plan-first
 > survey: nothing here touches auth, the sandbox, ingestion or the report's
@@ -57,8 +56,8 @@ list of loggers in `docs/name-and-identity.md` named two of thirteen.
       (FAITHFUL). The coverage adversary was not fired separately: the QA pass
       reverted every change against its test, which is that agent's method,
       and the diff adds no application code
-- [x] CLAUDE.md + development-phases: 1.6.1 DONE; the hash lands in the
-      follow-up commit
+- [x] CLAUDE.md + development-phases: 1.6.1 DONE with the commit hash
+      (`679da00`)
 
 ## Non-goals (explicit)
 - Caps on the other services (the report worker renders one PDF at a time;
