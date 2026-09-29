@@ -1,7 +1,6 @@
 # Task: Phase 12 — cancelling an analysis, gracefully
 
-> **Status: DONE 2026-09-28 — the commit hash is recorded here and in
-> CLAUDE.md by a follow-up commit.** A MINOR step (1.5.1 → 1.6.0): a new
+> **Status: DONE 2026-09-28 — commit `f1ee33b`, tag `v1.6.0`.** A MINOR step (1.5.1 → 1.6.0): a new
 > endpoint, a new status value, two additive response fields. Survey
 > `tasks/phase12-survey.md`, signed off by `mmarin` the same day (§7.1 a,
 > §7.2 no written reason, §7.3 a, §7.4 five minutes; the panel's §9 folded
@@ -140,8 +139,8 @@ seconds; it never collides with the finish.**
       toned ones — neutral or emphasis, in dark mode especially — the dialog
       over the card with Escape and Tab, where focus lands after a cancel, and
       the spacing of the two new `.sub` lines
-- [x] CLAUDE.md + development-phases: phase 12 DONE; the hash lands in the
-      follow-up commit
+- [x] CLAUDE.md + development-phases: phase 12 DONE with the commit hash
+      (`f1ee33b`)
 
 ## Non-goals (explicit)
 - Cancelling an E7 verification run or a PDF job
