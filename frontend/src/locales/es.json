@@ -37,7 +37,7 @@
     "greeting": "Hola, {{name}}",
     "subtitle": "Aquí verás tus análisis en curso.",
     "nextStepTitle": "Siguiente paso",
-    "nextStepBody": "Registra un sistema y sube su código para obtener el primer informe.",
+    "nextStepBody": "Registra un sistema y sube su código para obtener el primer reporte.",
     "goToProjects": "Ir a proyectos",
     "signOut": "Cerrar sesión"
   },
@@ -274,7 +274,7 @@
     "createdAt": "Creado el {{date}}",
     "form": {
       "section": "1 · Datos del sistema",
-      "intro": "Estos datos van directo a la tabla \"Detalles del sistema\" del informe.",
+      "intro": "Estos datos van directo a la tabla \"Detalles del sistema\" del reporte.",
       "name": "Nombre del proyecto",
       "systemName": "Nombre del sistema (sitio web)",
       "framework": "Framework",
@@ -397,7 +397,7 @@
     "thirdParty": {
       "title_one": "Hallazgo en código de terceros ({{count}})",
       "title_other": "Hallazgos en código de terceros ({{count}})",
-      "why": "Están en dependencias que tú no mantienes, así que no entran en tu revisión ni frenan el paso al plan de pruebas. Siguen en el informe, y el inventario los cruza contra la base de vulnerabilidades.",
+      "why": "Están en dependencias que tú no mantienes, así que no entran en tu revisión ni frenan el paso al plan de pruebas. Siguen en el reporte, y el inventario los cruza contra la base de vulnerabilidades.",
       "listLabel": "Hallazgos en código de terceros",
       "note": "Este hallazgo está en una dependencia. Puedes leerlo, pero no se revisa aquí: lo cubren el inventario y la correlación de CVE."
     }

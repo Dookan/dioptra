@@ -206,6 +206,17 @@ services:
     # group. Its GID differs per host: `stat -c %g /var/run/docker.sock`.
     group_add:
       - "${DIOPTRA_DOCKER_GID:-999}"
+    # The worker parses each tool's report IN MEMORY, several times its size
+    # (26 MiB of SARIF peaked at 158 MiB, ~6x): at the default
+    # DIOPTRA_MAX_TOOL_PARSE_BYTES (256 MiB) that is ~1.5 GiB, on top of the
+    # Python process. A hostile tree must not take the host's memory with it:
+    # past the cap the kernel kills the biggest process — RQ's forked job, so
+    # the worker itself normally keeps running — and the sweep closes the
+    # analysis once it is past DIOPTRA_ANALYSIS_STALE_MINUTES (1.6.1). No swap beyond it. The analysis containers
+    # it starts carry their own --memory and are not counted here.
+    # Lowering DIOPTRA_MAX_TOOL_PARSE_BYTES is how a small host lowers this.
+    mem_limit: ${DIOPTRA_WORKER_MEMORY:-3g}
+    memswap_limit: ${DIOPTRA_WORKER_MEMORY:-3g}
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped

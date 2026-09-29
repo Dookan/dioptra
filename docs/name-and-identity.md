@@ -61,7 +61,7 @@ Single authoritative list. Anything not on it MUST NOT embed the product name.
 | PostgreSQL roles and database | `dioptra` (owner, runs the migrations from the one-shot `migrate` service), `dioptra_app` (runtime role of the API and the worker, `docker/initdb/01-runtime-role.sql`), database `dioptra` |
 | Container user | `dioptra` (uid 10001, never root) |
 | Python / npm package names | `dioptra-backend`, `dioptra-frontend` |
-| Application logger | `dioptra`, `dioptra.seed` |
+| Application logger | `dioptra` and its children, one per module: `dioptra.bootstrap`, `dioptra.inventory.import`, `dioptra.inventory.sync`, `dioptra.notify`, `dioptra.pipeline`, `dioptra.process`, `dioptra.queue`, `dioptra.reports`, `dioptra.reports.jobs`, `dioptra.seed`, `dioptra.sweep`, `dioptra.verify` (`backend/tests/test_loggers.py` keeps this row equal to the code) |
 | Refresh cookie | `dioptra_refresh` |
 | JWT issuer claim | `dioptra` |
 | Browser storage keys | `dioptra.theme`, `dioptra.language` |

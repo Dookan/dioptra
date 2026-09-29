@@ -28,6 +28,14 @@ describe('locale files', () => {
     expect(english).toEqual(spanish);
   });
 
+  it('call the document "reporte" on screen, as the mockups do', () => {
+    // The anchor PDFs say "informe" and the report's own prose keeps it
+    // (backend/templates/report/strings.json); the screens say "reporte",
+    // like the approved mockups (1.6.1).
+    const offending = flattenEntries(es as Tree).filter(([, text]) => /\binforme/i.test(text));
+    expect(offending).toEqual([]);
+  });
+
   it('leave no value empty', () => {
     // Assert on VALUES, not key paths: a path is never empty, so checking the
     // output of flatten() here would be a tautology that ships blank strings.

@@ -120,6 +120,16 @@ descomprimido) cuenta hasta ~9 GB por subida simultánea en
 `DIOPTRA_DATA_DIR/workspaces`. El ZIP se borra en cuanto se descomprime; el
 código descomprimido se queda mientras exista el análisis.
 
+**El worker tiene un tope de memoria (1.6.1):** `DIOPTRA_WORKER_MEMORY`, 3 GiB
+por defecto (`3g`). Lee en memoria la salida de cada herramienta y necesita
+varias veces su tamaño: con `DIOPTRA_MAX_TOOL_PARSE_BYTES` en 256 MiB puede
+llegar a ~1,5 GiB. Si un análisis pasa el tope, el sistema mata el proceso de
+ese análisis (el worker sigue en pie, y el resto del servidor también); el
+análisis queda como "se detuvo sin terminar" cuando pasa la ventana de
+`DIOPTRA_ANALYSIS_STALE_MINUTES` (120 min) y corre el siguiente barrido: al
+arrancar la API, al subir código o al cancelar un análisis. En un servidor con poca RAM baja los dos juntos; los contenedores de
+análisis que lanza el worker tienen su propio tope y no cuentan aquí.
+
 ### Servidor frontend
 
 | Recurso | Mínimo |
@@ -359,6 +369,11 @@ análisis termina, la cola, el worker y las imágenes de análisis funcionan.
   Docker.
 - **El worker tiene el socket de Docker**, equivalente a root en el backend. Es
   lo que le permite lanzar los análisis aislados; ningún otro servicio lo tiene.
+- **No hay correo.** `DIOPTRA_MAIL_ENABLED` queda en `false`: con `true` la API
+  se niega a arrancar, porque esta versión no trae cliente de correo ni el
+  flujo de recuperación de contraseña. Una contraseña olvidada la restablece un
+  admin desde la pestaña Usuarios; si no queda ningún admin,
+  `python -m app.auth.bootstrap` crea el primero de nuevo.
 
 ## 11. Desarrollo local (`scripts/dev.sh`)
 
@@ -561,6 +576,16 @@ unpacked code.** With the default caps (1 GiB compressed, 8 GiB unpacked)
 plan up to ~9 GB per concurrent upload in `DIOPTRA_DATA_DIR/workspaces`. The
 ZIP is deleted as soon as it is unpacked; the unpacked code stays as long as
 the analysis exists.
+
+**The worker has a memory cap (1.6.1):** `DIOPTRA_WORKER_MEMORY`, 3 GiB by
+default (`3g`). It reads each tool's output in memory and needs several times
+its size: with `DIOPTRA_MAX_TOOL_PARSE_BYTES` at 256 MiB it can reach
+~1.5 GiB. If an analysis goes past the cap, the system kills that analysis'
+process (the worker stays up, and so does the rest of the server); the
+analysis is marked "stopped without finishing" once it is past
+`DIOPTRA_ANALYSIS_STALE_MINUTES` (120 min) and the next sweep runs: at API
+start-up, on a code upload or on a cancel. On a host with little RAM lower both together; the analysis
+containers the worker starts have their own cap and do not count here.
 
 ### Frontend server
 
@@ -801,6 +826,11 @@ the analysis finishes, the queue, the worker and the analysis images work.
 - **The worker holds the Docker socket**, which is root-equivalent on the
   backend. It is what lets it start the isolated analyses; no other service has
   it.
+- **There is no mail.** `DIOPTRA_MAIL_ENABLED` stays `false`: with `true` the
+  API refuses to start, because this version ships no mail client and no
+  password-recovery flow. A forgotten password is reset by an admin from the
+  Usuarios tab; if no admin is left, `python -m app.auth.bootstrap` creates the
+  first one again.
 
 ## 11. Local development (`scripts/dev.sh`)
 

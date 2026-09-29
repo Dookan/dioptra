@@ -40,7 +40,7 @@ Líder del proyecto: **Moises Marin** (`mmarin`).
   consignas deterministas (P3); andamiaje, sandbox y re-auditoría por mutación
   (P4); inventario de software con copia local OSV + NVD, bitácora en pantalla,
   secciones de cierre del reporte y auto-auditoría (P5).
-- **Versión actual: 1.6.0.** Segundo ciclo, en curso: PHP/Laravel terminado
+- **Versión actual: 1.6.1.** Segundo ciclo, en curso: PHP/Laravel terminado
   (fase 7a); exportación de PDF asíncrona terminada (fase 8); ZIP de hasta
   1 GiB con barra de progreso del análisis terminado (fase 10); detección de
   respaldos, fotos subidas, `.env`, claves y logs incluidos en el código
@@ -50,7 +50,8 @@ Líder del proyecto: **Moises Marin** (`mmarin`).
   quedaron trabados y fija las herramientas por su huella SHA-256; la 1.6.0
   agrega el botón "Cancelar el análisis": quien subió el código o un admin lo
   detiene en segundos, sin escribir un motivo, y queda como cancelado, no
-  como error (fase 12).
+  como error (fase 12); la 1.6.1 le pone un tope de memoria al worker
+  (`DIOPTRA_WORKER_MEMORY`, 3 GiB) y ordena textos y documentación.
 - **Numeración:** un cambio o corrección pequeña sube el tercer número, una
   fase completa el segundo, un cambio que rompe el contrato de la API el
   primero.
@@ -210,7 +211,7 @@ Project lead: **Moises Marin** (`mmarin`).
   mutation re-audit (P4); the software inventory with the local OSV + NVD
   mirror, the audit-log screen, the report's closing sections and the
   self-audit (P5).
-- **Current version: 1.6.0.** Second cycle, in progress: PHP/Laravel done
+- **Current version: 1.6.1.** Second cycle, in progress: PHP/Laravel done
   (phase 7a); asynchronous PDF export done (phase 8); ZIP ingest up to 1 GiB
   with an analysis progress bar done (phase 10); detection of backups,
   uploaded photos, `.env` files, keys and logs committed to the code done
@@ -219,7 +220,8 @@ Project lead: **Moises Marin** (`mmarin`).
   analyses left stuck, and pins the tools by their SHA-256 digest; 1.6.0 adds
   the "Cancel the analysis" button: whoever sent the code, or an admin, stops
   it within seconds, with no written reason, and it stays as cancelled, not as
-  an error (phase 12).
+  an error (phase 12); 1.6.1 caps the worker's memory
+  (`DIOPTRA_WORKER_MEMORY`, 3 GiB) and tidies copy and documentation.
 - **Numbering:** a small change or correction bumps the third number, a
   completed phase the second, a change that breaks the API contract the
   first.

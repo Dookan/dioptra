@@ -186,6 +186,13 @@ Added to `docs/mockups/index.html` on 2026-08-28, same tokens and principles:
   the analysis', read right. No test applies `components.css`, so a change to
   `.progress.wide`, `.srlive` or the clock needs the same look again.
 
+## "Reporte" on screen, "informe" in the document — 1.6.1, 2026-09-29
+
+- The screens call the document **reporte**, the mockups' word; the report's
+  own prose (`backend/templates/report/strings.json`) keeps **informe**, the
+  word of every anchor PDF, because the report IS the institutional document.
+  `frontend/src/locales/locales.test.ts` refuses "informe" in `es.json`.
+
 ## Cancelar el análisis (screen 03) — phase 12, 2026-09-28
 
 - While an analysis is queued or running, the card offers **"Cancelar el
