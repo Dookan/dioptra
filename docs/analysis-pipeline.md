@@ -115,6 +115,28 @@ duplicate message is a no-op and a worker still alive cannot revive an
 abandoned row; a jail that already exists when extraction starts is refused
 (`upload_missing`), never analysed as if whole.
 
+**An analysis can be cancelled, gracefully** (phase 12,
+`tasks/phase12-survey.md`; `mmarin`'s definition: not an error, stops in
+seconds, never collides with the finish). `POST /api/v1/analyses/{id}/cancel`
+— the creator while still an analyst, or an admin; no written reason — closes
+a QUEUED analysis at once (its queue message then finds nothing to claim) and,
+on a RUNNING one, only records `cancel_requested_at`. The worker polls that
+column every 2 s while a tool runs (`core/process.py::run_stoppable`, the
+process in its own session so the kill reaches `git-remote-https` and
+`semgrep-core` too), between entries and inside large members of the
+extraction, and at every step; on a yes it `docker kill`s the named container,
+deletes every coverage row and raw output the run wrote, removes the files and
+closes the row **CANCELLED** — its own status, never FAILED, and the tool it
+killed gets no coverage row. The findings, SBOM, CBOM and metrics are written
+in the SAME transaction as the DONE transition, which requires no cancel
+pending, so a cancel that lands during the finish either discards everything
+or is refused (409 `analysis_not_cancellable`). Measured on the analysis
+image: a Semgrep run cancelled at 5 s was asked at 6.0 s and its container was
+gone at 6.1 s. A cancel whose worker died is closed by the sweep after
+`DIOPTRA_ANALYSIS_CANCEL_GRACE_MINUTES` (5), at the next cancel click or ingest;
+when a container's kill cannot be confirmed its files are left to the sweep
+rather than removed under a live mount.
+
 Languages (analysis runners and, since P3 day 14, the tree-sitter AST layer of
 E5): wave 1 JS/TS + Python (P1–P4). Wave 2 was **cut to a second cycle on
 2026-09-22** and is being built there: **PHP/Laravel is DONE (2026-09-23,

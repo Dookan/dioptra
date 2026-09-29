@@ -8,6 +8,8 @@ const ANALYSIS_TONE: Record<AnalysisStatus, string> = {
   running: 'warn',
   done: 'ok',
   failed: 'err',
+  // A person's decision, not an error: the badge's own neutral ink (phase 12).
+  cancelled: '',
 };
 
 const SEVERITY_TONE: Record<Severity, string> = {

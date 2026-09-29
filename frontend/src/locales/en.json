@@ -103,7 +103,8 @@
       "sbomInvalid": "The generated component inventory is not valid.",
       "normalization": "A tool's output could not be interpreted.",
       "noToolRan": "No analysis tool could run. Check the installation.",
-      "abandoned": "The analysis stopped without finishing: the process running it died or the queue lost it. Send the code again."
+      "abandoned": "The analysis stopped without finishing: the process running it died or the queue lost it. Send the code again.",
+      "notCancellable": "This analysis has already finished; only a queued or running one can be cancelled."
     },
     "report": {
       "renderFailed": "The report could not be generated.",
@@ -213,7 +214,17 @@
       "queued": "Queued",
       "running": "Analyzing",
       "done": "Finished",
-      "failed": "Failed"
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "cancel": {
+      "button": "Cancel the analysis",
+      "title": "Cancel the analysis?",
+      "body": "Whatever is in progress stops and the copy of the code is deleted. The analysis stays as cancelled; you can send the code again whenever you like.",
+      "confirm": "Cancel the analysis",
+      "back": "Go back",
+      "requested": "Cancelling… the running tool stops in a few seconds.",
+      "done": "This analysis was cancelled on {{date}}. Send the code again whenever you like."
     },
     "tool": {
       "ran": "ran",
@@ -848,6 +859,8 @@
       "analysis.ingest.zip": "uploaded a system's code (ZIP)",
       "analysis.ingest.git": "cloned a system's code (git)",
       "analysis.abandon": "closed an analysis that stopped without finishing",
+      "analysis.cancel.request": "asked to cancel an analysis",
+      "analysis.cancel": "cancelled an analysis",
       "finding.verdict.confirmed": "confirmed a finding as real",
       "finding.verdict.false_positive": "discarded a finding as a false positive",
       "report.edit": "edited a report section",

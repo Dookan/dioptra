@@ -79,6 +79,9 @@ class Settings(BaseSettings):
     #: window: with one worker a queue of large analyses legitimately waits.
     analysis_stale_minutes: int = Field(default=120, ge=10, le=7 * 24 * 60)
     analysis_queue_retention_hours: int = Field(default=24, ge=1, le=24 * 30)
+    #: A cancel asked of a RUNNING analysis whose worker died is closed by the
+    #: sweep after this long (phase 12). A live worker stops within seconds.
+    analysis_cancel_grace_minutes: int = Field(default=5, ge=1, le=24 * 60)
 
     #: RQ broker. ``queue_inline`` runs every job synchronously in the calling
     #: process — the test suite and single-process development need no broker.

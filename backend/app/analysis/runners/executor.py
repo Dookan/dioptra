@@ -26,6 +26,7 @@ from pathlib import Path
 from app.analysis.models import ToolStatus
 from app.analysis.runners.base import OUT_DIR, WORK_DIR, ExecutionResult, Executor, RunnerSpec
 from app.core.config import Settings
+from app.core.process import Ending, StopCheck, run_stoppable
 
 # The container user is ``Settings.runner_user`` (10001:10001 as in the
 # analysis image; the settings pattern refuses root).
@@ -155,6 +156,9 @@ class ProcessOutcome:
 
     ``status`` is already classified for the two cases that are not about the
     tool at all: it never started (MISSING) or it was killed (TIMEOUT).
+    ``stopped`` is the third: a person cancelled the analysis and the process
+    was killed for that (phase 12) — no status, because it is no coverage
+    result at all.
     """
 
     status: ToolStatus | None
@@ -162,6 +166,8 @@ class ProcessOutcome:
     stderr: str
     duration_ms: int
     detail: str | None
+    stopped: bool = False
+    kill_confirmed: bool = True
 
 
 def run_argv(
@@ -169,15 +175,22 @@ def run_argv(
     *,
     cwd: Path | None,
     timeout_seconds: int,
-    on_timeout: Callable[[], None] | None = None,
+    on_timeout: Callable[[], object] | None = None,
+    should_stop: StopCheck | None = None,
 ) -> ProcessOutcome:
     """Run ``argv`` with a timeout and a kill hook. Shared with the E7 sandbox.
 
     The E7 sandbox needs exactly this and a different result contract (three
     files instead of one), so the process handling lives here once rather than
     being written a second time (tasks/phase4-survey.md → Verdict).
+
+    With ``should_stop`` the process is waited on in slices and killed when a
+    cancel is asked (`core/process.py`); without it — the sandbox — nothing
+    changes.
     """
     started = time.monotonic()
+    if should_stop is not None:
+        return _run_stoppable(argv, cwd, timeout_seconds, on_timeout, should_stop, started)
     try:
         completed = subprocess.run(  # noqa: S603 — argv is built from our own specs, never from input
             argv,
@@ -213,6 +226,55 @@ def run_argv(
     )
 
 
+def _run_stoppable(
+    argv: list[str],
+    cwd: Path | None,
+    timeout_seconds: int,
+    on_kill: Callable[[], object] | None,
+    should_stop: StopCheck,
+    started: float,
+) -> ProcessOutcome:
+    def kill() -> bool:
+        # A hook that answers nothing (the timeout's old contract) confirms.
+        return on_kill is None or on_kill() is not False
+
+    try:
+        done = run_stoppable(
+            argv, timeout_seconds=timeout_seconds, should_stop=should_stop, cwd=cwd, on_kill=kill
+        )
+    except FileNotFoundError:
+        return ProcessOutcome(
+            status=ToolStatus.MISSING,
+            exit_code=None,
+            stderr="",
+            duration_ms=int((time.monotonic() - started) * 1000),
+            detail=f"{argv[0]} not found",
+        )
+    duration_ms = int((time.monotonic() - started) * 1000)
+    stderr = _stderr_text(done.stderr)
+    if done.ending is Ending.STOPPED:
+        return ProcessOutcome(
+            status=None,
+            exit_code=None,
+            stderr=stderr,
+            duration_ms=duration_ms,
+            detail=None,
+            stopped=True,
+            kill_confirmed=done.kill_confirmed,
+        )
+    if done.ending is Ending.TIMED_OUT:
+        return ProcessOutcome(
+            status=ToolStatus.TIMEOUT,
+            exit_code=None,
+            stderr=stderr,
+            duration_ms=duration_ms,
+            detail=f"killed after {timeout_seconds}s",
+        )
+    return ProcessOutcome(
+        status=None, exit_code=done.returncode, stderr=stderr, duration_ms=duration_ms, detail=None
+    )
+
+
 def _run_process(
     spec: RunnerSpec,
     argv: list[str],
@@ -221,13 +283,33 @@ def _run_process(
     out_dir: Path,
     cap: int,
     parse_cap: int,
-    on_timeout: Callable[[], None] | None = None,
+    on_timeout: Callable[[], object] | None = None,
+    should_stop: StopCheck | None = None,
 ) -> ExecutionResult:
     started = time.monotonic()
     # A report left by an earlier run (a retry, a sibling spec writing the same
     # name) must never be read back as this run's result.
     (out_dir / spec.output_file).unlink(missing_ok=True)
-    outcome = run_argv(argv, cwd=cwd, timeout_seconds=spec.timeout_seconds, on_timeout=on_timeout)
+    outcome = run_argv(
+        argv,
+        cwd=cwd,
+        timeout_seconds=spec.timeout_seconds,
+        on_timeout=on_timeout,
+        should_stop=should_stop,
+    )
+    if outcome.stopped:
+        # Never read back what a killed tool left: the run is not a result.
+        return ExecutionResult(
+            status=ToolStatus.FAILED,
+            exit_code=None,
+            stderr=outcome.stderr,
+            output=None,
+            truncated=False,
+            duration_ms=outcome.duration_ms,
+            detail="cancelled",
+            cancelled=True,
+            kill_confirmed=outcome.kill_confirmed,
+        )
     if outcome.status is not None:
         return ExecutionResult(
             status=outcome.status,
@@ -252,8 +334,9 @@ def _run_process(
 class DockerExecutor:
     """One ephemeral container per tool run, no network, hard limits."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, *, should_stop: StopCheck | None = None) -> None:
         self._settings = settings
+        self._should_stop = should_stop
         self._container_name: str | None = None
 
     def command(self, spec: RunnerSpec, *, workspace: Path, out_dir: Path) -> list[str]:
@@ -319,10 +402,16 @@ class DockerExecutor:
 
         docker = shutil.which("docker") or "docker"
 
-        def kill_container() -> None:
-            subprocess.run(  # noqa: S603 — fixed argv, our own container name
-                [docker, "kill", name], capture_output=True, check=False, timeout=30
-            )
+        def kill_container() -> bool:
+            """``docker kill`` the named container; True once it is gone."""
+            try:
+                killed = subprocess.run(  # noqa: S603 — fixed argv, our own container name
+                    [docker, "kill", name], capture_output=True, check=False, timeout=30
+                )
+            except (OSError, subprocess.TimeoutExpired):
+                return False
+            # "No such container": it had already exited and been removed (--rm).
+            return killed.returncode == 0 or b"No such container" in (killed.stderr or b"")
 
         return _run_process(
             spec,
@@ -332,14 +421,16 @@ class DockerExecutor:
             cap=self._settings.max_tool_output_bytes,
             parse_cap=self._settings.max_tool_parse_bytes,
             on_timeout=kill_container,
+            should_stop=self._should_stop,
         )
 
 
 class LocalExecutor:
     """Same argv on the host: ``/work`` and ``/out`` are rewritten to real paths."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, *, should_stop: StopCheck | None = None) -> None:
         self._settings = settings
+        self._should_stop = should_stop
 
     @staticmethod
     def translate(spec: RunnerSpec, *, workspace: Path, out_dir: Path) -> list[str]:
@@ -373,11 +464,16 @@ class LocalExecutor:
             out_dir=out_dir,
             cap=self._settings.max_tool_output_bytes,
             parse_cap=self._settings.max_tool_parse_bytes,
+            should_stop=self._should_stop,
         )
 
 
-def build_executor(settings: Settings) -> Executor:
-    """Pick the executor the deployment asked for."""
+def build_executor(settings: Settings, *, should_stop: StopCheck | None = None) -> Executor:
+    """Pick the executor the deployment asked for.
+
+    ``should_stop`` makes every run cancellable (phase 12); the pipeline passes
+    it, nothing else does.
+    """
     if settings.runner_mode == "docker":
-        return DockerExecutor(settings)
-    return LocalExecutor(settings)
+        return DockerExecutor(settings, should_stop=should_stop)
+    return LocalExecutor(settings, should_stop=should_stop)

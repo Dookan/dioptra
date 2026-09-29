@@ -29,6 +29,7 @@ import anyio
 from starlette.requests import ClientDisconnect
 
 from app.core.config import Settings
+from app.core.process import StopCheck
 from app.ingest.archive import ExtractionLimits, extract_zip
 from app.ingest.errors import UploadInterrupted, UploadMissing, UploadTooLarge
 
@@ -120,7 +121,9 @@ def discard(directory: Path) -> None:
     shutil.rmtree(directory, ignore_errors=True)
 
 
-def extract_upload(workspace: Path, settings: Settings) -> None:
+def extract_upload(
+    workspace: Path, settings: Settings, *, should_stop: StopCheck | None = None
+) -> None:
     """Worker side: unpack the spooled ZIP into ``workspace`` (the jail), then drop it.
 
     ``archive.extract_zip`` is unchanged — every guard it had in the request it
@@ -150,6 +153,7 @@ def extract_upload(workspace: Path, settings: Settings) -> None:
                     max_unpacked_bytes=settings.max_unpacked_bytes,
                     max_ratio=settings.max_zip_ratio,
                 ),
+                should_stop=should_stop,
             )
     finally:
         spool.unlink(missing_ok=True)

@@ -215,6 +215,38 @@ jobs:
           DIOPTRA_DATABASE_URL: postgresql+psycopg://dioptra:ci-only-password@localhost:5432/dioptra
           PGURL: postgresql://dioptra:ci-only-password@localhost:5432/dioptra
 
+      - name: A cancelled analysis fits its column, and the downgrade keeps it
+        # The status column stores the member NAME, and `CANCELLED` is nine
+        # characters: under 0016 the column is VARCHAR(8), which PostgreSQL
+        # enforces and the SQLite suite does not (phase 12, survey §2.2).
+        # The negative control proves the widening is what makes it fit.
+        run: |
+          set -euo pipefail
+          uv run alembic downgrade 0016_sca_third_party_correction
+          psql "$PGURL" -v ON_ERROR_STOP=1 -c "
+            INSERT INTO projects (id, name, created_at, updated_at)
+              VALUES ('00000000-0000-4000-8000-0000000000d1', 'ci-cancel', now(), now());"
+          row() { psql "$PGURL" -v ON_ERROR_STOP=1 -c "
+            INSERT INTO analyses (id, project_id, source_kind, source_ref, status,
+                                  languages, frameworks, lockfiles, created_at)
+              VALUES ('00000000-0000-4000-8000-0000000000d2', '00000000-0000-4000-8000-0000000000d1',
+                      'ZIP', 'ci', 'CANCELLED', '[]', '[]', '[]', now());"; }
+          if row 2>/dev/null; then echo "CANCELLED fit a VARCHAR(8)?"; exit 1; fi
+          uv run alembic upgrade head
+          row
+          state() { psql "$PGURL" -tAc "SELECT status || '|' || coalesce(failure_code, '') FROM analyses WHERE source_ref = 'ci' AND project_id = '00000000-0000-4000-8000-0000000000d1';"; }
+          test "$(state)" = "CANCELLED|"
+          uv run alembic downgrade 0016_sca_third_party_correction
+          test "$(state)" = "FAILED|analysis_cancelled"
+          uv run alembic upgrade head
+          psql "$PGURL" -v ON_ERROR_STOP=1 -c "DELETE FROM projects WHERE name = 'ci-cancel';"
+        working-directory: backend
+        env:
+          DIOPTRA_ENV: test
+          DIOPTRA_JWT_SECRET: ci-only-secret-value-at-least-32-chars
+          DIOPTRA_DATABASE_URL: postgresql+psycopg://dioptra:ci-only-password@localhost:5432/dioptra
+          PGURL: postgresql://dioptra:ci-only-password@localhost:5432/dioptra
+
       - name: The audit trail is append-only in the real database
         # The suite runs on SQLite, which cannot exercise the plpgsql trigger.
         # Creating it is not the same as proving it enforces, so assert here that

@@ -186,6 +186,33 @@ Added to `docs/mockups/index.html` on 2026-08-28, same tokens and principles:
   the analysis', read right. No test applies `components.css`, so a change to
   `.progress.wide`, `.srlive` or the clock needs the same look again.
 
+## Cancelar el análisis (screen 03) — phase 12, 2026-09-28
+
+- While an analysis is queued or running, the card offers **"Cancelar el
+  análisis"** (`components/cancel-analysis.tsx`, a ghost button) to whoever
+  sent the code and to an admin — presentation only; the server decides
+  (`analysis/cancel.py::may_cancel`). It opens the native `<dialog>` of the
+  PDF export's pattern with ONE sentence ("Se detiene lo que esté en curso y
+  se borra la copia del código…" — a queued analysis runs no tool, and a git
+  one was cloned, not uploaded) and "Cancelar el análisis" /
+  "Volver": no reason field and no second step, because `mmarin` asked for it
+  fast and without friction; the dialog is the only guard against a
+  mis-click.
+- Asked and still running: the card's `.srlive` region says "Cancelando… la
+  herramienta en curso se detiene en unos segundos" (the visible copy is
+  `aria-hidden`), and the button stays enabled — a second click after the
+  grace also closes a cancel whose worker died.
+- Cancelled: the badge is the bare `.badge`, in the ink colour — no tone,
+  because it is a decision, not an error — and the card says "Se canceló este
+  análisis el …. Vuelve a enviar el código cuando quieras." in `.sub`, never
+  `.alert` — announced by the card's always-mounted region, the visible copy
+  `aria-hidden`. After a cancel, focus moves to the card's first row (the
+  button may unmount, and the phase-8 rule forbids dropping focus to
+  `<body>`); the button is never disabled while the request is in flight. Bitácora words `analysis.cancel.request` and `analysis.cancel`.
+- Recorded deviation: mockup 03 draws no cancel. No new element, class or
+  token. **Needs an on-screen look in both themes**: the untoned badge and the
+  dialog over the card (no test applies `components.css`).
+
 ## Cobertura de herramientas en la tarjeta del análisis (screen 03) — 1.5.1, 2026-09-28
 
 - A tool that RAN but dropped files now carries a sentence beside its badge

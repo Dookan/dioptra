@@ -1,6 +1,6 @@
 [project]
 name = "dioptra-backend"
-version = "1.5.1"
+version = "1.6.0"
 description = "Dioptra — white-box analysis platform backend"
 requires-python = ">=3.13"
 license = { text = "Apache-2.0" }
@@ -174,6 +174,10 @@ only_mutate = [
     "app/analysis/pipeline.py",
     "app/analysis/runners/executor.py",
     "app/reports/context.py",
+    # Phase 12: the graceful cancel — the stoppable process, the API's half,
+    # and (above) the pipeline's cancel path and one-transaction finish.
+    "app/analysis/cancel.py",
+    "app/core/process.py",
 ]
 pytest_add_cli_args_test_selection = [
     "tests/test_gates.py",
@@ -212,4 +216,5 @@ pytest_add_cli_args_test_selection = [
     "tests/test_tool_output.py",
     "tests/test_execution_notes.py",
     "tests/test_analysis_progress.py",
+    "tests/test_analysis_cancel.py",
 ]

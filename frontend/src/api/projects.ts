@@ -38,7 +38,7 @@ export interface ProjectCreate {
   };
 }
 
-export type AnalysisStatus = 'queued' | 'running' | 'done' | 'failed';
+export type AnalysisStatus = 'queued' | 'running' | 'done' | 'failed' | 'cancelled';
 export type ToolStatus = 'ran' | 'failed' | 'missing' | 'timeout';
 export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info';
 export type Verdict = 'confirmed' | 'false_positive';
@@ -97,6 +97,10 @@ export interface Analysis {
   finished_at: string | null;
   /** Only while running: the pipeline step the worker is on (phase 10). */
   progress: AnalysisProgress | null;
+  /** A person asked this running analysis to stop; its worker is on it (phase 12). */
+  cancel_requested: boolean;
+  /** Who sent the code; they and an admin may cancel (the server decides). */
+  created_by_id: string | null;
   /** Every finding by severity, verdicts ignored. */
   finding_counts: Partial<Record<Severity, number>>;
   /** What the report prints: false positives left out. */
@@ -300,6 +304,14 @@ export function listAnalyses(accessToken: string, projectId: string): Promise<An
 
 export function getAnalysis(accessToken: string, id: string): Promise<Analysis> {
   return apiFetch<Analysis>(`/analyses/${encodeURIComponent(id)}`, { accessToken });
+}
+
+/** Cancel a queued analysis, or ask a running one to stop (phase 12). No reason. */
+export function cancelAnalysis(accessToken: string, analysisId: string): Promise<Analysis> {
+  return apiFetch<Analysis>(`/analyses/${encodeURIComponent(analysisId)}/cancel`, {
+    method: 'POST',
+    accessToken,
+  });
 }
 
 export function listFindings(accessToken: string, analysisId: string): Promise<Finding[]> {

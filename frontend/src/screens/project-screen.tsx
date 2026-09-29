@@ -15,6 +15,7 @@ import { PdfExportButton } from '../report-jobs/pdf-export-button';
 import { useAuth } from '../auth/auth-context';
 import { AdvanceStage } from '../components/advance-stage';
 import { AppShell } from '../components/app-shell';
+import { CancelAnalysis } from '../components/cancel-analysis';
 import { stageIndex } from '../components/stages';
 import { SeverityBadge, StatusBadge, ToolBadge } from '../components/status-badge';
 import { Stepper } from '../components/stepper';
@@ -106,8 +107,22 @@ const PROGRESS_STEPS = new Set([
 ]);
 
 /** The sentence naming a running analysis' step, or '' when it is not running. */
-function progressSentence(t: TFunction, analysis: Analysis): string {
+function cancelledSentence(t: TFunction, analysis: Analysis, language?: string): string {
+  const date = new Date(analysis.finished_at ?? analysis.created_at).toLocaleString(language, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+  return t('analysis.cancel.done', { date });
+}
+
+function progressSentence(t: TFunction, analysis: Analysis, language?: string): string {
   const progress = analysis.progress;
+  // The card's region announces the end of a cancel too: it stays mounted and
+  // only its text changes (the phase-10 rule), so a queued cancel is heard.
+  if (analysis.status === 'cancelled') return cancelledSentence(t, analysis, language);
+  if (analysis.status === 'running' && analysis.cancel_requested) {
+    return t('analysis.cancel.requested');
+  }
   if (analysis.status !== 'running' || progress === null) return '';
   if (!PROGRESS_STEPS.has(progress.step)) {
     return t('analysis.progress.count', { index: progress.index, total: progress.total });
@@ -404,10 +419,13 @@ function AnalysisCard({
     dateStyle: 'medium',
     timeStyle: 'short',
   });
+  // Where focus lands after a cancel: the cancel button may unmount (a queued
+  // analysis ends at once), and focus must not fall to <body> (phase-8 rule).
+  const head = useRef<HTMLDivElement>(null);
 
   return (
     <li className="card">
-      <div className="row first">
+      <div className="row first" ref={head} tabIndex={-1}>
         <StatusBadge status={analysis.status} />
         <span className="chip">{t(`stepper.${analysis.stage}`)}</span>
         <span className="mono">{analysis.source_ref}</span>
@@ -416,9 +434,26 @@ function AnalysisCard({
       {/* Mounted with the card, before the analysis runs, so the first step
           is announced too; the visible bar below is aria-hidden. */}
       <span className="srlive" role="status">
-        {progressSentence(t, analysis)}
+        {progressSentence(t, analysis, i18n.resolvedLanguage)}
       </span>
       {analysis.status === 'running' && <AnalysisProgressBar analysis={analysis} />}
+      {analysis.status === 'running' && analysis.cancel_requested && (
+        <p className="sub" aria-hidden="true">
+          {t('analysis.cancel.requested')}
+        </p>
+      )}
+      {analysis.status === 'cancelled' && (
+        // A decision someone took, not an error: `.sub`, never `.alert`. The
+        // live region above says it; this copy is for the eye.
+        <p className="sub" aria-hidden="true">
+          {cancelledSentence(t, analysis, i18n.resolvedLanguage)}
+        </p>
+      )}
+      <CancelAnalysis
+        analysis={analysis}
+        onChange={onChange}
+        onCancelled={() => head.current?.focus()}
+      />
       {analysis.status === 'failed' && (
         <p className="alert" role="alert">
           {reason !== null && <>{t(reason)} </>}

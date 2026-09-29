@@ -45,6 +45,9 @@ class AnalysisStatus(StrEnum):
     RUNNING = "running"
     DONE = "done"
     FAILED = "failed"
+    #: A person stopped it (phase 12). Not a failure: its own status, never
+    #: FAILED, and no coverage row for the tool the cancel killed.
+    CANCELLED = "cancelled"
 
 
 class ToolCategory(StrEnum):
@@ -122,7 +125,10 @@ class Analysis(Base):
     #: Original file name for a ZIP, the URL for git. Display only, escaped.
     source_ref: Mapped[str] = mapped_column(String(512))
     status: Mapped[AnalysisStatus] = mapped_column(
-        _text_enum(AnalysisStatus, 8), default=AnalysisStatus.QUEUED, index=True
+        # 16 since migration 0017: CANCELLED is nine characters.
+        _text_enum(AnalysisStatus, 16),
+        default=AnalysisStatus.QUEUED,
+        index=True,
     )
     #: Typed failure code (``IngestError.code``), never a message or a trace.
     failure_code: Mapped[str | None] = mapped_column(String(64), default=None)
@@ -145,6 +151,9 @@ class Analysis(Base):
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utc_now)
     started_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     finished_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    #: Set when a person asks a RUNNING analysis to stop; the worker polls it
+    #: and closes the row itself (phase 12). NULL otherwise.
+    cancel_requested_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
 
     findings: Mapped[list[Finding]] = relationship(
         back_populates="analysis", cascade="all, delete-orphan", order_by="Finding.ordinal"

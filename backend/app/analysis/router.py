@@ -6,11 +6,14 @@ import json
 import uuid
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.orm import Session
 
+from app.analysis import cancel
 from app.analysis.models import AnalysisStatus
-from app.auth.deps import ActiveUser
+from app.auth.deps import ActiveUser, client_ip, require_roles
+from app.auth.models import Role, User
+from app.core.config import get_settings
 from app.db.session import get_db
 from app.ingest import service
 from app.ingest.errors import AnalysisNotFound, AnalysisNotReady
@@ -23,6 +26,8 @@ router = APIRouter(prefix="/api/v1/analyses", tags=["analyses"])
 
 DbSession = Annotated[Session, Depends(get_db)]
 ReportFormat = Literal["pdf", "html", "md", "docx"]
+#: E2's roles; ``cancel.may_cancel`` narrows an analyst to their own analyses.
+CancelUser = Annotated[User, Depends(require_roles(Role.ADMIN, Role.ANALYST))]
 
 _MEDIA_TYPES: dict[str, str] = {
     "pdf": "application/pdf",
@@ -35,6 +40,23 @@ _MEDIA_TYPES: dict[str, str] = {
 @router.get("/{analysis_id}", response_model=AnalysisOut)
 def get_analysis(analysis_id: uuid.UUID, _user: ActiveUser, db: DbSession) -> AnalysisOut:
     return analysis_out(service.get_analysis(db, analysis_id))
+
+
+@router.post(
+    "/{analysis_id}/cancel", response_model=AnalysisOut, status_code=status.HTTP_202_ACCEPTED
+)
+def cancel_analysis(
+    analysis_id: uuid.UUID, request: Request, user: CancelUser, db: DbSession
+) -> AnalysisOut:
+    """Cancel a queued analysis, or ask a running one's worker to stop (phase 12).
+
+    No body: no written reason, by `mmarin`'s decision (CLAUDE.md → Hard Rules →
+    Auth). 202 because a running analysis is closed by its worker, seconds later.
+    """
+    analysis = cancel.request_cancel(
+        db, get_settings(), actor=user, analysis_id=analysis_id, source_ip=client_ip(request)
+    )
+    return analysis_out(analysis)
 
 
 @router.get("/{analysis_id}/findings", response_model=list[FindingOut])

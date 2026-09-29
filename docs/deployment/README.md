@@ -286,6 +286,15 @@ su tamaño (medido: 26 MiB de salida de Semgrep, 158 MiB de pico, unas 6
 veces), así que al tope por defecto puede llegar a ~1,5 GiB; en un servidor
 con poca memoria, bájalo, y si lo subes, sube también la memoria del worker.
 
+**Cancelar un análisis (1.6.0).** Un ajuste del backend, con un valor por
+defecto que no hace falta tocar: `DIOPTRA_ANALYSIS_CANCEL_GRACE_MINUTES` (5).
+Un análisis en curso se detiene en segundos cuando alguien lo cancela; si su
+worker ya había muerto, nadie responde el pedido, y pasado ese tiempo el
+próximo clic en "Cancelar el análisis" (o la próxima subida de código) lo
+cierra como cancelado y borra sus archivos. La actualización trae la migración
+`0017`, que agranda la columna del estado del análisis: el servicio `migrate`
+la aplica solo.
+
 `DIOPTRA_API_UPSTREAM` va **sin barra final** (`http://10.0.0.20:8000`, no
 `…:8000/`): con barra, nginx se niega a arrancar ("proxy_pass cannot have URI
 part in location given by regular expression").
@@ -718,6 +727,14 @@ memory and needs several times its size (measured: 26 MiB of Semgrep output,
 a 158 MiB peak, about 6×), so at the default cap it can reach ~1.5 GiB; on a
 host with little memory lower it, and if you raise it, raise the worker's
 memory too.
+
+**Cancelling an analysis (1.6.0).** One backend setting whose default needs no
+change: `DIOPTRA_ANALYSIS_CANCEL_GRACE_MINUTES` (5). A running analysis stops
+within seconds when someone cancels it; if its worker had already died, nobody
+answers the request, and after that long the next click on "Cancelar el
+análisis" (or the next code upload) closes it as cancelled and removes its
+files. The upgrade carries migration `0017`, which widens the analysis status
+column: the `migrate` service applies it on its own.
 
 `DIOPTRA_API_UPSTREAM` takes **no trailing slash** (`http://10.0.0.20:8000`,
 not `…:8000/`): with one, nginx refuses to start ("proxy_pass cannot have URI

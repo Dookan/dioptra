@@ -269,7 +269,7 @@ def test_the_stale_window_must_exceed_the_pipelines_timeout() -> None:
 def test_a_job_for_a_row_that_is_not_queued_does_nothing(
     client: TestClient, analyst: User, db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _s: FixtureExecutor())
+    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _s, **_kw: FixtureExecutor())
     analysis_id = uuid.UUID(_ingest(client, login(client, analyst.username)))
     analysis = db.get(Analysis, analysis_id)
     assert analysis is not None
@@ -306,7 +306,7 @@ def test_the_sweep_closing_a_row_stops_its_worker_and_keeps_the_outcome(
             return result
 
     executor = SweptMidRun()
-    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _s: executor)
+    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _s, **_kw: executor)
     analysis_id = uuid.UUID(_ingest(client, login(client, analyst.username)))
 
     db.expire_all()
@@ -351,7 +351,7 @@ def test_a_running_row_is_closed_by_its_own_worker(db: Session) -> None:
 def test_the_ingest_route_sweeps_before_it_spools(
     client: TestClient, analyst: User, db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _s: FixtureExecutor())
+    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _s, **_kw: FixtureExecutor())
     project = _project(db)
     stale = _analysis(db, project, AnalysisStatus.RUNNING, age=timedelta(hours=3))
     _ingest(client, login(client, analyst.username))
@@ -498,7 +498,7 @@ def test_a_job_claims_only_its_own_row_and_stamps_it(
     project = _project(db)
     mine = _analysis(db, project, AnalysisStatus.QUEUED)
     other = _analysis(db, project, AnalysisStatus.QUEUED)
-    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _s: FixtureExecutor())
+    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _s, **_kw: FixtureExecutor())
 
     pipeline.run_pipeline(mine.id)  # no workspace: it fails, but only after claiming
 
@@ -520,7 +520,7 @@ def test_a_crash_is_closed_as_a_pipeline_error(
             del spec, workspace, out_dir
             raise RuntimeError("the executor itself broke")
 
-    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _s: Crashing())
+    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _s, **_kw: Crashing())
     analysis = db.get(Analysis, uuid.UUID(_ingest(client, login(client, analyst.username))))
     assert analysis is not None
     assert (analysis.status, analysis.failure_code) == (AnalysisStatus.FAILED, "pipeline_error")
@@ -545,7 +545,7 @@ def test_closing_and_entering_touch_only_their_own_row(db: Session) -> None:
 def test_a_duplicate_message_for_a_running_analysis_never_runs_it_twice(
     client: TestClient, analyst: User, db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _s: FixtureExecutor())
+    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _s, **_kw: FixtureExecutor())
     analysis_id = uuid.UUID(_ingest(client, login(client, analyst.username)))
     db.execute(
         update(Analysis)

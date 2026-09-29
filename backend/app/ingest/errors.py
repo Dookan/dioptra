@@ -113,6 +113,14 @@ class AnalysisNotFound(IngestError):
     message_key = "errors.analysis.notFound"
 
 
+class AnalysisNotCancellable(IngestError):
+    """Only a QUEUED or RUNNING analysis can be cancelled (phase 12)."""
+
+    status_code = 409
+    code = "analysis_not_cancellable"
+    message_key = "errors.analysis.notCancellable"
+
+
 class AnalysisNotReady(IngestError):
     """The report was requested before the pipeline finished."""
 

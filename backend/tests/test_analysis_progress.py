@@ -93,7 +93,7 @@ def test_each_step_is_visible_to_a_poll_while_it_runs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     watcher = WatchingExecutor(session_factory)
-    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _settings: watcher)
+    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _settings, **_kw: watcher)
     entered: list[str] = []
     from app.analysis import pipeline
 
@@ -135,7 +135,7 @@ def test_a_failed_run_leaves_no_step_behind(
             del spec, workspace, out_dir
             return ExecutionResult(ToolStatus.FAILED, 2, "boom", None, False, 1, "exit 2")
 
-    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _settings: Broken())
+    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _settings, **_kw: Broken())
     headers = login(client, analyst.username)
     project = client.post(
         "/api/v1/projects", json={"name": "p-broken", "system": {"name": "s"}}, headers=headers

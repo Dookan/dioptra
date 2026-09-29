@@ -1,6 +1,6 @@
 /** One project: ingest errors in plain language, downloads only when done. */
 import es from '../locales/es.json';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -245,6 +245,169 @@ describe('project screen', () => {
     await signIn();
     await waitFor(() => {
       expect(document.querySelector('.card .progress .pfill')).toHaveClass('w15');
+    });
+  });
+
+  describe('cancelling an analysis (phase 12)', () => {
+    const ME = '0f9b2a5e-0000-4000-8000-000000000001';
+
+    it('cancels at the creator\'s one confirmation, no reason, and reads as no error', async () => {
+      const queued = { ...analysis('queued'), created_by_id: ME, cancel_requested: false };
+      const cancelled = { ...queued, status: 'cancelled', finished_at: '2026-09-28T20:00:00Z' };
+      const calls = renderProject({
+        [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [queued] },
+        '/api/v1/analyses/a-1/cancel': { status: 202, body: cancelled },
+      });
+      const user = await signIn();
+
+      await user.click(await screen.findByRole('button', { name: es.analysis.cancel.button }));
+      const dialog = screen.getByRole('dialog', { name: es.analysis.cancel.title });
+      expect(dialog).toHaveTextContent(es.analysis.cancel.body);
+      expect(dialog.querySelector('textarea, input')).toBeNull(); // no reason, no second step
+      await user.click(within(dialog).getByRole('button', { name: es.analysis.cancel.confirm }));
+
+      expect(await screen.findByText(es.analysis.status.cancelled)).toBeInTheDocument();
+      const post = calls.mock.calls.find(([path]) => String(path).endsWith('/a-1/cancel'));
+      expect(post?.[1]?.method).toBe('POST');
+      expect(post?.[1]?.body).toBeUndefined();
+      expect(screen.queryByRole('alert')).toBeNull();
+      // Announced by the card's region, which stayed mounted; the visible copy
+      // is for the eye; focus lands on the card, never on <body>.
+      await waitFor(() => {
+        expect(liveTexts().some((text) => text.startsWith('Se canceló este análisis el'))).toBe(
+          true,
+        );
+      });
+      const visible = screen
+        .getAllByText(/Se canceló este análisis el/)
+        .find((node) => node.getAttribute('role') !== 'status');
+      expect(visible).toHaveClass('sub');
+      expect(visible).toHaveAttribute('aria-hidden', 'true');
+      expect(document.activeElement).toBe(document.querySelector('.card .row.first'));
+      expect(screen.queryByRole('button', { name: es.analysis.cancel.button })).toBeNull();
+    });
+
+    it('offers the button on a running analysis and shows the request', async () => {
+      const running = {
+        ...analysis('queued'),
+        status: 'running',
+        created_by_id: ME,
+        cancel_requested: false,
+        progress: { step: 'semgrep', index: 2, total: 8 },
+      };
+      renderProject({
+        [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [running] },
+        '/api/v1/analyses/a-1/cancel': {
+          status: 202,
+          body: { ...running, cancel_requested: true },
+        },
+      });
+      const user = await signIn();
+      await user.click(await screen.findByRole('button', { name: es.analysis.cancel.button }));
+      const dialog = screen.getByRole('dialog', { name: es.analysis.cancel.title });
+      await user.click(within(dialog).getByRole('button', { name: es.analysis.cancel.confirm }));
+      await waitFor(() => {
+        expect(liveTexts()).toContain(es.analysis.cancel.requested);
+      });
+    });
+
+    it('says why the server refused, as an error, and keeps the analysis', async () => {
+      const queued = { ...analysis('queued'), created_by_id: ME, cancel_requested: false };
+      renderProject({
+        [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [queued] },
+        '/api/v1/analyses/a-1/cancel': {
+          status: 409,
+          body: { code: 'analysis_not_cancellable', message_key: 'errors.analysis.notCancellable' },
+        },
+      });
+      const user = await signIn();
+      await user.click(await screen.findByRole('button', { name: es.analysis.cancel.button }));
+      const dialog = screen.getByRole('dialog', { name: es.analysis.cancel.title });
+      await user.click(within(dialog).getByRole('button', { name: es.analysis.cancel.confirm }));
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        es.errors.analysis.notCancellable,
+      );
+      expect(screen.getByText(es.analysis.status.queued)).toBeInTheDocument();
+    });
+
+    it('sends one request however often it is confirmed while in flight', async () => {
+      const queued = { ...analysis('queued'), created_by_id: ME, cancel_requested: false };
+      let answer: (value: { status: number; body: unknown }) => void = () => {};
+      const pending = new Promise<{ status: number; body: unknown }>((resolve) => {
+        answer = resolve;
+      });
+      const calls = renderProject({
+        [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [queued] },
+        '/api/v1/analyses/a-1/cancel': () => pending,
+      });
+      const user = await signIn();
+      for (let round = 0; round < 2; round += 1) {
+        await user.click(await screen.findByRole('button', { name: es.analysis.cancel.button }));
+        const dialog = screen.getByRole('dialog', { name: es.analysis.cancel.title });
+        await user.click(within(dialog).getByRole('button', { name: es.analysis.cancel.confirm }));
+      }
+      const posts = calls.mock.calls.filter(([path]) => String(path).endsWith('/a-1/cancel'));
+      expect(posts).toHaveLength(1);
+      answer({ status: 202, body: { ...queued, status: 'cancelled' } });
+      expect(await screen.findByText(es.analysis.status.cancelled)).toBeInTheDocument();
+    });
+
+    it('going back cancels nothing', async () => {
+      const queued = { ...analysis('queued'), created_by_id: ME, cancel_requested: false };
+      const calls = renderProject({
+        [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [queued] },
+      });
+      const user = await signIn();
+      await user.click(await screen.findByRole('button', { name: es.analysis.cancel.button }));
+      const dialog = screen.getByRole('dialog', { name: es.analysis.cancel.title });
+      await user.click(within(dialog).getByRole('button', { name: es.analysis.cancel.back }));
+      expect(calls.mock.calls.some(([path]) => String(path).endsWith('/cancel'))).toBe(false);
+    });
+
+    it('says the running tool is stopping while the worker answers', async () => {
+      const stopping = {
+        ...analysis('queued'),
+        status: 'running',
+        created_by_id: ME,
+        cancel_requested: true,
+        progress: { step: 'semgrep', index: 2, total: 8 },
+      };
+      renderProject({
+        [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [stopping] },
+      });
+      await signIn();
+      await waitFor(() => {
+        expect(liveTexts()).toContain(es.analysis.cancel.requested);
+      });
+      const visible = screen
+        .getAllByText(es.analysis.cancel.requested)
+        .find((node) => node.getAttribute('role') !== 'status');
+      expect(visible?.closest('[aria-hidden="true"]')).not.toBeNull();
+    });
+
+    it.each([
+      ['another analyst', 'analyst' as Role, 'someone-else', false],
+      ['a developer, even the creator', 'developer' as Role, ME, false],
+      ['an admin', 'admin' as Role, 'someone-else', true],
+    ])('offers the button to %s: %s', async (_who, role, creator, offered) => {
+      const queued = { ...analysis('queued'), created_by_id: creator, cancel_requested: false };
+      renderProject(
+        { [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [queued] } },
+        role,
+      );
+      await signIn(role === 'developer' ? 'cperez' : role === 'admin' ? 'amedina' : 'mmarin');
+      await screen.findByText(es.analysis.status.queued);
+      expect(screen.queryByRole('button', { name: es.analysis.cancel.button }) !== null).toBe(
+        offered,
+      );
+    });
+
+    it('never offers it once the analysis finished', async () => {
+      const done = { ...analysis('done'), created_by_id: ME, cancel_requested: false };
+      renderProject({ [`/api/v1/projects/${PROJECT.id}/analyses`]: { status: 200, body: [done] } });
+      await signIn();
+      await screen.findByText(es.analysis.status.done);
+      expect(screen.queryByRole('button', { name: es.analysis.cancel.button })).toBeNull();
     });
   });
 

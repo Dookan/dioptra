@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from app.analysis.models import Analysis, Severity
+from app.analysis.models import Analysis, AnalysisStatus, Severity
 from app.analysis.progress import progress_of
 from app.analysis.sweep import sweep_quietly
 from app.auth.deps import ActiveUser, client_ip, require_roles
@@ -50,6 +50,9 @@ def analysis_out(analysis: Analysis) -> AnalysisOut:
         payload.progress = ProgressOut(
             step=progress.step, index=progress.index, total=progress.total
         )
+    payload.cancel_requested = (
+        analysis.status is AnalysisStatus.RUNNING and analysis.cancel_requested_at is not None
+    )
     payload.finding_counts = counts
     payload.report_counts = report_counts
     status = triage_status(analysis)

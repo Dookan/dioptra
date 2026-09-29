@@ -60,6 +60,12 @@ class ExecutionResult:
     duration_ms: int
     detail: str | None
     document: bytes | None = None
+    #: The analysis was cancelled and this run was killed for it (phase 12):
+    #: not a coverage result — the pipeline records nothing for it.
+    cancelled: bool = False
+    #: False when the kill could not be confirmed (a container that may still
+    #: hold the jail mounted): the files are then left to the sweep.
+    kill_confirmed: bool = True
 
     @property
     def parseable(self) -> bytes | None:

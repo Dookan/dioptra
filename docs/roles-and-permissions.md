@@ -11,7 +11,7 @@ Usernames are initial + lastname, lowercase, no dots: `mmarin`, `cperez`,
 |---|---|---|---|
 | Create/disable users, assign roles | ✓ | — | — |
 | ↳ list accounts (`GET /api/v1/users`) | ✓ | — | — |
-| ↳ create an account (initial password chosen by the admin, changed at first login; no written reason — the Hard Rule's one exception) | ✓ | — | — |
+| ↳ create an account (initial password chosen by the admin, changed at first login; no written reason — one of the Hard Rule's two exceptions) | ✓ | — | — |
 | ↳ change a role, disable / enable, reset a password (written reason; never on one's own account) | ✓ any OTHER account | — | — |
 | Create project / start analysis (E1–E2) | ✓ | ✓ | — |
 | Triage findings: confirm / discard with justification (E3) | — | ✓ (the audited project's own code; a SAST or secret finding inside a dependency directory is informative and refused with `finding_not_triageable`; an SCA finding and a sensitive artefact stay triageable wherever they sit) | — |
@@ -28,6 +28,7 @@ Usernames are initial + lastname, lowercase, no dots: `mmarin`, `cperez`,
 | VEX verdicts | — | via E3 triage only — no separate endpoint | — |
 | Read audit log (`GET /api/v1/audit`) | everything | own actions | own actions |
 | Close a stage (`POST …/stage/advance`) | E2 only | E2, E3 | E4–E7 |
+| Cancel a queued or running analysis (`POST …/analyses/{id}/cancel`, no written reason, phase 12) | ✓ any | ✓ only the ones they sent | — (not even one they sent before a demotion) |
 
 The inventory rows were written at the P5 survey (`tasks/phase5-survey.md`
 §7) before the endpoints existed. **Deviation recorded**: the matrix used to
@@ -43,10 +44,13 @@ authorization surface without a survey (scope-change log, 2026-09-22).
   learns to test.
 - Every sensitive action (triage verdict, gate approval, report sign, a role
   change, disabling or enabling an account, a password reset) MUST carry a
-  written justification → append-only audit log. **One exception**
-  (CLAUDE.md → Hard Rules → Auth, `mmarin` 2026-09-23): CREATING an account
-  carries none — its row (`user.create`, who created which username with which
-  role) states it completely.
+  written justification → append-only audit log. **Two exceptions**
+  (CLAUDE.md → Hard Rules → Auth): CREATING an account carries none
+  (`mmarin` 2026-09-23) — its row (`user.create`, who created which username
+  with which role) states it completely; and CANCELLING an analysis carries
+  none (`mmarin` 2026-09-28, phase 12: fast, without friction) — its rows
+  (`analysis.cancel.request`, `analysis.cancel`) name who and when, and nothing
+  is lost that re-sending the code does not restore.
 - An admin never administers their own account (role, status, password —
   `cannot_administer_self`), and a change that would leave the factory with no
   enabled admin is refused, also when two admins act on each other at once

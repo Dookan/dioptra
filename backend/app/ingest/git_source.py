@@ -15,6 +15,7 @@ import subprocess
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from app.core.process import Ending, StopCheck, Stopped, run_stoppable
 from app.ingest.errors import ForbiddenHost, InvalidRepositoryUrl, RepoUnreachable
 
 ALLOWED_SCHEMES = frozenset({"https"})
@@ -69,8 +70,19 @@ def validate_repository_url(url: str, *, resolve: bool = True) -> str:
     return url
 
 
-def shallow_clone(url: str, destination: Path, *, timeout_seconds: int) -> None:
-    """Clone with depth 1, redirects disabled, no credential helpers, bounded time."""
+def shallow_clone(
+    url: str,
+    destination: Path,
+    *,
+    timeout_seconds: int,
+    should_stop: StopCheck | None = None,
+) -> None:
+    """Clone with depth 1, redirects disabled, no credential helpers, bounded time.
+
+    With ``should_stop`` a cancel kills the clone's whole process group
+    (``git-remote-https`` included) within seconds and raises ``Stopped``
+    (phase 12).
+    """
     validate_repository_url(url)
     git = shutil.which("git")
     if git is None:
@@ -97,17 +109,21 @@ def shallow_clone(url: str, destination: Path, *, timeout_seconds: int) -> None:
         url,
         str(destination),
     ]
+    env = {
+        "GIT_TERMINAL_PROMPT": "0",
+        "PATH": "/usr/bin:/bin",
+        "HOME": str(destination.parent),
+    }
+    if should_stop is not None:
+        _clone_stoppable(argv, destination, env, timeout_seconds, should_stop)
+        return
     try:
         completed = subprocess.run(  # noqa: S603 — argv is a fixed list, url validated above
             argv,
             capture_output=True,
             timeout=timeout_seconds,
             check=False,
-            env={
-                "GIT_TERMINAL_PROMPT": "0",
-                "PATH": "/usr/bin:/bin",
-                "HOME": str(destination.parent),
-            },
+            env=env,
         )
     except subprocess.TimeoutExpired as exc:
         shutil.rmtree(destination, ignore_errors=True)
@@ -115,3 +131,21 @@ def shallow_clone(url: str, destination: Path, *, timeout_seconds: int) -> None:
     if completed.returncode != 0:
         shutil.rmtree(destination, ignore_errors=True)
         raise RepoUnreachable(f"git exit {completed.returncode}")
+
+
+def _clone_stoppable(
+    argv: list[str],
+    destination: Path,
+    env: dict[str, str],
+    timeout_seconds: int,
+    should_stop: StopCheck,
+) -> None:
+    done = run_stoppable(argv, timeout_seconds=timeout_seconds, should_stop=should_stop, env=env)
+    if done.ending is not Ending.EXITED or done.returncode != 0:
+        shutil.rmtree(destination, ignore_errors=True)
+    if done.ending is Ending.STOPPED:
+        raise Stopped("clone")
+    if done.ending is Ending.TIMED_OUT:
+        raise RepoUnreachable("clone timed out")
+    if done.returncode != 0:
+        raise RepoUnreachable(f"git exit {done.returncode}")

@@ -25,10 +25,10 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.orm import Session
 
-from app.analysis.models import Analysis, AnalysisStatus
+from app.analysis.models import Analysis, AnalysisStatus, RawToolOutput, ToolRun
 from app.audit import service as audit
 from app.auth.models import SYSTEM_ACTOR
 from app.core.clock import utc_now
@@ -38,7 +38,7 @@ from app.ingest.upload import UPLOAD_NAME
 logger = logging.getLogger("dioptra.sweep")
 
 ABANDONED = "analysis_abandoned"
-TERMINAL = frozenset({AnalysisStatus.DONE, AnalysisStatus.FAILED})
+TERMINAL = frozenset({AnalysisStatus.DONE, AnalysisStatus.FAILED, AnalysisStatus.CANCELLED})
 
 
 @dataclass(frozen=True)
@@ -46,6 +46,8 @@ class AnalysisSweepStats:
     abandoned: int
     orphans_removed: int
     spools_removed: int
+    cancelled: int = 0
+    cancelled_trees_removed: int = 0
 
 
 def sweep_analyses(
@@ -55,11 +57,80 @@ def sweep_analyses(
     now = now or utc_now()
     stale_running = now - timedelta(minutes=settings.analysis_stale_minutes)
     stale_queued = now - timedelta(hours=settings.analysis_queue_retention_hours)
+    cancelled = _close_unanswered_cancels(
+        db, settings, now, now - timedelta(minutes=settings.analysis_cancel_grace_minutes)
+    )
     abandoned = _abandon_stale(db, settings, now, stale_running, stale_queued)
     orphans, spools = _clear_spools(db, settings, stale_running)
-    if abandoned or orphans or spools:
-        logger.info("analysis sweep abandoned=%s orphans=%s spools=%s", abandoned, orphans, spools)
-    return AnalysisSweepStats(abandoned, orphans, spools)
+    trees = _clear_cancelled_trees(db, settings, stale_running)
+    if abandoned or orphans or spools or cancelled or trees:
+        logger.info(
+            "analysis sweep abandoned=%s orphans=%s spools=%s cancelled=%s trees=%s",
+            abandoned,
+            orphans,
+            spools,
+            cancelled,
+            trees,
+        )
+    return AnalysisSweepStats(abandoned, orphans, spools, cancelled, trees)
+
+
+def _close_unanswered_cancels(
+    db: Session, settings: Settings, now: datetime, asked_before: datetime
+) -> int:
+    """A cancel nobody answered: the worker died. Close it CANCELLED (phase 12).
+
+    A live worker stops within seconds of the request, so a request older than
+    the grace means no worker holds the row. Same outcome as the worker's own
+    path: the run's rows deleted, the files removed, one audit row by
+    ``system`` — written only if THIS update moved the row.
+    """
+    pending = (Analysis.status == AnalysisStatus.RUNNING) & (
+        Analysis.cancel_requested_at < asked_before
+    )
+    candidates = db.execute(select(Analysis.id, Analysis.project_id).where(pending)).all()
+    closed_count = 0
+    for analysis_id, project_id in candidates:
+        closed = db.execute(
+            update(Analysis)
+            .where(Analysis.id == analysis_id, pending)
+            .values(status=AnalysisStatus.CANCELLED, current_step=None, finished_at=now)
+        )
+        if getattr(closed, "rowcount", 0) != 1:
+            continue
+        db.execute(delete(ToolRun).where(ToolRun.analysis_id == analysis_id))
+        db.execute(delete(RawToolOutput).where(RawToolOutput.analysis_id == analysis_id))
+        audit.record(
+            db, actor_username=SYSTEM_ACTOR, action="analysis.cancel", target=str(analysis_id)
+        )
+        db.commit()
+        remove_analysis_tree(settings, project_id, analysis_id)
+        closed_count += 1
+    db.commit()
+    return closed_count
+
+
+def _clear_cancelled_trees(db: Session, settings: Settings, finished_before: datetime) -> int:
+    """The files a cancel left because its tool's kill was not confirmed.
+
+    Only once the stale window has passed since the cancel — a backstop, not a
+    proof: a container whose ``docker kill`` failed has no timeout left (its
+    client was killed), so it runs until its tool ends by itself. Removing
+    the tree then needs a sick Docker daemon to matter, and the stale window
+    is the pipeline's own upper bound.
+    """
+    rows = db.execute(
+        select(Analysis.id, Analysis.project_id).where(
+            Analysis.status == AnalysisStatus.CANCELLED, Analysis.finished_at < finished_before
+        )
+    ).all()
+    removed = 0
+    for analysis_id, project_id in rows:
+        directory = _analysis_dir(settings, project_id, analysis_id)
+        if directory is not None and directory.is_dir() and not directory.is_symlink():
+            remove_analysis_tree(settings, project_id, analysis_id)
+            removed += 1
+    return removed
 
 
 def _abandon_stale(
@@ -69,7 +140,13 @@ def _abandon_stale(
     stale_running: datetime,
     stale_queued: datetime,
 ) -> int:
-    running = (Analysis.status == AnalysisStatus.RUNNING) & (Analysis.started_at < stale_running)
+    # A RUNNING row with a cancel pending is the cancel pass's: it must end
+    # CANCELLED, never FAILED `analysis_abandoned` (phase 12, invariant panel).
+    running = (
+        (Analysis.status == AnalysisStatus.RUNNING)
+        & (Analysis.started_at < stale_running)
+        & Analysis.cancel_requested_at.is_(None)
+    )
     queued = (Analysis.status == AnalysisStatus.QUEUED) & (Analysis.created_at < stale_queued)
     candidates = db.execute(
         select(Analysis.id, Analysis.project_id, Analysis.status).where(or_(running, queued))
@@ -96,7 +173,7 @@ def _abandon_stale(
             target=f"{analysis_id} was {status.value}",
         )
         db.commit()
-        _remove_tree(settings, project_id, analysis_id)
+        remove_analysis_tree(settings, project_id, analysis_id)
         abandoned += 1
     db.commit()
     return abandoned
@@ -111,7 +188,7 @@ def _analysis_dir(settings: Settings, project_id: uuid.UUID, analysis_id: uuid.U
     return directory
 
 
-def _remove_tree(settings: Settings, project_id: uuid.UUID, analysis_id: uuid.UUID) -> None:
+def remove_analysis_tree(settings: Settings, project_id: uuid.UUID, analysis_id: uuid.UUID) -> None:
     directory = _analysis_dir(settings, project_id, analysis_id)
     if directory is not None:
         shutil.rmtree(directory, ignore_errors=True)
@@ -163,9 +240,12 @@ def _clear_spools(db: Session, settings: Settings, older_than: datetime) -> tupl
                 continue
             row = db.get(Analysis, analysis_id)
             if row is None:
-                _remove_tree(settings, project_id, analysis_id)
+                remove_analysis_tree(settings, project_id, analysis_id)
                 orphans += 1
             elif row.status in TERMINAL:
+                # A cancelled row's jail is `_clear_cancelled_trees`'s, after the
+                # stale window: removing it here could pull it from under a
+                # container whose kill was not confirmed.
                 spool.unlink(missing_ok=True)
                 spools += 1
     return orphans, spools

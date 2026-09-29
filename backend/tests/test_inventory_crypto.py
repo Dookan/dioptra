@@ -152,7 +152,7 @@ def test_the_pipeline_persists_crypto_assets_beside_the_findings(
     )
     executor = FixtureExecutor()
     executor.outputs = {**FixtureExecutor.outputs, "semgrep.sarif": json.dumps(sarif).encode()}
-    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _settings: executor)
+    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _settings, **_kw: executor)
     analysis_id = uuid.UUID(_ingest(client, login(client, analyst.username)))
     assets = list(db.scalars(select(CryptoAsset).where(CryptoAsset.analysis_id == analysis_id)))
     assert [(a.primitive, a.algorithm, a.path, a.line) for a in assets] == [

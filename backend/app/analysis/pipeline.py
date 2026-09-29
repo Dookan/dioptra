@@ -15,7 +15,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import update
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from app.analysis import artefacts
@@ -47,10 +47,14 @@ from app.analysis.runners import default_runners
 from app.analysis.runners.base import WORK_DIR, ExecutionResult, Runner, RunnerSpec
 from app.analysis.runners.executor import build_executor
 from app.analysis.sbom import SbomInvalid, component_count, validate_cyclonedx
+from app.analysis.sweep import remove_analysis_tree
 from app.analysis.third_party import finding_is_third_party, is_third_party
+from app.audit import service as audit
+from app.auth.models import SYSTEM_ACTOR
 from app.core.clock import utc_now
 from app.core.config import Settings, get_settings
 from app.core.errors import AppError
+from app.core.process import StopCheck, Stopped
 from app.db.session import get_session_factory
 from app.ingest.detection import detect
 from app.ingest.git_source import shallow_clone
@@ -83,6 +87,20 @@ class _Collected:
         self.cloc: dict[str, Any] = {}
 
 
+class AnalysisCancelled(Exception):  # noqa: N818 — control flow, never shown
+    """A person asked this analysis to stop: close it CANCELLED, write nothing else.
+
+    ``kill_confirmed`` is False when the tool's container could not be
+    confirmed dead — it may still hold the jail mounted, so the files are left
+    to the sweep instead of being removed under a live mount
+    (`tasks/phase12-survey.md` §9.3).
+    """
+
+    def __init__(self, *, kill_confirmed: bool = True) -> None:
+        super().__init__("analysis cancelled")
+        self.kill_confirmed = kill_confirmed
+
+
 class AnalysisAbandoned(AppError):
     """The sweep closed this analysis while its worker still ran: stop, write nothing."""
 
@@ -100,6 +118,12 @@ def run_pipeline(analysis_id: uuid.UUID | str) -> None:
     no longer QUEUED and does nothing, and a worker still alive after the
     sweep abandoned its row can neither move it on nor turn it back into
     DONE. The report sweep has the same shape (`reports/jobs.py::_finish`).
+
+    A cancel (phase 12) is a request on the row the worker polls; the worker
+    kills its tool, discards what it wrote and closes the row CANCELLED
+    itself. The DONE transition is written in the SAME transaction as the
+    findings and requires no cancel pending, so a cancel either wins (nothing
+    is kept) or loses (the analysis is DONE) — never half of each.
     """
     identifier = uuid.UUID(str(analysis_id))
     settings = get_settings()
@@ -118,9 +142,13 @@ def run_pipeline(analysis_id: uuid.UUID | str) -> None:
             logger.error("analysis %s vanished before the job ran", identifier)
             return
         db.refresh(analysis)
+        project_id = analysis.project_id
         outcome, failure_code = AnalysisStatus.DONE, None
         try:
-            _execute(db, analysis, settings)
+            _execute(db, analysis, settings, _stop_check(identifier))
+        except AnalysisCancelled as exc:
+            _cancel(db, settings, identifier, project_id, kill_confirmed=exc.kill_confirmed)
+            return
         except AnalysisAbandoned:
             db.rollback()
             logger.warning("analysis %s was abandoned by the sweep while it ran", identifier)
@@ -131,7 +159,10 @@ def run_pipeline(analysis_id: uuid.UUID | str) -> None:
         except Exception:
             logger.exception("analysis %s crashed", identifier)
             outcome, failure_code = AnalysisStatus.FAILED, "pipeline_error"
-        _close(db, identifier, outcome, failure_code)
+        if not _close(db, identifier, outcome, failure_code) and _cancel_pending(db, identifier):
+            # The person asked to stop before the outcome landed: the request
+            # wins, whatever the outcome would have been.
+            _cancel(db, settings, identifier, project_id, kill_confirmed=True)
 
 
 def _rowcount(result: object) -> int:
@@ -139,10 +170,95 @@ def _rowcount(result: object) -> int:
     return count if isinstance(count, int) else 0
 
 
+def _stop_check(identifier: uuid.UUID) -> StopCheck:
+    """The predicate every stoppable step asks: a cancel pending, or the row left RUNNING.
+
+    A NEW short session per call: the job's own session holds uncommitted rows
+    and must not be refreshed under them.
+    """
+    factory = get_session_factory()
+
+    def should_stop() -> bool:
+        with factory() as probe:
+            row = probe.execute(
+                select(Analysis.status, Analysis.cancel_requested_at).where(
+                    Analysis.id == identifier
+                )
+            ).one_or_none()
+        if row is None:
+            return True
+        status, requested = row
+        return status is not AnalysisStatus.RUNNING or requested is not None
+
+    return should_stop
+
+
+def _cancel_pending(db: Session, identifier: uuid.UUID) -> bool:
+    requested = db.execute(
+        select(Analysis.cancel_requested_at).where(
+            Analysis.id == identifier, Analysis.status == AnalysisStatus.RUNNING
+        )
+    ).scalar_one_or_none()
+    return requested is not None
+
+
+def _stop_reason(db: Session, identifier: uuid.UUID) -> Exception:
+    """Why the row cannot move on: a person's cancel, or the sweep's abandon."""
+    if _cancel_pending(db, identifier):
+        return AnalysisCancelled()
+    return AnalysisAbandoned(str(identifier))
+
+
+def _cancel(
+    db: Session,
+    settings: Settings,
+    identifier: uuid.UUID,
+    project_id: uuid.UUID,
+    *,
+    kill_confirmed: bool,
+) -> None:
+    """RUNNING → CANCELLED: discard every row the run wrote, then its files.
+
+    The coverage rows and raw outputs of the tools that ran before the cancel
+    are deleted (`tasks/phase12-survey.md` §7.3); the analysis row and the
+    audit trail are the whole story. The audit row is written only by the
+    update that moved the row — the sweep may already have closed it after
+    the grace, and there is never a second ``analysis.cancel``.
+    """
+    db.rollback()
+    closed = db.execute(
+        update(Analysis)
+        .where(Analysis.id == identifier, Analysis.status == AnalysisStatus.RUNNING)
+        .values(status=AnalysisStatus.CANCELLED, current_step=None, finished_at=utc_now())
+    )
+    moved = _rowcount(closed) == 1
+    if moved:
+        audit.record(
+            db, actor_username=SYSTEM_ACTOR, action="analysis.cancel", target=str(identifier)
+        )
+    status = db.execute(select(Analysis.status).where(Analysis.id == identifier)).scalar()
+    if moved or status is AnalysisStatus.CANCELLED:
+        # Only a row that IS cancelled loses its rows: a row another path
+        # closed as FAILED keeps its coverage (invariant panel, phase 12).
+        db.execute(delete(ToolRun).where(ToolRun.analysis_id == identifier))
+        db.execute(delete(RawToolOutput).where(RawToolOutput.analysis_id == identifier))
+    db.commit()
+    if kill_confirmed:
+        remove_analysis_tree(settings, project_id, identifier)
+    else:
+        logger.warning("analysis %s: a tool may still run; files left to the sweep", identifier)
+    logger.info("analysis %s cancelled", identifier)
+
+
 def _close(
     db: Session, identifier: uuid.UUID, outcome: AnalysisStatus, failure_code: str | None
-) -> None:
-    """RUNNING → ``outcome``, only while the row is still RUNNING."""
+) -> bool:
+    """RUNNING → ``outcome``, only while RUNNING and no cancel is pending.
+
+    For DONE this commits the findings, SBOM, CBOM and metrics ``_execute``
+    left in the session together with the transition; when no row moved they
+    are rolled back with it. True when the row moved.
+    """
     values: dict[str, Any] = {
         "status": outcome,
         "current_step": None,
@@ -152,12 +268,19 @@ def _close(
         values["failure_code"] = failure_code
     closed = db.execute(
         update(Analysis)
-        .where(Analysis.id == identifier, Analysis.status == AnalysisStatus.RUNNING)
+        .where(
+            Analysis.id == identifier,
+            Analysis.status == AnalysisStatus.RUNNING,
+            Analysis.cancel_requested_at.is_(None),
+        )
         .values(**values)
     )
-    db.commit()
     if _rowcount(closed) == 0:
-        logger.warning("analysis %s was closed by the sweep before it finished", identifier)
+        db.rollback()
+        logger.warning("analysis %s was cancelled or swept before it finished", identifier)
+        return False
+    db.commit()
+    return True
 
 
 def _enter(db: Session, analysis: Analysis, step: str) -> None:
@@ -165,20 +288,42 @@ def _enter(db: Session, analysis: Analysis, step: str) -> None:
 
     Conditional like the transitions: once the sweep has closed the row, the
     next step raises ``AnalysisAbandoned`` and the job stops instead of
-    running the remaining tools for an analysis nobody will read.
+    running the remaining tools for an analysis nobody will read; once a
+    person asked to stop, it raises ``AnalysisCancelled``.
     """
     entered = db.execute(
         update(Analysis)
-        .where(Analysis.id == analysis.id, Analysis.status == AnalysisStatus.RUNNING)
+        .where(
+            Analysis.id == analysis.id,
+            Analysis.status == AnalysisStatus.RUNNING,
+            Analysis.cancel_requested_at.is_(None),
+        )
         .values(current_step=step)
     )
     db.commit()
     if _rowcount(entered) == 0:
-        raise AnalysisAbandoned(str(analysis.id))
+        raise _stop_reason(db, analysis.id)
     db.refresh(analysis)
 
 
-def _execute(db: Session, analysis: Analysis, settings: Settings) -> None:
+def _execute(
+    db: Session, analysis: Analysis, settings: Settings, should_stop: StopCheck | None = None
+) -> None:
+    """Acquire, run every tool, normalise. Leaves the final rows UNCOMMITTED.
+
+    ``run_pipeline`` commits them with the DONE transition (§3.4 of the
+    phase-12 survey). A ``Stopped`` from the clone or the extraction, and a
+    run the cancel killed, become ``AnalysisCancelled``.
+    """
+    try:
+        _execute_steps(db, analysis, settings, should_stop)
+    except Stopped:
+        raise _stop_reason(db, analysis.id) from None
+
+
+def _execute_steps(
+    db: Session, analysis: Analysis, settings: Settings, should_stop: StopCheck | None
+) -> None:
     if analysis.workspace_path is None:
         message = "analysis has no workspace"
         raise AppError(message)
@@ -191,12 +336,15 @@ def _execute(db: Session, analysis: Analysis, settings: Settings) -> None:
     acquired = False
     if analysis.source_kind is SourceKind.GIT:
         shallow_clone(
-            analysis.source_ref, workspace, timeout_seconds=settings.git_clone_timeout_seconds
+            analysis.source_ref,
+            workspace,
+            timeout_seconds=settings.git_clone_timeout_seconds,
+            should_stop=should_stop,
         )
         acquired = True
     elif analysis.source_kind is SourceKind.ZIP:
         try:
-            extract_upload(workspace, settings)
+            extract_upload(workspace, settings, should_stop=should_stop)
         except Exception:
             # Nothing of a refused archive stays on disk; the row keeps the
             # typed failure code (`run_pipeline`).
@@ -214,7 +362,7 @@ def _execute(db: Session, analysis: Analysis, settings: Settings) -> None:
     out_dir = workspace.parent / "out"
     out_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     settings = _stage_rules(settings, workspace.parent)
-    executor = build_executor(settings)
+    executor = build_executor(settings, should_stop=should_stop)
     # Both spellings of the jail: a tool may print the path as given or resolved.
     collected = _Collected((WORK_DIR, str(workspace), str(workspace.resolve())))
 
@@ -235,10 +383,12 @@ def _execute(db: Session, analysis: Analysis, settings: Settings) -> None:
             continue
         spec = runner.spec(settings, workspace=workspace, out_dir=out_dir)
         result = executor.run(spec, workspace=workspace, out_dir=out_dir)
+        _raise_if_cancelled(db, analysis, result)
         _record(db, analysis, runner, runner.name, spec, result, collected)
         history_spec = _history_spec(runner, settings, workspace, out_dir)
         if history_spec is not None:
             history = executor.run(history_spec, workspace=workspace, out_dir=out_dir)
+            _raise_if_cancelled(db, analysis, history)
             _record(
                 db, analysis, runner, f"{runner.name}-history", history_spec, history, collected
             )
@@ -376,7 +526,17 @@ def _execute(db: Session, analysis: Analysis, settings: Settings) -> None:
             commented_code_files=scan_commented_code(workspace),
         )
     )
-    db.commit()
+    # NOT committed here: `_close` commits these rows with the DONE transition.
+
+
+def _raise_if_cancelled(db: Session, analysis: Analysis, result: ExecutionResult) -> None:
+    """A run the cancel killed is no result: stop before it is recorded (§1.4)."""
+    if not result.cancelled:
+        return
+    reason = _stop_reason(db, analysis.id)
+    if isinstance(reason, AnalysisCancelled):
+        raise AnalysisCancelled(kill_confirmed=result.kill_confirmed)
+    raise reason
 
 
 def _scan_artefacts(db: Session, analysis: Analysis, workspace: Path) -> list[NormalizedFinding]:

@@ -261,7 +261,7 @@ class CutExecutor(FixtureExecutor):
 @pytest.fixture
 def cut_executor(monkeypatch: pytest.MonkeyPatch) -> CutExecutor:
     executor = CutExecutor()
-    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _settings: executor)
+    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _settings, **_kw: executor)
     return executor
 
 

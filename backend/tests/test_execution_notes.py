@@ -121,7 +121,7 @@ class NotedExecutor(FixtureExecutor):
 def test_the_coverage_row_carries_the_note_and_stays_ran(
     client: TestClient, analyst: User, db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _s: NotedExecutor())
+    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _s, **_kw: NotedExecutor())
     headers = login(client, analyst.username)
     analysis = db.get(Analysis, uuid.UUID(_ingest(client, headers)))
     assert analysis is not None
@@ -215,7 +215,9 @@ class RecordingExecutor(FixtureExecutor):
 def test_the_raw_row_and_the_coverage_row_carry_the_run_as_it_was(
     client: TestClient, analyst: User, db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _s: RecordingExecutor())
+    monkeypatch.setattr(
+        "app.analysis.pipeline.build_executor", lambda _s, **_kw: RecordingExecutor()
+    )
     analysis = db.get(Analysis, uuid.UUID(_ingest(client, login(client, analyst.username))))
     assert analysis is not None
     runs = {run.tool: run for run in analysis.tool_runs}

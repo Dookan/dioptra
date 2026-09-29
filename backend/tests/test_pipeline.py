@@ -70,7 +70,7 @@ def login(client: TestClient, username: str) -> dict[str, str]:
 @pytest.fixture
 def fixture_executor(monkeypatch: pytest.MonkeyPatch) -> FixtureExecutor:
     executor = FixtureExecutor()
-    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _settings: executor)
+    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _settings, **_kw: executor)
     return executor
 
 
@@ -489,7 +489,7 @@ def test_tool_paths_are_relative_to_the_tree_root_end_to_end(
             return ExecutionResult(ToolStatus.FAILED, 2, "boom", None, False, 1, "exit 2")
 
     executor = RootedExecutor()
-    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _settings: executor)
+    monkeypatch.setattr("app.analysis.pipeline.build_executor", lambda _settings, **_kw: executor)
     headers = login(client, analyst.username)
     analysis_id = _ingest(client, headers)
 

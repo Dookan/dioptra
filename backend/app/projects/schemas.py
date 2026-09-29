@@ -118,6 +118,11 @@ class AnalysisOut(BaseModel):
     finished_at: datetime | None
     #: Only while RUNNING; ``analysis/progress.py``.
     progress: ProgressOut | None = None
+    #: A person asked this RUNNING analysis to stop; its worker is on it (phase 12).
+    cancel_requested: bool = False
+    #: Who sent the code: the screen offers the cancel to them and to an admin
+    #: (the server decides, ``analysis/cancel.py::may_cancel``).
+    created_by_id: uuid.UUID | None = None
     #: Every finding by severity, verdicts ignored.
     finding_counts: dict[str, int] = Field(default_factory=dict)
     #: What the report prints: false positives left out (mirrors `Finding.in_report`).

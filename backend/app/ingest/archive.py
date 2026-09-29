@@ -15,9 +15,13 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import BinaryIO
 
+from app.core.process import StopCheck, Stopped
 from app.ingest.errors import InvalidArchive, TooManyEntries, ZipBomb, ZipSlipDetected, ZipTooLarge
 
 _CHUNK = 1024 * 1024
+#: A stoppable extraction (phase 12) asks every this many entries or bytes.
+STOP_EVERY_ENTRIES = 1000
+STOP_EVERY_BYTES = 64 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -57,18 +61,31 @@ def _safe_relative(name: str) -> PurePosixPath:
     return path
 
 
-def extract_zip(source: BinaryIO, jail: Path, limits: ExtractionLimits) -> ExtractionReport:
-    """Extract ``source`` under ``jail``. The jail must not exist yet."""
+def extract_zip(
+    source: BinaryIO,
+    jail: Path,
+    limits: ExtractionLimits,
+    *,
+    should_stop: StopCheck | None = None,
+) -> ExtractionReport:
+    """Extract ``source`` under ``jail``. The jail must not exist yet.
+
+    ``should_stop`` is asked every ``STOP_EVERY_ENTRIES`` entries or
+    ``STOP_EVERY_BYTES`` written; a yes raises ``Stopped`` and the jail is
+    removed like on any other failure (phase 12). The guards do not change.
+    """
     jail = jail.resolve()
     jail.mkdir(parents=True, exist_ok=False, mode=0o700)
     try:
-        return _extract(source, jail, limits)
+        return _extract(source, jail, limits, should_stop)
     except Exception:
         shutil.rmtree(jail, ignore_errors=True)
         raise
 
 
-def _extract(source: BinaryIO, jail: Path, limits: ExtractionLimits) -> ExtractionReport:
+def _extract(
+    source: BinaryIO, jail: Path, limits: ExtractionLimits, should_stop: StopCheck | None
+) -> ExtractionReport:
     try:
         archive = zipfile.ZipFile(source)
     except (zipfile.BadZipFile, OSError) as exc:
@@ -88,7 +105,10 @@ def _extract(source: BinaryIO, jail: Path, limits: ExtractionLimits) -> Extracti
         written = 0
         files = 0
         skipped = 0
-        for entry in entries:
+        asked_at = 0
+        for index, entry in enumerate(entries):
+            if should_stop is not None and index % STOP_EVERY_ENTRIES == 0 and should_stop():
+                raise Stopped("extraction")
             relative = _safe_relative(entry.filename)
             if _is_special(entry):
                 skipped += 1
@@ -108,6 +128,11 @@ def _extract(source: BinaryIO, jail: Path, limits: ExtractionLimits) -> Extracti
                             # The header lied about the size: the stream is the truth.
                             raise ZipBomb("streamed bytes exceed the cap")
                         out.write(chunk)
+                        if should_stop is not None and written - asked_at >= STOP_EVERY_BYTES:
+                            # One member can be gigabytes: ask inside it too.
+                            asked_at = written
+                            if should_stop():
+                                raise Stopped("extraction")
             except (zipfile.BadZipFile, RuntimeError, EOFError) as exc:
                 # RuntimeError covers encrypted members; we never take a password.
                 raise InvalidArchive(f"cannot read entry: {exc.__class__.__name__}") from exc

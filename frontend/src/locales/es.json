@@ -103,7 +103,8 @@
       "sbomInvalid": "El inventario de componentes generado no es válido.",
       "normalization": "La salida de una herramienta no se pudo interpretar.",
       "noToolRan": "Ninguna herramienta de análisis pudo ejecutarse. Revisa la instalación.",
-      "abandoned": "El análisis se detuvo sin terminar: el proceso que lo ejecutaba se cayó o la cola lo perdió. Vuelve a enviar el código."
+      "abandoned": "El análisis se detuvo sin terminar: el proceso que lo ejecutaba se cayó o la cola lo perdió. Vuelve a enviar el código.",
+      "notCancellable": "Este análisis ya terminó; solo se puede cancelar uno en cola o en curso."
     },
     "report": {
       "renderFailed": "No se pudo generar el reporte.",
@@ -213,7 +214,17 @@
       "queued": "En cola",
       "running": "Analizando",
       "done": "Terminado",
-      "failed": "Falló"
+      "failed": "Falló",
+      "cancelled": "Cancelado"
+    },
+    "cancel": {
+      "button": "Cancelar el análisis",
+      "title": "¿Cancelar el análisis?",
+      "body": "Se detiene lo que esté en curso y se borra la copia del código. El análisis queda como cancelado; puedes volver a enviar el código cuando quieras.",
+      "confirm": "Cancelar el análisis",
+      "back": "Volver",
+      "requested": "Cancelando… la herramienta en curso se detiene en unos segundos.",
+      "done": "Se canceló este análisis el {{date}}. Vuelve a enviar el código cuando quieras."
     },
     "tool": {
       "ran": "ejecutada",
@@ -848,6 +859,8 @@
       "analysis.ingest.zip": "subió el código de un sistema (ZIP)",
       "analysis.ingest.git": "clonó el código de un sistema (git)",
       "analysis.abandon": "cerró un análisis que se detuvo sin terminar",
+      "analysis.cancel.request": "pidió cancelar un análisis",
+      "analysis.cancel": "canceló un análisis",
       "finding.verdict.confirmed": "confirmó un hallazgo como real",
       "finding.verdict.false_positive": "descartó un hallazgo como falso positivo",
       "report.edit": "editó una sección del reporte",
